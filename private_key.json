@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "cem-ee-utility",
+  "private_key_id": "9b7338457fd83ac3cd446d6805e6ec9126adc008",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC84XCBekDrDPBu\nY75OY4iF28v1u7aNZb3vIVHVBHFVvjdGKPJUf3XVWddSa9RhcFrIUIxX4Uh2vmiz\ncr/Nmm1/oH5UEWnmoQ2zHw5PWjuQL7J/npDh+2DsFhcOCo1JyKQqspMhfP9g3UN/\n7mZaTloy5FuuYirgPn8fn85yYVWGDLcfc6fAxndoyD/zxBH9QoZ8uUX472YWCn0h\n+fvhZMzsUG48lvBMdWjJNkC+d7H3+yAFrPrDQoxx6LbFVLRQLdP26KMH7NDAw/kI\nDz9sLVnxNZpz6pkOOfmIp5NUREoJXqW+jSrMsZRo8Mi2CTyl9rD93ooPrdIphIAc\na1JweRzXAgMBAAECggEAAwMBPT9Ky7SwHMKAZVWW9rNzhB6TIZwOtEJuwJvKhth6\nnybF/mzt3xIIqerIPymAeRM3uasA8cvFdZ8NyeR9fHx9py+D5caJpmKHYuKIcpsg\nGILZwpC0ke8kPPgUGqoVXAzu5ajNlajRi7escCIxtAAKKjSshFjaxBFTRGWi7Hk+\nZ5srk7oIue8R/w0oxTUWmW+hHboZxmkDo+YfQ6bAlZBNPwvP85urBQL56WqYX2tC\ndTjSmp0+d9DgJUpSufqoNprySI3N0d+BHgNSvMabTkMegwv+pufIr0NtPI1JvrME\nxMrq4XuRCIl6fX2P7lZWDQr2R5+DH9aEkZkL6sFDuQKBgQDp6+2AJrKSsNhAvjv4\nd5dOqD/kHYBoIUhkRoTD1It3zT67YfZYuWQV/aD2Cv3UevFkOV1SjKZXdIOvaPtu\n/58yyMJQ8Zt50pHXSkENUQY3jh/kPUetREp8GuRh2ayOS2Xwg+hFEe178A6poU5j\nVGejIcla/5IE8GRLFTkMfZ0KswKBgQDOtThz0I7CrLfqHIGHbTSybz41LymKcnuI\nGQFOJ01kuPEp08Dt8rOWu2pwk4FEIUMWkPVNtco+CgyaD45tK/Y1FODGVAfBVEV8\nvuwk2mUX4pz+cNEM4pJBJy6dhMDRDt8dopdCO4OKXFc2mzV6iZfHNriA/I+8uVYA\nkywF0EYHTQKBgQCir3WW2dL52EoeBO/aZvnxN2xv7uCeCv+41Z6CP7Dbmf/V/FSC\n8jScYq9uTsin3PVDGe5Aehc53Yu0E9RCJz+F5z/VYaMav4q0ay0A4Ofs/UhKyR+v\nbj5LP7y0HNo4gFGeS27fko9S0eqwqMHGrS4Cs33BbtsT2kg2O8VYXYg5pwKBgQCl\npFjBjf3oiIm0g/VUNbHFzxkVe16ZgBX3wLnoC9yb+wveTb7LrvI0tqib38f1dYYS\nPkUkaanQPzNL/W1PlKvua3WX2FyCkupABaqr+YqLMmBGENeksKcsqJ5VQb1VicpH\nMDRvscs+A7MrogKf2ESVMgd17W2teQMu4MClQ/np/QKBgF9Ncq3X/3oehAMeZCet\nmNHmcFVSZdTmAR8edZ3hlNOiITqRvXLp/S8py5cKOWKUiBhii4gaQc6ciXZGLhrU\npKxslqP8N93jZni6f9uLDexDulQS1yUQcqG+iWCpchWrV0LNLv9tEki6HhVJOycd\nTyFBk/mjskR/VacRqreDVYhY\n-----END PRIVATE KEY-----\n",
+  "client_email": "cem-ee-utility@cem-ee-utility.iam.gserviceaccount.com",
+  "client_id": "115450066868893233651",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/cem-ee-utility%40cem-ee-utility.iam.gserviceaccount.com"
+}
