@@ -10,4 +10,4 @@ _dist/
 
 # server side compiles files #
 ##############################
-server/C/_build
+server/C/_build/
