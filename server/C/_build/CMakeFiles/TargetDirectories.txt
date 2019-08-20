@@ -1,5 +1,0 @@
-C:/Users/haile/Documents/GEE/webApp/server/C/_build/CMakeFiles/bmi_cem.dir
-C:/Users/haile/Documents/GEE/webApp/server/C/_build/CMakeFiles/bmi_cem-static.dir
-C:/Users/haile/Documents/GEE/webApp/server/C/_build/CMakeFiles/INSTALL.dir
-C:/Users/haile/Documents/GEE/webApp/server/C/_build/CMakeFiles/ALL_BUILD.dir
-C:/Users/haile/Documents/GEE/webApp/server/C/_build/CMakeFiles/ZERO_CHECK.dir
