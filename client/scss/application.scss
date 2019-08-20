@@ -1,0 +1,176 @@
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: "Raleway", sans-serif;
+  background-color: #efefef;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* header and progress bar */
+.header-container {
+    height: 15%;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+.header {
+    color: #fff!important;
+    background-color: #000!important;
+    z-index: 4;
+    width: 98%;
+    padding: 1%;
+}
+
+.progress-bar {    
+    color: #000!important;
+    width: 100%;
+    margin-top: 8px;
+}
+
+.tile {
+    color: #fff;
+    width: 23%;
+    float:left;
+    margin: 2px 0.5%;
+    text-align: center;
+    border-width: 2px;
+    border-style: outset;
+}
+
+.tile-inner {
+    padding: 5px;
+}
+
+.tile-red {
+    background-color: #f44336;
+    border-color: #f44336;
+}
+
+.tile-blue {
+    background-color: #2196F3;
+    border-color: #2196F3;
+}
+
+.tile-green {
+    background-color: #009688;
+    border-color: #009688;
+}
+
+.tile-yellow {
+    background-color: #ff9800;
+    border-color: #ff9800;
+}
+
+/* map */
+.app-container{
+    height: 78%;
+    width: 98%;
+    padding: 1%;
+}
+
+.map-container {
+    height: 60%;
+    width: 60%;
+    background-color: #fff;
+    float: left;
+}
+
+#map {
+    height: 100%;
+}
+
+.tab-view-container {    
+    height: 60%;
+    width: 38%;
+    float: left;
+    background-color: #fff;
+    margin: 0 1%;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: bold;
+    display: inline;
+    padding-top: 10px;
+}
+
+.grid-content {
+    padding: 15px;
+}
+
+.button {    
+    font-family: "Raleway", sans-serif;
+    font-size: 16px;
+    padding: 5px;
+    margin: 5px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.button[disabled] {
+    cursor: default;
+}
+
+.input {
+    margin: 0px 10px;
+    font-size: 14px;
+}
+
+.tab:hover {
+    cursor: pointer;
+}
+
+.tab[selected] {
+    cursor: default;
+    border-style: inset;
+    filter: brightness(80%);
+}
+
+.bounds-table {
+    font-size: 16px;
+}
+
+/*Sign in stuff*/
+.hidden {
+    display: none;
+  }
+.g-sign-in .button {
+    display: inline-block;
+    background: #4285f4;
+    color: white;
+    width: 190px;
+    border-radius: 5px;
+    white-space: nowrap;
+}
+.g-sign-in .button:hover {
+    cursor: pointer;
+}
+.g-sign-in .label {
+    font-weight: bold;
+}
+.g-sign-in .icon {
+    background: url('extern/resources/g-icon.png') transparent 5px 50% no-repeat;
+    display: inline-block;
+    vertical-align: middle;
+    width: 42px;
+    height: 42px;
+    border-right: #2265d4 1px solid;
+}
+.g-sign-in .button-text {
+    display: inline-block;
+    vertical-align: middle;
+    padding-left: 42px;
+    padding-right: 42px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+/* footer */
+.footer {
+    width: 100%;
+    color: #fff;
+    background-color: #616161;
+}

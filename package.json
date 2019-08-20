@@ -1,0 +1,32 @@
+{
+  "name": "cem-util",
+  "version": "1.0.0",
+  "description": "",
+  "main": "application.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haileyajohnson/cem-utility.git"
+  },
+  "author": "haileyajohnson",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/haileyajohnson/cem-utility/issues"
+  },
+  "homepage": "https://github.com/haileyajohnson/cem-utility#readme",
+  "devDependencies": {
+    "autoprefixer": "^9.6.1",
+    "cssnano": "^4.1.10",
+    "del": "^5.0.0",
+    "gulp": "^4.0.2",
+    "gulp-clean": "^0.4.0",
+    "gulp-concat": "^2.6.1",
+    "gulp-postcss": "^8.0.0",
+    "gulp-replace": "^1.0.0",
+    "gulp-sass": "^4.0.2",
+    "gulp-sourcemaps": "^2.6.5",
+    "gulp-uglify-es": "^1.0.4"
+  }
+}

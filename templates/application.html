@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="utf-8">
+    <title>CEM wrapper application</title>    
+    <!-- load Google fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">    
+    <!-- Load JQuery from CDN -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+    <script>
+      var map;
+      function initMap() {}
+    </script>
+    
+    <!-- Load local compiled OpenLayers -->
+    <script src="{{ url_for('static', filename='extern/js/ol.js') }}"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='extern/css/ol.css') }}" type="text/css">
+    <!-- Load local compiled Earth Engine JavaScript client library. -->
+    <script src="{{ url_for('static', filename='extern/js/ee_api_js.js') }}"></script>
+    <!-- Load application -->
+    {% for filename in distDir %}    
+    <script src="{{ url_for('static', filename=filename) }}"></script>
+    {% endfor %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='application.css') }}">
+
+  </head>
+  <!-- initialize app on page load -->
+  <body onload="loadApp()">
+        <!-- Top container -->
+        <div class="header-container">
+            <div class="header" style="z-index:4">
+                <span>The Coastline Evolution Model utility</span>
+            </div>
+
+            <!-- Progress bar -->
+            <div class="progress-bar">
+            
+                <div class="tile-row">
+                    <div class="tile tile-red tab" id="gridTab">
+                        <div class="tile-inner">Grid</div>
+                    </div>
+                    <div class="tile tile-blue tab" id="waveTab">
+                        <div class="tile-inner">Wave Climate</div>
+                    </div>
+                    <div class="tile tile-green tab" id="condsTab">
+                        <div class="tile-inner">Init. Conds.</div>
+                    </div>
+                    <div class="tile tile-yellow tab" id="runTab">
+                        <div class="tile-inner">Run</div>
+                    </div>
+                </div>
+            
+            </div>
+        </div>
+
+        <!-- application -->
+        <div class="app-container">
+            <div class="map-container">
+                <div id="map" class="map"></div>
+            </div>
+            <div class="tab-view-container">
+                <div class="grid-tab-view">
+                    <div class="grid-content">
+                        <div class="g-sign-in hidden">
+                            <span class="label">Sign in with:</span>
+                            <div class="button">
+                                <span class="icon"></span>
+                                <span class="button-text">Google</span>
+                            </div>
+                        </div>
+                        <div class="section-title">Rotation:</div>
+                        <input class="input" type="number" name="rotation" min="-360" max="360">
+                        <form class="grid-selection-area">
+                            <br>
+                            <div class="section-title">Bounds:</div>
+                            <table class="bounds-table">
+                            <thead><th/><th>Longitude</th><th> Latitude</th></thead>
+                            <tr><td> Point 1</td>
+                                <td><input class="input coord" type="number" name="lon1" min="-180" max="180"></td>
+                                <td><input class="input coord" type="number" name="lat1" min="-90" max="90"></td>
+                            </tr>
+                            <tr><td>Point 2</td>
+                                <td><input class="input coord" type="number" name="lon2" min="-180" max="180"></td>
+                                <td><input class="input coord" type="number" name="lat2" min="-90" max="90"></td>
+                            </tr>
+                            </table>
+                            <input type="button" class="button draw-button" onclick="onDrawClicked()" value="Select on map">
+                        </form>                    
+                        <div class="section-title">Num rows:</div>
+                        <input class="input" type="number" name="numRows" min="0" max="1000">                     
+                        <div class="section-title">Num cols:</div>
+                        <input class="input" type="number" name="numCols" min="0" max="1000">
+                        <br>
+                        <input type="button" class="button go-button" onclick="onGoClicked()" value="Submit">
+                        <input type="button" class="button clear-button" onclick="onClear()" value="Clear">
+                    </div>
+                </div>
+                <div class="wave-tab-view"></div>
+                <div class="conds-tab-view"></div>
+                <div class="run-tab-view"></div>
+            </div>
+            <input type="button" class="button save-button" onclick="onSave()" value="Save config">
+            <input type="button" class="button load-button" onclick="onLoad()" value="Load config">
+            <input id="file-input" type="file" name="name" style="display: none;" accept=".json" onchange="loadConfig()"/>
+        </div>
+
+        <!-- footer -->
+        <div class="footer"></div> 
+
+  </body>
+</html>
