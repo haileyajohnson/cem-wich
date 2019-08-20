@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\haile\Documents\GEE\webApp\server\C\_build\CMakeFiles\2f715c6e85e3feb2cf383e88aa99a04a\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{5DFF7036-F809-3E31-B9AA-300697B30604}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
