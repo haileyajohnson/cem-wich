@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\Users\haile\Documents\GEE\webApp\server\C\bmi\bmi_cem.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\haile\Documents\GEE\webApp\server\C\cem\cem.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\haile\Documents\GEE\webApp\server\C\cem\BeachGrid.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\haile\Documents\GEE\webApp\server\C\cem\BeachNode.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\haile\Documents\GEE\webApp\server\C\cem\sedtrans.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\haile\Documents\GEE\webApp\server\C\cem\WaveClimate.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="C:\Users\haile\Documents\GEE\webApp\server\C\cem\utils.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\haile\Documents\GEE\webApp\server\C\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{FD9E6B1E-12CA-3495-B8F7-352F02715E9E}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
