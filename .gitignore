@@ -1,0 +1,13 @@
+# settings files #
+##################
+node_modules/
+.vs/
+.vscode/
+
+# client side dist files #
+##########################
+_dist/
+
+# server side compiles files #
+##############################
+server/C/_build
