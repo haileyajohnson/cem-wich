@@ -19,7 +19,7 @@
     3. `cmake ..`
     4. `make`
     5. `make install`
-    6. verify `bmi_cem.dll` or `bmi_cem.so` has been installed under `server\C\_build
+    6. verify `bmi_cem.dll` or `bmi_cem.so` has been installed under `server\C\_build`
 
 2. Package the client-side application using gulp:  
     The application can be packaged either for production or debugging.
