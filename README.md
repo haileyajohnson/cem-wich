@@ -8,7 +8,7 @@
     2. `conda env create -f environment.yml` to create the environment
     3. `conda activate cem-util` to activate the environment
 
-2. Tha Javascript distribution is managed using gulpjs. To set install gulp fuctions
+2. Tha Javascript distribution is managed using gulpjs. To set install gulp fuctions:
     1. `npm install`
 
 ## Build
