@@ -69,6 +69,10 @@ enum Debug {
 
 enum Debug g_debug;
 
+int add_nums(int a, int b) {
+	return a + b;
+}
+
 int cem_initialize(void)
 {
   srand(time(NULL));

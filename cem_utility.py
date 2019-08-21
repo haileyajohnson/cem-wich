@@ -1,10 +1,8 @@
 from flask import Flask, render_template
 app = Flask(__name__, static_folder="_dist")
-import ee
-import sys
-import os
 
-DEBUG = False
+import ee
+import os
 
 @app.route("/")
 def startup():
@@ -20,6 +18,4 @@ def startup():
     return render_template("application.html", distDir=distDir)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and str(sys.argv[1]) == "-debug":
-        DEBUG = False
     app.run(host="localhost", port=8080)

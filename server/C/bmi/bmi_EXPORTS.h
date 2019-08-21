@@ -2,7 +2,7 @@
 #ifndef bmi_EXPORT_H
 #define bmi_EXPORT_H
 
-#ifdef SHARED_EXPORTS_BUILT_AS_STATIC
+#ifdef bmi_BUILT_AS_STATIC
 #  define bmi_EXPORT
 #  define BMI_CEM_NO_EXPORT
 #else
