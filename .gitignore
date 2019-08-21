@@ -11,3 +11,4 @@ _dist/
 # server side compiles files #
 ##############################
 server/C/_build/
+server/C/bmi/bmi_EXPORTS.h
