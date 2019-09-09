@@ -4,10 +4,16 @@ function MapInterface() {
         box: null,
         polyGrid: [],
         cemGrid: [],
+
+        shorelineSource: null,
         boundsSource: null,
         gridSource: null,
         modelSource: null,
         imLayer: null,
+
+        shorelineFeaturesInExtent: [],
+        transectsInExtent: [],
+
         drawingMode: false,
         draw: null,
         numCols: 100,
@@ -80,6 +86,23 @@ function MapInterface() {
 
             // Return the mean value corresponding to the maximum BSS.
             return means.sort(bss).get([-1]);
+        },
+
+        getTransects: function () {
+            //var features = this.shorelineSource.getFeatures();
+            var tempSource= new ol.source.Vector();
+            var features = [];
+
+            this.shorelineSource.forEachFeatureIntersectingExtent(this.box.getExtent(), (f) => {
+                features.push(f);
+            });
+
+            tempSource.addFeatures(features);
+            
+            var shorelineLayer = new ol.layer.Vector({
+                source: tempSource
+            });
+            this.map.addLayer(shorelineLayer);
         },
 
         drawGrid: function() {
@@ -160,13 +183,23 @@ function MapInterface() {
             this.map.getView().on('change:rotation', () => {
                 this.rotation = this.map.getView().getRotation();
                 onRotationChange(this.rotation);
-            });            
+            });
+            
+            // create shoreline source
+            this.shorelineSource = new ol.source.Vector({
+                url: '_dist/extern/resources/10m_coastline.kml',
+                format: new ol.format.KML()
+            });
+            var shorelineLayer = new ol.layer.Vector({
+                source: this.shorelineSource
+            });
+            this.map.addLayer(shorelineLayer);
 
             // create box source
             this.boundsSource = new ol.source.Vector({});           
             
             // create grid source
-             this.gridSource = new ol.source.Vector({});      
+            this.gridSource = new ol.source.Vector({});      
              
             // create CEM source
             this.modelSource = new ol.source.Vector({});   
@@ -209,13 +242,14 @@ function MapInterface() {
                 that.box = feature.getGeometry();
                 onBoxChange();
                 this.drawGrid();
+                this.getTransects();
                 this.toggleDrawMode();
             });
             
             // add layer
             this.map.addLayer(new ol.layer.Vector({
                 source: this.boundsSource
-            }));     
+            }));
         },
 
         getRectangleVertices: function(first, last) {
@@ -288,7 +322,6 @@ function MapInterface() {
             var smooth = water.clip(poly);
 
             // show on map
-            //var that = this;
             smooth.getThumbURL({ dimensions: [800, 800], region: poly.toGeoJSONString() }, (url) => { 
                 this.displayPhoto(url);
                 this.createGrid(smooth);
