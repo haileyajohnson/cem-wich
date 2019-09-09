@@ -10,6 +10,7 @@ function MapInterface() {
         gridSource: null,
         modelSource: null,
         imLayer: null,
+        coastlineSource:null,
 
         shorelineFeaturesInExtent: [],
         transectsInExtent: [],
@@ -202,7 +203,10 @@ function MapInterface() {
             this.gridSource = new ol.source.Vector({});      
              
             // create CEM source
-            this.modelSource = new ol.source.Vector({});   
+            this.modelSource = new ol.source.Vector({}); 
+            
+            // create coastline source
+            this.coastlineSource = new ol.source.Vector({});
 
             // create Bing Maps layer
             var bingLayer = new ol.layer.Tile({
@@ -296,10 +300,6 @@ function MapInterface() {
             var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
 
             var water_bands = ['B3', 'B5'];
-            var water_threshold = 0.4;
-            var water_sigma = 1;
-
-            var ndwi_hist_ymax = 10;
             var ndwi = composite.normalizedDifference(water_bands);
 
             var values = ndwi.reduceRegion({
@@ -310,22 +310,50 @@ function MapInterface() {
             });
 
             var water = ndwi.gt(this.otsu(values.get('nd')));
-            // var water_edge = ee.Algorithms.CannyEdgeDetector(water, 0.5, 0);
+            var water_edge = ee.Algorithms.CannyEdgeDetector(water, 0.5, 1);            
+            water_edge = water_edge.gt(0);
+            var minConnectivity = 40;
+            var connectCount = water_edge.connectedPixelCount(minConnectivity, true);
+            var mask = water_edge.gt(0).and(connectCount.gte(40));
 
-            // var gaussian = ee.Kernel.gaussian({
-            //     radius: 5
-            // });
+            mask = mask.clip(poly);
+            var vects = mask.reduceToVectors({
+              geometry: poly,
+              scale: 30,
+              geometryType: 'polygon',
+              eightConnected: true,
+              bestEffort: true
+            });
 
-            // var smooth = water_edge.convolve(gaussian);
-            // var smooth = smooth.clip(poly);
+            var style = new ol.style.Style({
+                stroke: new ol.style.Stroke({
+                    color: 'black',
+                    width: 0.2
+                    }),
+            });
+            var features = vects.getInfo().features;
+            var olFeatures = [];
 
-            var smooth = water.clip(poly);
+            for (var i = 0; i < features.length; i++) {
+                var f = features[i];                
+                var coords = f.geometry.coordinates.filter(Boolean);
+                olFeatures.push(new ol.Feature({
+                    geometry: new ol.geom.LineString([coords])
+                }));
+            }
+            this.coastlineSource.addFeatures(olFeatures);
+
+            // add to map
+            var vectorLayer = new ol.layer.Vector({source: this.coastlineSource});
+            
+            vectorLayer.setZIndex(8);
+            this.map.addLayer(vectorLayer);
 
             // show on map
-            smooth.getThumbURL({ dimensions: [800, 800], region: poly.toGeoJSONString() }, (url) => { 
-                this.displayPhoto(url);
-                this.createGrid(smooth);
-            });
+            // smooth.getThumbURL({ dimensions: [800, 800], region: poly.toGeoJSONString() }, (url) => { 
+            //     this.displayPhoto(url);
+            //     //this.createGrid(smooth);
+            // });
         },
 
         /**
@@ -406,6 +434,7 @@ function MapInterface() {
             this.boundsSource.clear();
             this.gridSource.clear();
             this.modelSource.clear();
+            this.coastlineSource.clear();
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
             this.box = null;
         }
