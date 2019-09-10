@@ -111,8 +111,8 @@ function MapInterface() {
 
             var style = new ol.style.Style({
                 stroke: new ol.style.Stroke({
-                color: 'blue',
-                width: 0.3
+                    color: 'blue',
+                    width: 0.3
                 })
             });
 
@@ -328,7 +328,7 @@ function MapInterface() {
             var style = new ol.style.Style({
                 stroke: new ol.style.Stroke({
                     color: 'black',
-                    width: 0.2
+                    width: 0.25
                     }),
             });
             var features = vects.getInfo().features;
@@ -336,15 +336,22 @@ function MapInterface() {
 
             for (var i = 0; i < features.length; i++) {
                 var f = features[i];                
-                var coords = f.geometry.coordinates.filter(Boolean);
-                olFeatures.push(new ol.Feature({
-                    geometry: new ol.geom.LineString([coords])
-                }));
+                var coords = f.geometry.coordinates.filter(Boolean);//.reduce((acc, val) => acc.concat(val), []);
+                for (var j = 0; j < coords.length; j++) {
+                    olFeatures.push(new ol.Feature({
+                        geometry: new ol.geom.MultiLineString([coords[j]]),
+                        style: style
+                    }));
+                }
             }
             this.coastlineSource.addFeatures(olFeatures);
 
             // add to map
-            var vectorLayer = new ol.layer.Vector({source: this.coastlineSource});
+            var vectorLayer = new ol.layer.Vector({
+                source: this.coastlineSource,            
+                style: function(feature, resolution) {
+                    return feature.get('style');
+                }});
             
             vectorLayer.setZIndex(8);
             this.map.addLayer(vectorLayer);
