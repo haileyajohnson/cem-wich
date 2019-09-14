@@ -108,14 +108,14 @@ function MapInterface() {
             var edge3_0 = this.linspace(coords[0], coords[3], this.numRows);
 
             // add each line feature
-            for (var i = 0; i < edge1_2.length; i++) {
+            for (var i = 0; i <= this.numRows; i++) {
                 this.gridSource.addFeature(new ol.Feature({
                     geometry: new ol.geom.LineString([edge1_2[i], edge3_0[i]]),
                     style:style
                 }));
             }
 
-            for (var j = 0; j < edge0_1.length; j++) {
+            for (var j = 0; j <= this.numCols; j++) {
                 this.gridSource.addFeature(new ol.Feature({
                     geometry: new ol.geom.LineString([edge0_1[j], edge2_3[j]]),
                     style: style
@@ -133,16 +133,17 @@ function MapInterface() {
 
             // create matrix of polygons to map cem grid
             this.polyGrid = [];
-            for (var i = 0; i < edge1_2.length - 1; i++) {
+            var top_edge = this.linspace(edge3_0[0], edge1_2[0], this.numCols);
+            for (var i = 1; i <= this.numRows; i++) {
                 this.polyGrid.push([]);
-                var top_edge = this.linspace(edge3_0[i], edge1_2[i], this.numCols);
-                var bottom_edge = this.linspace(edge3_0[i+1], edge1_2[i+1], this.numCols);
-                for (var j = 0; j < top_edge.length - 1; j++) {
+                var bottom_edge = this.linspace(edge3_0[i], edge1_2[i], this.numCols);
+                for (var j = 0; j < this.numCols; j++) {
                     // grid polygon for individual cells in the row
                     var polyCoords = [top_edge[j], top_edge[j+1], bottom_edge[j+1], bottom_edge[j], top_edge[j]];
                     // add to polygon grid
-                    this.polyGrid[i][j] = polyCoords;
+                    this.polyGrid[i-1][j] = polyCoords;
                 }
+                top_edge = bottom_edge;
             }
         },
 
@@ -291,7 +292,7 @@ function MapInterface() {
             var smooth = mask.convolve(gaussian).clip(poly);
 
             smooth.getThumbURL({dimensions: [800, 800], region: poly.toGeoJSONString() }, (url) => {
-                //this.displayPhoto(url);
+                this.displayPhoto(url);
                 this.createGrid(smooth);
             })
         },
@@ -330,6 +331,7 @@ function MapInterface() {
                 })
             });
             var cemGrid = dict.getInfo();
+            //var temp = 0;
 
             // iterate all cell features
             for (var i = 0; i < cemGrid.features.length; i++) {
@@ -347,25 +349,84 @@ function MapInterface() {
                 } else {   // determine angle if frac full
                     // make sub features of top, bottom, left, and right cells halves and get means
                     var coords = feature.geometry.coordinates[0];
-                    var vScale = [0.5*(coords[0][0] - coords[3][0]), 0.5*(coords[0][1] - coords[3][1])];
-                    var hScale = [0.5*(coords[1][0] - coords[0][0]), 0.5*(coords[1][1] - coords[0][1])];
+                    var vScale = [0.5*(coords[0][0] - coords[1][0]), 0.5*(coords[0][1] - coords[1][1])];
+                    var hScale = [0.5*(coords[3][0] - coords[0][0]), 0.5*(coords[3][1] - coords[0][1])];
                     // coordinates order clockwise starting at bottom left
-                    var left = new ee.Feature( // 0, 1, 2, 3, 4
-                        new ee.Geometry.Polygon([coords [0], 
-                            [coords[0][0] + hScale[0], coords[0][1] + hScale[1]], [coords[3][0] + hScale[0], coords[3][1] + hScale[1]],
-                            coords[3], coords[4]]));
-                    var top = new ee.Feature( // 1, 2, 3, 4, 1
-                        new ee.Geometry.Polygon([coords[1], 
-                            [coords[1][0] - vScale[0], coords[1][1] - vScale[1]], [coords[4][0] - vScale[0], coords[4][1] - vScale[1]],
-                            coords[4], coords[1]]));
-                    var right = new ee.Feature( // 2, 3, 4, 1, 2
-                        new ee.Geometry.Polygon([coords[2], 
-                            [coords[2][0] - hScale[0], coords[2][1] - hScale[1]], [coords[1][0] - hScale[0], coords[1][1] - hScale[1]],
-                            coords[1], coords[2]]));
-                    var bottom = new ee.Feature( // 3, 0, 1, 2, 3
+                    var left = new ee.Feature(
+                        new ee.Geometry.Polygon([coords[0], 
+                            [coords[0][0] + hScale[0], coords[0][1] + hScale[1]], [coords[1][0] + hScale[0], coords[1][1] + hScale[1]],
+                            coords[1], coords[4]]));
+                    var top = new ee.Feature(
                         new ee.Geometry.Polygon([coords[3], 
-                            [coords[3][0] + vScale[0], coords[3][1] + vScale[1]], [coords[2][0] + vScale[0], coords[2][1] + vScale[1]],
-                            coords[2], coords[3]]));
+                            [coords[3][0] - vScale[0], coords[3][1] - vScale[1]], [coords[4][0] - vScale[0], coords[4][1] - vScale[1]],
+                            coords[4], coords[3]]));
+                    var right = new ee.Feature(
+                        new ee.Geometry.Polygon([coords[2], 
+                            [coords[2][0] - hScale[0], coords[2][1] - hScale[1]], [coords[3][0] - hScale[0], coords[3][1] - hScale[1]],
+                            coords[3], coords[2]]));
+                    var bottom = new ee.Feature(
+                        new ee.Geometry.Polygon([coords[1], 
+                            [coords[1][0] + vScale[0], coords[1][1] + vScale[1]], [coords[2][0] + vScale[0], coords[2][1] + vScale[1]],
+                            coords[2], coords[1]]));
+
+                    // var tempcoords;
+                    // if (temp == 0) { tempcoords = left.geometry().coordinates().getInfo()[0];}
+                    // else if (temp == 1) {tempcoords = top.geometry().coordinates().getInfo()[0];}
+                    // else if (temp == 2) {tempcoords = right.geometry().coordinates().getInfo()[0];}
+                    // else if (temp == 3) {tempcoords = bottom.geometry().coordinates().getInfo()[0];}
+                    // else if (temp == 4) {tempcoords = leftCoords;}
+                    // else {
+                    //     continue;
+                    // }
+                    // this.modelSource.addFeature(new ol.Feature({
+                    //     geometry: new ol.geom.Point(tempcoords[0]),
+                    //     style: new ol.style.Style({
+                    //         image: new ol.style.Circle({
+                    //             radius: 7,
+                    //             fill: new ol.style.Fill({color: 'blue'}),
+                    //             stroke: new ol.style.Stroke({
+                    //             color: [255,0,0], width: 2
+                    //             })
+                    //     })
+                    //     })
+                    // }));
+                    // this.modelSource.addFeature(new ol.Feature({
+                    //     geometry: new ol.geom.Point(tempcoords[1]),
+                    //     style: new ol.style.Style({
+                    //         image: new ol.style.Circle({
+                    //             radius: 7,
+                    //             fill: new ol.style.Fill({color: 'red'}),
+                    //             stroke: new ol.style.Stroke({
+                    //             color: [255,0,0], width: 2
+                    //             })
+                    //     })
+                    //     })
+                    // }));
+                    // this.modelSource.addFeature(new ol.Feature({
+                    //     geometry: new ol.geom.Point(tempcoords[2]),
+                    //     style: new ol.style.Style({
+                    //         image: new ol.style.Circle({
+                    //             radius: 7,
+                    //             fill: new ol.style.Fill({color: 'yellow'}),
+                    //             stroke: new ol.style.Stroke({
+                    //             color: [255,0,0], width: 2
+                    //             })
+                    //     })
+                    //     })
+                    // }));
+                    // this.modelSource.addFeature(new ol.Feature({
+                    //     geometry: new ol.geom.Point(tempcoords[3]),
+                    //     style: new ol.style.Style({
+                    //         image: new ol.style.Circle({
+                    //             radius: 7,
+                    //             fill: new ol.style.Fill({color: 'green'}),
+                    //             stroke: new ol.style.Stroke({
+                    //             color: [255,0,0], width: 2
+                    //             })
+                    //     })
+                    //     })
+                    // }));
+                    // temp = temp +1;
         
                     var subFeatures = new ee.FeatureCollection([left, top, right, bottom]);
                     // get means of sub features
@@ -374,18 +435,17 @@ function MapInterface() {
                         collection: subFeatures,
                         scale: 30
                     });
+
                     // set orientation as sub feature with max mean (most land pixels)
-                    var subFeature = subFeatures.limit(1, 'mean', false);
+                    var subFeature = subDict.sort('mean', false).limit(1);
                     // scale coordinates
                     var subCoords = subFeature.geometry().coordinates().getInfo()[0];
-                    var scale = [2*fill*(subCoords[0][0] - subCoords[3][0]), 2*fill*(subCoords[0][1] - subCoords[3][1])];
+                    var scale = [2*fill*(subCoords[3][0] - subCoords[0][0]), 2*fill*(subCoords[3][1] - subCoords[0][1])];
                     var newCoords = [subCoords[0], [subCoords[0][0] + scale[0], subCoords[0][1] + scale[1]],
-                        [subCoords[3][0] + scale[0], subCoords[3][1] + scale[1]], subCoords[3], subCoords[4]];
+                        [subCoords[1][0] + scale[0], subCoords[1][1] + scale[1]], subCoords[1], subCoords[4]];
                         
                     this.modelSource.addFeature( new ol.Feature({
-                        geometry: new ol.geom.Polygon([[coords[2], 
-                            [coords[2][0] - hScale[0], coords[2][1] - hScale[1]], [coords[1][0] - hScale[0], coords[1][1] - hScale[1]],
-                            coords[1], coords[2]]]),
+                        geometry: new ol.geom.Polygon([newCoords]),
                         style: style
                     }));
                 }
