@@ -1,3 +1,10 @@
+dirEnum = {
+    LEFT: 0,
+    UP: 1,
+    RIGHT: 2,
+    DOWN: 3
+}
+
 function MapInterface() {
     return {
         map: null,        
@@ -9,47 +16,224 @@ function MapInterface() {
         gridSource: null,
         modelSource: null,
 
-        shorelineFeaturesInExtent: [],
-        transectsInExtent: [],
-
         drawingMode: false,
         draw: null,
         numCols: 100,
         numRows:  50,
         rotation: 0,
 
-        linspace: function(start, stop, N) {
-            var difLon = stop[0] - start[0];
-            var dLon = difLon/N;
-            var difLat = stop[1] - start[1];
-            var dLat = difLat/N;
-            coords = [start];
-            for (var i = 1; i < N; i ++) {
-                coords.push([start[0] + i*dLon, start[1] + i*dLat]);
-            }
-            coords.push(stop);
-            return coords;
-        },
 
-        toggleDrawMode: function() {
-            this.drawingMode = !this.drawingMode;
-            if (this.drawingMode) {
-                $('.draw-button').addClass('selected');
-                this.boundsSource.clear();
-                this.gridSource.clear();
-                this.box = null;
-                this.map.addInteraction(this.draw);
-            }
-            else {
-                $('draw-button').removeClass('selected');
-                this.map.removeInteraction(this.draw);
-            }
+        initMap: function() {
+            // initialize earth engine
+            ee.initialize();
+
+            // create rotatable map
+            this.map = new ol.Map({
+                interactions: ol.interaction.defaults().extend([
+                    new ol.interaction.DragRotateAndZoom()
+                ]),
+                target: 'map',
+                view: new ol.View({
+                    projection: "EPSG:4326",
+                    center: [-75.5, 35.25],
+                    zoom:6
+                    // center: [0, 0],
+                    // zoom: 2
+                })
+            });
+
+            this.map.getView().on('change:rotation', () => {
+                this.rotation = this.map.getView().getRotation();
+                onRotationChange(this.rotation);
+            });
+
+            // create box source
+            this.boundsSource = new ol.source.Vector({});           
+            
+            // create grid source
+            this.gridSource = new ol.source.Vector({});      
+             
+            // create CEM source
+            this.modelSource = new ol.source.Vector({}); 
+
+            // create Bing Maps layer
+            var bingLayer = new ol.layer.Tile({
+                visible: true,
+                preload: Infinity,
+                source: new ol.source.BingMaps({
+                    key: 'Am3Erq9Ut-VwSCA-xAUa8RoLu_jFgJwrK5zu0d81AWJkBwwOEr6DSSvzbi7b70e_',
+                    imagerySet: 'aerial'
+                })
+            });
+            this.map.addLayer(bingLayer);
+
+            // craete draw function
+            var that = this;
+            geometryFunction = function (coordinates, geometry) {
+                var first = coordinates[0];
+                var last = coordinates[1];
+                var coordinates = that.getRectangleVertices(first, last);                
+                if (!geometry) {
+                    geometry = new ol.geom.Polygon([coordinates]);
+                } else {
+                    geometry.setCoordinates([coordinates]);
+                }
+                return geometry;
+            };
+
+            // add drawing interaction
+            this.draw = new ol.interaction.Draw({
+                source: that.boundsSource,
+                type: 'Circle',
+                geometryFunction: geometryFunction
+            });
+            
+            // When a drawing ends, save geometry
+            this.boundsSource.on('addfeature', (evt) => {
+                var feature = evt.feature;
+                that.box = feature.getGeometry();
+                onBoxChange();
+                this.drawGrid();
+                this.toggleDrawMode();
+            });
+            
+            // add layer
+            this.map.addLayer(new ol.layer.Vector({
+                source: this.boundsSource
+            }));
+        },        
+
+        mapTransform: function() {
+            var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
+
+            var dataset = ee.ImageCollection('LANDSAT/LE07/C01/T1').filterBounds(poly).filterDate('1999-01-01', '1999-12-31');
+            var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
+
+            var water_bands = ['B3', 'B5'];
+            var ndwi = composite.normalizedDifference(water_bands);
+
+            var values = ndwi.reduceRegion({
+                reducer: ee.Reducer.histogram(),
+                geometry: poly,
+                scale: 10,
+                bestEffort: true
+            });
+
+            var water = ndwi.gt(this.otsu(values.get('nd')));
+            var minConnectivity = 50;
+            var connectCount = water.connectedPixelCount(minConnectivity, true);
+            var land_pix = water.eq(0).and(connectCount.lt(minConnectivity));
+            var water_pix = water.eq(1).and(connectCount.lt(minConnectivity)).multiply(-1);
+            var mask = water.add(land_pix).add(water_pix).not();
+
+            var gaussian = ee.Kernel.gaussian({
+                radius: 1
+            });
+            
+            var smooth = mask.convolve(gaussian).clip(poly);
+
+            smooth.getThumbURL({dimensions: [800, 800], region: poly.toGeoJSONString() }, (url) => {
+                this.displayPhoto(url);
+            })
+            this.createGrid(smooth);
         },
 
         /**
-         * Deprecated
-         * @param {*} photoUrl 
+         * convert Otsu image into CEM input grid
+         * size numRows X numCols
          */
+        createGrid: function(image) {
+            this.cemGrid = [];
+            var features = [];
+            for (r = 0; r < this.numRows; r++) {
+                this.cemGrid.push([]);
+                for (c = 0; c < this.numCols; c++) {
+                    // create polygon feature for each cell                    
+                    features.push(new ee.Feature(new ee.Geometry.Polygon(this.polyGrid[r][c])));
+                }
+            }
+
+            var fc = new ee.FeatureCollection(features);
+                    
+            // Reduce the region. The region parameter is the Feature geometry.
+            var dict = image.reduceRegions({
+                reducer: ee.Reducer.mean(),
+                collection: fc,
+                scale: 30
+            });
+
+            var style = new ol.style.Style({
+                stroke: new ol.style.Stroke({
+                    color: 'yellow',
+                    width: 0.3
+                    }),
+                fill: new ol.style.Fill({
+                    color: [0, 0, 0, 0.3]
+                })
+            });
+            var cemGrid = dict.getInfo();
+            //var temp = 0;
+
+            // iterate all cell features
+            for (var i = 0; i < cemGrid.features.length; i++) {
+                var feature = cemGrid.features[i];
+                var fill = feature.properties.mean;
+                // skip if cell is empty
+                if (fill == 0) {
+                    continue;
+                }                
+                if (fill == 1) {  // add square if cell is full
+                    this.modelSource.addFeature( new ol.Feature({
+                        geometry: new ol.geom.Polygon(feature.geometry.coordinates),
+                        style: style
+                    }))
+                } else {   // determine angle if frac full
+                    
+                    var coords = feature.geometry.coordinates[0];
+                    var vScale = [fill*(coords[0][0] - coords[1][0]), fill*(coords[0][1] - coords[1][1])];
+                    var hScale = [fill*(coords[3][0] - coords[0][0]), fill*(coords[3][1] - coords[0][1])];
+
+                    var maxEdge = this.getMaxLandEdge(cemGrid, i);
+                    var newCoords;
+                    switch (maxEdge) {
+                        case dirEnum.LEFT:
+                            newCoords = [coords[0], 
+                                [coords[0][0] + hScale[0], coords[0][1] + hScale[1]], [coords[1][0] + hScale[0], coords[1][1] + hScale[1]],
+                                coords[1], coords[4]];
+                            break;
+                        case dirEnum.UP:
+                            newCoords = [coords[3], 
+                                [coords[3][0] - vScale[0], coords[3][1] - vScale[1]], [coords[4][0] - vScale[0], coords[4][1] - vScale[1]],
+                                coords[4], coords[3]]
+                            break;
+                        case dirEnum.RIGHT:
+                            newCoords = [coords[2], 
+                                [coords[2][0] - hScale[0], coords[2][1] - hScale[1]], [coords[3][0] - hScale[0], coords[3][1] - hScale[1]],
+                                coords[3], coords[2]]
+                            break;
+                        case dirEnum.DOWN:
+                            newCoords = [coords[1], 
+                                [coords[1][0] + vScale[0], coords[1][1] + vScale[1]], [coords[2][0] + vScale[0], coords[2][1] + vScale[1]],
+                                coords[2], coords[1]]
+                            break;
+                    }
+                        
+                    this.modelSource.addFeature( new ol.Feature({
+                        geometry: new ol.geom.Polygon([newCoords]),
+                        style: style
+                    }));
+                }
+            }
+
+            // add to map
+            var vectorLayer = new ol.layer.Vector({source: this.modelSource, 
+                style: function(feature, resolution) {
+                    return feature.get('style');
+                }});
+            vectorLayer.setZIndex(4);
+            this.map.addLayer(vectorLayer);
+        },
+
         displayPhoto: function(photoUrl) {
             this.imLayer = new ol.layer.Image({
                 source: new ol.source.ImageStatic({
@@ -147,86 +331,6 @@ function MapInterface() {
             }
         },
 
-        initMap: function() {
-            // initialize earth engine
-            ee.initialize();
-
-            // create rotatable map
-            this.map = new ol.Map({
-                interactions: ol.interaction.defaults().extend([
-                    new ol.interaction.DragRotateAndZoom()
-                ]),
-                target: 'map',
-                view: new ol.View({
-                    projection: "EPSG:4326",
-                    center: [-75.5, 35.25],
-                    zoom:6
-                    // center: [0, 0],
-                    // zoom: 2
-                })
-            });
-
-            this.map.getView().on('change:rotation', () => {
-                this.rotation = this.map.getView().getRotation();
-                onRotationChange(this.rotation);
-            });
-
-            // create box source
-            this.boundsSource = new ol.source.Vector({});           
-            
-            // create grid source
-            this.gridSource = new ol.source.Vector({});      
-             
-            // create CEM source
-            this.modelSource = new ol.source.Vector({}); 
-
-            // create Bing Maps layer
-            var bingLayer = new ol.layer.Tile({
-                visible: true,
-                preload: Infinity,
-                source: new ol.source.BingMaps({
-                    key: 'Am3Erq9Ut-VwSCA-xAUa8RoLu_jFgJwrK5zu0d81AWJkBwwOEr6DSSvzbi7b70e_',
-                    imagerySet: 'aerial'
-                })
-            });
-            this.map.addLayer(bingLayer);
-
-            // craete draw function
-            var that = this;
-            geometryFunction = function (coordinates, geometry) {
-                var first = coordinates[0];
-                var last = coordinates[1];
-                var coordinates = that.getRectangleVertices(first, last);                
-                if (!geometry) {
-                    geometry = new ol.geom.Polygon([coordinates]);
-                } else {
-                    geometry.setCoordinates([coordinates]);
-                }
-                return geometry;
-            };
-
-            // add drawing interaction
-            this.draw = new ol.interaction.Draw({
-                source: that.boundsSource,
-                type: 'Circle',
-                geometryFunction: geometryFunction
-            });
-            
-            // When a drawing ends, save geometry
-            this.boundsSource.on('addfeature', (evt) => {
-                var feature = evt.feature;
-                that.box = feature.getGeometry();
-                onBoxChange();
-                this.drawGrid();
-                this.toggleDrawMode();
-            });
-            
-            // add layer
-            this.map.addLayer(new ol.layer.Vector({
-                source: this.boundsSource
-            }));
-        },
-
         getRectangleVertices: function(first, last) {
             // find distance between corners
             var dLon = last[0] - first[0];
@@ -264,202 +368,6 @@ function MapInterface() {
             this.boundsSource.addFeature(new ol.Feature({ geometry: geometry}));
         },
 
-        mapTransform: function() {
-            var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
-
-            var dataset = ee.ImageCollection('LANDSAT/LE07/C01/T1').filterBounds(poly).filterDate('1999-01-01', '1999-12-31');
-            var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
-
-            var water_bands = ['B3', 'B5'];
-            var ndwi = composite.normalizedDifference(water_bands);
-
-            var values = ndwi.reduceRegion({
-                reducer: ee.Reducer.histogram(),
-                geometry: poly,
-                scale: 30,
-                bestEffort: true
-            });
-
-            var water = ndwi.gt(this.otsu(values.get('nd')));
-            var minConnectivity = 50;
-            var connectCount = water.connectedPixelCount(minConnectivity, true);
-            var mask = water.eq(0).and(connectCount.gte(minConnectivity));
-
-            var gaussian = ee.Kernel.gaussian({
-                radius: 1
-            });
-            
-            var smooth = mask.convolve(gaussian).clip(poly);
-
-            smooth.getThumbURL({dimensions: [800, 800], region: poly.toGeoJSONString() }, (url) => {
-                this.displayPhoto(url);
-                this.createGrid(smooth);
-            })
-        },
-
-        /**
-         * convert Otsu image into CEM input grid
-         * size numRows X numCols
-         */
-        createGrid: function(image) {
-            this.cemGrid = [];
-            var features = [];
-            for (r = 0; r < this.numRows; r++) {
-                this.cemGrid.push([]);
-                for (c = 0; c < this.numCols; c++) {
-                    // create polygon feature for each cell                    
-                    features.push(new ee.Feature(new ee.Geometry.Polygon(this.polyGrid[r][c])));
-                }
-            }
-
-            var fc = new ee.FeatureCollection(features);
-                    
-            // Reduce the region. The region parameter is the Feature geometry.
-            var dict = image.reduceRegions({
-                reducer: ee.Reducer.mean(),
-                collection: fc,
-                scale: 30
-            });
-
-            var style = new ol.style.Style({
-                stroke: new ol.style.Stroke({
-                    color: 'blue',
-                    width: 0.3
-                    }),
-                fill: new ol.style.Fill({
-                    color: [0, 0, 0, 0.3]
-                })
-            });
-            var cemGrid = dict.getInfo();
-            //var temp = 0;
-
-            // iterate all cell features
-            for (var i = 0; i < cemGrid.features.length; i++) {
-                var feature = cemGrid.features[i];
-                var fill = feature.properties.mean;
-                // skip if cell is empty
-                if (fill == 0) {
-                    continue;
-                }                
-                if (fill == 1) {  // add square if cell is full
-                    this.modelSource.addFeature( new ol.Feature({
-                        geometry: new ol.geom.Polygon(feature.geometry.coordinates),
-                        style: style
-                    }))
-                } else {   // determine angle if frac full
-                    // make sub features of top, bottom, left, and right cells halves and get means
-                    var coords = feature.geometry.coordinates[0];
-                    var vScale = [0.5*(coords[0][0] - coords[1][0]), 0.5*(coords[0][1] - coords[1][1])];
-                    var hScale = [0.5*(coords[3][0] - coords[0][0]), 0.5*(coords[3][1] - coords[0][1])];
-                    // coordinates order clockwise starting at bottom left
-                    var left = new ee.Feature(
-                        new ee.Geometry.Polygon([coords[0], 
-                            [coords[0][0] + hScale[0], coords[0][1] + hScale[1]], [coords[1][0] + hScale[0], coords[1][1] + hScale[1]],
-                            coords[1], coords[4]]));
-                    var top = new ee.Feature(
-                        new ee.Geometry.Polygon([coords[3], 
-                            [coords[3][0] - vScale[0], coords[3][1] - vScale[1]], [coords[4][0] - vScale[0], coords[4][1] - vScale[1]],
-                            coords[4], coords[3]]));
-                    var right = new ee.Feature(
-                        new ee.Geometry.Polygon([coords[2], 
-                            [coords[2][0] - hScale[0], coords[2][1] - hScale[1]], [coords[3][0] - hScale[0], coords[3][1] - hScale[1]],
-                            coords[3], coords[2]]));
-                    var bottom = new ee.Feature(
-                        new ee.Geometry.Polygon([coords[1], 
-                            [coords[1][0] + vScale[0], coords[1][1] + vScale[1]], [coords[2][0] + vScale[0], coords[2][1] + vScale[1]],
-                            coords[2], coords[1]]));
-
-                    // var tempcoords;
-                    // if (temp == 0) { tempcoords = left.geometry().coordinates().getInfo()[0];}
-                    // else if (temp == 1) {tempcoords = top.geometry().coordinates().getInfo()[0];}
-                    // else if (temp == 2) {tempcoords = right.geometry().coordinates().getInfo()[0];}
-                    // else if (temp == 3) {tempcoords = bottom.geometry().coordinates().getInfo()[0];}
-                    // else if (temp == 4) {tempcoords = leftCoords;}
-                    // else {
-                    //     continue;
-                    // }
-                    // this.modelSource.addFeature(new ol.Feature({
-                    //     geometry: new ol.geom.Point(tempcoords[0]),
-                    //     style: new ol.style.Style({
-                    //         image: new ol.style.Circle({
-                    //             radius: 7,
-                    //             fill: new ol.style.Fill({color: 'blue'}),
-                    //             stroke: new ol.style.Stroke({
-                    //             color: [255,0,0], width: 2
-                    //             })
-                    //     })
-                    //     })
-                    // }));
-                    // this.modelSource.addFeature(new ol.Feature({
-                    //     geometry: new ol.geom.Point(tempcoords[1]),
-                    //     style: new ol.style.Style({
-                    //         image: new ol.style.Circle({
-                    //             radius: 7,
-                    //             fill: new ol.style.Fill({color: 'red'}),
-                    //             stroke: new ol.style.Stroke({
-                    //             color: [255,0,0], width: 2
-                    //             })
-                    //     })
-                    //     })
-                    // }));
-                    // this.modelSource.addFeature(new ol.Feature({
-                    //     geometry: new ol.geom.Point(tempcoords[2]),
-                    //     style: new ol.style.Style({
-                    //         image: new ol.style.Circle({
-                    //             radius: 7,
-                    //             fill: new ol.style.Fill({color: 'yellow'}),
-                    //             stroke: new ol.style.Stroke({
-                    //             color: [255,0,0], width: 2
-                    //             })
-                    //     })
-                    //     })
-                    // }));
-                    // this.modelSource.addFeature(new ol.Feature({
-                    //     geometry: new ol.geom.Point(tempcoords[3]),
-                    //     style: new ol.style.Style({
-                    //         image: new ol.style.Circle({
-                    //             radius: 7,
-                    //             fill: new ol.style.Fill({color: 'green'}),
-                    //             stroke: new ol.style.Stroke({
-                    //             color: [255,0,0], width: 2
-                    //             })
-                    //     })
-                    //     })
-                    // }));
-                    // temp = temp +1;
-        
-                    var subFeatures = new ee.FeatureCollection([left, top, right, bottom]);
-                    // get means of sub features
-                    var subDict = image.reduceRegions({
-                        reducer: ee.Reducer.mean(),
-                        collection: subFeatures,
-                        scale: 30
-                    });
-
-                    // set orientation as sub feature with max mean (most land pixels)
-                    var subFeature = subDict.sort('mean', false).limit(1);
-                    // scale coordinates
-                    var subCoords = subFeature.geometry().coordinates().getInfo()[0];
-                    var scale = [2*fill*(subCoords[3][0] - subCoords[0][0]), 2*fill*(subCoords[3][1] - subCoords[0][1])];
-                    var newCoords = [subCoords[0], [subCoords[0][0] + scale[0], subCoords[0][1] + scale[1]],
-                        [subCoords[1][0] + scale[0], subCoords[1][1] + scale[1]], subCoords[1], subCoords[4]];
-                        
-                    this.modelSource.addFeature( new ol.Feature({
-                        geometry: new ol.geom.Polygon([newCoords]),
-                        style: style
-                    }));
-                }
-            }
-
-            // add to map
-            var vectorLayer = new ol.layer.Vector({source: this.modelSource, 
-                style: function(feature, resolution) {
-                    return feature.get('style');
-                }});
-            vectorLayer.setZIndex(4);
-            this.map.addLayer(vectorLayer);
-        },
-
         /**
          * Getters and setters
          */
@@ -470,6 +378,95 @@ function MapInterface() {
 
         setNumCols: function(cols) {
             this.numCols = cols;
+        },
+        
+
+        /***
+         * Helpers
+         */
+        linspace: function(start, stop, N) {
+            var difLon = stop[0] - start[0];
+            var dLon = difLon/N;
+            var difLat = stop[1] - start[1];
+            var dLat = difLat/N;
+            coords = [start];
+            for (var i = 1; i < N; i ++) {
+                coords.push([start[0] + i*dLon, start[1] + i*dLat]);
+            }
+            coords.push(stop);
+            return coords;
+        },
+
+        toggleDrawMode: function() {
+            this.drawingMode = !this.drawingMode;
+            if (this.drawingMode) {
+                $('.draw-button').addClass('selected');
+                this.boundsSource.clear();
+                this.gridSource.clear();
+                this.box = null;
+                this.map.addInteraction(this.draw);
+            }
+            else {
+                $('draw-button').removeClass('selected');
+                this.map.removeInteraction(this.draw);
+            }
+        },
+
+        getMaxLandEdge: function(cemGrid, i) {
+            // find surrounding cells in each direction
+            var left = [], right = [], up = [], down = [];
+            if ((i-1) % this.numCols > 0) { // if not left hand column
+                left.push(cemGrid.features[i-1].properties.mean);
+                if ((i/this.numCols) > 1) {  //if not top row
+                    left.push(cemGrid.features[i-this.numCols-1].properties.mean);
+                    up.push(cemGrid.features[i-this.numCols-1].properties.mean);
+                }
+                if ((i/this.numCols) < this.numRows-1) { // if not bottom row
+                    left.push(cemGrid.features[i+this.numCols-1].properties.mean);
+                    down.push(cemGrid.features[i+this.numCols-1].properties.mean);
+                }
+            }
+            if ((i+1) % this.numCols < this.numCols-1){ // if not right hand column
+                right.push(cemGrid.features[i+1].properties.mean);
+                if ((i/this.numCols) > 1) {  //if not top row
+                    right.push(cemGrid.features[i-this.numCols+1].properties.mean);
+                    up.push(cemGrid.features[i-this.numCols+1].properties.mean);
+                }
+                if ((i/this.numCols) < this.numRows-1) { // if not bottom row
+                    right.push(cemGrid.features[i+this.numCols+1].properties.mean);
+                    down.push(cemGrid.features[i+this.numCols+1].properties.mean);
+                }
+            }
+            if ((i/this.numCols) > 1) {  //if not top row
+                up.push(cemGrid.features[i-this.numCols].properties.mean);
+            }
+            if ((i/this.numCols) < this.numRows-1) { // if not bottom row
+                down.push(cemGrid.features[i+this.numCols].properties.mean);
+            }
+            
+            // determine which side has most dense land
+            var means = [this.getArrayMean(left), this.getArrayMean(up), this.getArrayMean(right), this.getArrayMean(down)];
+            return this.getArrayMaxIndex(means);
+        },
+
+        getArrayMean: function(arr) {
+            var total = 0;
+            for (var i = 0; i < arr.length; i++) {
+                total += arr[i];
+            }
+            return total/arr.length;
+        },
+
+        getArrayMaxIndex: function(arr) {
+            var val = 0;
+            var ind =  0;
+            for (var i = 0; i < arr.length; i++) {
+                if (arr[i] >= val) {
+                    val = arr[i];
+                    ind = i;
+                }
+            }
+            return ind;
         },
 
         /**
@@ -485,3 +482,13 @@ function MapInterface() {
 
     }
 }
+
+/**
+TODO
+    comments
+    error handling
+    image loading
+    manual edits
+    sensitivity control (i.e. connectivity minimum)
+    fix bug restarting (i.e. clear and then load)
+*/
