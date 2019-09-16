@@ -168,7 +168,7 @@ function MapInterface() {
                     width: 0.3
                     }),
                 fill: new ol.style.Fill({
-                    color: [0, 0, 0, 0.3]
+                    color: [255, 255, 0, 0.15]
                 })
             });
             var cemGrid = dict.getInfo();
