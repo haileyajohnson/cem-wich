@@ -27,16 +27,27 @@ html, body {
         color: #000!important;
         width: 100%;
         margin-top: 8px;
+        padding: 0 0.5%;
     }
 
     .tile {
         color: #fff;
-        width: 23%;
+        width: 23.5%;
         float:left;
         margin: 2px 0.5%;
         text-align: center;
         border-width: 2px;
-        border-style: outset;
+        border-style: outset; 
+
+        &:hover {
+            cursor: pointer;
+        }
+
+        &[selected] {
+            cursor: default;
+            border-style: inset;
+            filter: brightness(80%);
+        }
     }
 
     .tile-inner {
@@ -83,10 +94,10 @@ html, body {
 
     .tab-view-container {    
         height: 60%;
-        width: 38%;
+        width: 39%;
         float: left;
         background-color: #fff;
-        margin: 0 1%;
+        margin-left: 1%;
     }
 
     .section-title {
@@ -103,18 +114,6 @@ html, body {
     .input {
         margin: 0px 10px;
         font-size: 14px;
-    }
-
-    .tab {
-        &:hover {
-            cursor: pointer;
-        }
-
-        &[selected] {
-            cursor: default;
-            border-style: inset;
-            filter: brightness(80%);
-        }
     }
 
     .bounds-table {
