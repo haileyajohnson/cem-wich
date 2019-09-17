@@ -5,6 +5,8 @@
 var configJSON;
 var mapInterface;
 var modelInterface;
+var modal;
+
 const CLIENT_ID = '762501139172-rjf0ia3vv9edu6gg0m46aoij519khuk7.apps.googleusercontent.com';
 var selectedTab;
 var tabs;
@@ -58,9 +60,13 @@ function initialize() {
 
     // set up initial input screen
     initInputs();
+
+    modal = ModalInterface();
+    modal.init();
 }
 
 function initInputs() {
+    // TODO: refactor
     $rotation = $("input[name=rotation]");
     $rotation.val(rad_to_deg(mapInterface.rotation));
     $rotation.change(onRotationChange);
@@ -79,6 +85,7 @@ function initInputs() {
 
     $(".coord").change(onCoordsChange);
 }
+
 
 /**
  * Tab views
@@ -118,9 +125,9 @@ function onTabChange(id) {
 }
 
 function onGoClicked() {
-     mapInterface.mapTransform();
-     disableInputs();
-     disableClear();
+    disableInputs();
+    mapInterface.mapTransform();
+    disableClear();
 }
 
 function onDrawClicked() {
@@ -140,6 +147,8 @@ function onRotationChange(rot) {
     mapInterface.map.getView().setRotation(
         deg_to_rad(tryParseFloat($rotation.val()), mapInterface.rotation));
 }
+
+
 
 function onCoordsChange() {
     var coords = mapInterface.box ? mapInterface.box.getCoordinates()[0] : [["", ""], [], ["", ""]];
@@ -181,12 +190,14 @@ function disableInputs() {
     $(".coord").attr("disabled", "disabled");
     $(".draw-button").attr("disabled", "disabled");
     $(".go-button").attr("disabled", "disabled");
+    //$(".edit-button").attr("disabled", "disabled").removeAttr("selected");
 }
 
 function enableInputs() {
     $(".coord").removeAttr("disabled");
     $(".draw-button").removeAttr("disabled");
     $(".go-button").removeAttr("disabled");
+    //$(".edit-button").removeAttr("disabled");
 }
 
 function allowClear() {
@@ -195,6 +206,21 @@ function allowClear() {
 
 function disableClear() {
     $(".clear-button").attr("disabled", "disabled");    
+}
+
+function toggleEdit() {
+    $(".edit-button").attr("selected") ? $(".edit-button").removeAttr("selected") : $(".edit-button").attr("selected", "selected");
+    mapInterface.toggleEditMode();
+}
+
+function onOkClicked() {
+    // save changes
+    modal.save(this.mapInterface);
+    modal.close();
+}
+
+function onCancelClicked() {
+    modal.close();
 }
 
 function onSave() {
@@ -291,4 +317,105 @@ function saveConfig() {
         importJSON(content)
     };
  }
+
+ /**
+  * Modal window
+  */
+
+ function ModalInterface() {
+    return {
+        $modal: $(".modal"),
+        $fillInput: $("input[name=fill]"),
+        $alignmentButtons: $(".alignment-buttons .button"),
+        $cell: $(".cell"),
+
+        feature: null,
+        percentFull: 0,
+        orientation: 0,
+
+        init: function() {
+            this.$fillInput.change(() => {
+                this.setFill();
+                this.display();
+            });
+            this.$alignmentButtons.each((i, elem) => {
+                $(elem).click(() => {
+                    this.setOrientation(parseInt($(elem).attr('id')));
+                    this.display();
+                });
+            });
+        },
+
+        open: function(feature) {
+            this.feature = feature;
+            this.$fillInput.val(feature.get("fill")*100);
+            this.setFill();
+            this.orientation = feature.get('orientation');
+            this.display();
+            this.$modal.show();
+        },
+
+        setFill: function() {
+            this.percentFull = this.$fillInput.val();
+        },
+
+        setOrientation(n) {
+            this.orientation = n;
+        },
+
+        display: function() {
+            this.$cell.empty();
+            var $cellFull = $("<div class='cell-full'></div>");
+            var $cellEmpty = $("<div class='cell-empty'></div>");
+
+            var horzStyleFull = {
+                "width": "" + this.percentFull + "%",
+                "height": "100%"
+            }
+            var horzStyleEmpty = {
+                "width": "" + (100-this.percentFull) + "%",
+                "height": "100%"
+            }
+            
+            var vertStyleFull = {
+                "height": "" + this.percentFull + "%",
+                "width": "100%"
+            }
+            var vertStyleEmpty = {
+                "height": "" + (100-this.percentFull) + "%",
+                "width": "100%"
+            }
+
+            switch(this.orientation) {
+                case 0:
+                    $cellFull.css(horzStyleFull).appendTo(this.$cell);
+                    $cellEmpty.css(horzStyleEmpty).appendTo(this.$cell);
+                    break;
+                case 1:
+                    $cellFull.css(vertStyleFull).appendTo(this.$cell);
+                    $cellEmpty.css(vertStyleEmpty).appendTo(this.$cell);
+                    break;
+                case 2:
+                    $cellEmpty.css(horzStyleEmpty).css({"float":"left"}).appendTo(this.$cell);
+                    $cellFull.css(horzStyleFull).css({"float":"right"}).appendTo(this.$cell);
+                    break;
+                case 3:
+                    $cellEmpty.css(vertStyleEmpty).css({"float":"left"}).appendTo(this.$cell);
+                    $cellFull.css(vertStyleFull).css({"float":"right"}).appendTo(this.$cell);
+                    break;
+            }
+        },
+
+        save: function(mapInterface) {
+            var i = this.feature.get('id');
+            mapInterface.cemGrid[i] = this.percentFull/100;
+            mapInterface.updateFeature(this.feature, this.percentFull/100, this.orientation);
+        },
+
+        close: function() {
+            this.feature = null;
+            this.$modal.hide();
+        }
+    };
+}
 
