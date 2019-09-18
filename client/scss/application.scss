@@ -81,6 +81,10 @@ html, body {
     width: 98%;
     padding: 1%;
 
+    .section {
+        margin-bottom: 8px;
+    }
+
     .map-container {
         height: 60%;
         width: 60%;
@@ -98,6 +102,10 @@ html, body {
         float: left;
         background-color: #fff;
         margin-left: 1%;
+
+        .tab-view {
+            display: none;
+        }
     }
 
     .section-title {

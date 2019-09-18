@@ -45,7 +45,9 @@ function MapInterface() {
 
             this.map.getView().on('change:rotation', () => {
                 this.rotation = this.map.getView().getRotation();
-                onRotationChange(this.rotation);
+                if (!this.box){
+                    gridTab.setRotation();
+                }
             });
 
             this.map.on("click", (e) => {
@@ -104,7 +106,7 @@ function MapInterface() {
             this.boundsSource.on('addfeature', (evt) => {
                 var feature = evt.feature;
                 that.box = feature.getGeometry();
-                onBoxChange();
+                gridTab.onBoxDrawn();
                 this.drawGrid();
                 this.toggleDrawMode();
             });
@@ -277,7 +279,6 @@ function MapInterface() {
             });
             this.imLayer.setZIndex(2);
             this.map.addLayer(this.imLayer);
-            allowClear();
         },
 
         otsu: function(histogram) {
@@ -559,8 +560,8 @@ function MapInterface() {
 TODO
     sensitivity control
         - connectivity minimum
-    fix button logic (i.e. clear and then load)
-    refactor to tab objects
+    X fix button logic (i.e. clear and then load)
+    X refactor to tab objects
 
     wave inputs
     conrol inputs

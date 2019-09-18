@@ -42,7 +42,7 @@
                     <div class="tile tile-blue tab" id="waveTab">
                         <div class="tile-inner">Wave Climate</div>
                     </div>
-                    <div class="tile tile-green tab" id="condsTab">
+                    <div class="tile tile-green tab" id="cotrolTab">
                         <div class="tile-inner">Init. Conds.</div>
                     </div>
                     <div class="tile tile-yellow tab" id="runTab">
@@ -61,50 +61,61 @@
             </div>
 
             <div class="tab-view-container">
-
-                <div class="grid-tab-view">
-                    <div class="grid-content">
-                        <div class="g-sign-in hidden">
-                            <span class="label">Sign in with:</span>
-                            <div class="button">
-                                <span class="icon"></span>
-                                <span class="button-text">Google</span>
-                            </div>
-                        </div>
-                        <div class="section-title">Rotation:</div>
-                        <input class="input" type="number" name="rotation" min="-360" max="360">
-                        <form class="grid-selection-area">
-                            <br>
-                            <div class="section-title">Bounds:</div>
-                            <table class="bounds-table">
-                            <thead><th></th><th>Longitude</th><th> Latitude</th></thead>
-                            <tr><td> Point 1</td>
-                                <td><input class="input coord" type="number" name="lon1" min="-180" max="180"></td>
-                                <td><input class="input coord" type="number" name="lat1" min="-90" max="90"></td>
-                            </tr>
-                            <tr><td>Point 2</td>
-                                <td><input class="input coord" type="number" name="lon2" min="-180" max="180"></td>
-                                <td><input class="input coord" type="number" name="lat2" min="-90" max="90"></td>
-                            </tr>
-                            </table>
-                            <input type="button" class="button draw-button" onclick="onDrawClicked()" value="Select on map">
-                        </form>                    
-                        <div class="section-title">Num rows:</div>
-                        <input class="input" type="number" name="numRows" min="0" max="1000">                     
-                        <div class="section-title">Num cols:</div>
-                        <input class="input" type="number" name="numCols" min="0" max="1000">
-                        <br>
-                        <input type="button" class="button go-button" onclick="onGoClicked()" value="Submit">
-                        <input type="button" class="button clear-button" onclick="onClear()" value="Clear">
-                        <input type="button" class="button edit-button" onclick="toggleEdit()" value="Edit">
+                        
+                <div class="g-sign-in hidden">
+                    <span class="label">Sign in with:</span>
+                    <div class="button">
+                        <span class="icon"></span>
+                        <span class="button-text">Google</span>
                     </div>
                 </div>
 
-                <div class="wave-tab-view"></div>
+                <div class="grid-tab tab-view">
+                    <div class="grid-content">
 
-                <div class="conds-tab-view"></div>
+                        <div class="section">
+                            <div class="section-title">Rotation:</div>
+                            <input class="input" type="number" name="rotation" min="-360" max="360">
+                        </div>
+                        
+                        <div class="section">
+                            <form class="grid-selection-area">
+                                <div class="section-title">Bounds:</div>
+                                <table class="bounds-table">
+                                <thead><th></th><th>Longitude</th><th> Latitude</th></thead>
+                                <tr><td> Point 1</td>
+                                    <td><input class="input coord" type="number" name="lon1" min="-180" max="180"></td>
+                                    <td><input class="input coord" type="number" name="lat1" min="-90" max="90"></td>
+                                </tr>
+                                <tr><td>Point 2</td>
+                                    <td><input class="input coord" type="number" name="lon2" min="-180" max="180"></td>
+                                    <td><input class="input coord" type="number" name="lat2" min="-90" max="90"></td>
+                                </tr>
+                                </table>
+                                <input type="button" class="button draw-button" value="Select on map">
+                            </form>            
+                        </div>
 
-                <div class="run-tab-view"></div>
+                        <div class="section">        
+                            <div class="section-title">Num rows:</div>
+                            <input class="input" type="number" name="numRows" min="0" max="1000">                     
+                            <div class="section-title">Num cols:</div>
+                            <input class="input" type="number" name="numCols" min="0" max="1000">
+                        </div>
+                        
+                        <div class="section">  
+                            <input type="button" class="button submit-button" value="Submit">
+                            <input type="button" class="button clear-button" value="Clear">
+                            <input type="button" class="button edit-button" value="Edit">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="wave-tab tab-view"></div>
+
+                <div class="control-tab tab-view"></div>
+
+                <div class="run-tab tab-view"></div>
 
             </div>
 
@@ -114,23 +125,27 @@
                 <div class="modal-content">
                 <div class="header">Edit grid cell</div>
                 <div class="edit-pane">
-                    <div class="section-title">Fill percent:</div>
-                    <input class="input" type="number" name="fill" min="0" max="100">
-                    <br>
-                    <div class="section-title">Alignment:</div>
-                    <div class="alignment-buttons">                        
-                        <input type="button" class="button top-button" id="1" value="Top"> <br>
-                        <input type="button" class="button left-button" id="0" value="Left">
-                        <input type="button" class="button right-button" id="2" value="Right"> <br>
-                        <input type="button" class="button bottom-button" id="3" value="Bottom">
+                    <div class="section">  
+                        <div class="section-title">Fill percent:</div>
+                        <input class="input" type="number" name="fill" min="0" max="100">
                     </div>
-                    <br>  
-                    <div class="cell">
+                    <div class="section">  
+                        <div class="section-title">Alignment:</div>
+                        <div class="alignment-buttons">                        
+                            <input type="button" class="button top-button" id="1" value="Top"> <br>
+                            <input type="button" class="button left-button" id="0" value="Left">
+                            <input type="button" class="button right-button" id="2" value="Right"> <br>
+                            <input type="button" class="button bottom-button" id="3" value="Bottom">
+                        </div>
+                    </div>
+                    <div class="section">  
+                        <div class="cell">
+                        </div>
                     </div>
                 </div>
                 <div class="button-container">
-                    <input type="button" class="button modal-ok-button" onclick="onOkClicked()" value="Ok">
-                    <input type="button" class="button modal-cancel-button" onclick="onCancelClicked()" value="Cancel">
+                    <input type="button" class="button modal-ok-button" value="Ok">
+                    <input type="button" class="button modal-cancel-button" value="Cancel">
                 </div>
                 </div>            
             </div>
