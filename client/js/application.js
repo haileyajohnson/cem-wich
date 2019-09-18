@@ -321,7 +321,6 @@ function saveConfig() {
  /**
   * Modal window
   */
-
  function ModalInterface() {
     return {
         $modal: $(".modal"),
