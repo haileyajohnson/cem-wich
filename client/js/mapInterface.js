@@ -220,7 +220,7 @@ function MapInterface() {
                     }));
                 } else {   // determine angle if frac full
                     
-                    var coords = feature.geometry.coordinates[0];
+                    var coords = this.polyGrid[Math.floor(i/this.numCols)][i%this.numCols];
 
                     var maxEdge = this.getMaxLandEdge(cemGrid, i);
                     var newCoords = this.getNewCoords(coords, fill, maxEdge);
@@ -247,10 +247,7 @@ function MapInterface() {
         updateFeature(feature, fill, orientation) {
             var id = feature.get('id');
             var cellCoords = this.polyGrid[Math.floor(id/this.numCols)][id%this.numCols];
-            var coords = cellCoords.slice(0);
-            coords.pop();
-            coords.reverse();
-            coords.push(coords[0]);
+            
             if (fill > 0) {
                 var newCoords = this.getNewCoords(cellCoords, fill, orientation);
             } else {
@@ -369,30 +366,30 @@ function MapInterface() {
         },
 
         getNewCoords: function(coords, fill, dir) {
-            var vScale = [fill*(coords[0][0] - coords[1][0]), fill*(coords[0][1] - coords[1][1])];
-            var hScale = [fill*(coords[3][0] - coords[0][0]), fill*(coords[3][1] - coords[0][1])];
+            var vScale = [fill*(coords[0][0] - coords[3][0]), fill*(coords[0][1] - coords[3][1])];
+            var hScale = [fill*(coords[1][0] - coords[0][0]), fill*(coords[1][1] - coords[0][1])];
 
             var newCoords;
             switch (dir) {
                 case dirEnum.LEFT:
                     newCoords = [coords[0], 
-                        [coords[0][0] + hScale[0], coords[0][1] + hScale[1]], [coords[1][0] + hScale[0], coords[1][1] + hScale[1]],
-                        coords[1], coords[4]];
+                        [coords[0][0] + hScale[0], coords[0][1] + hScale[1]], [coords[3][0] + hScale[0], coords[3][1] + hScale[1]],
+                        coords[3], coords[0]];
                     break;
                 case dirEnum.UP:
-                    newCoords = [coords[3], 
-                        [coords[3][0] - vScale[0], coords[3][1] - vScale[1]], [coords[4][0] - vScale[0], coords[4][1] - vScale[1]],
-                        coords[4], coords[3]]
+                    newCoords = [coords[1], 
+                        [coords[1][0] - vScale[0], coords[1][1] - vScale[1]], [coords[0][0] - vScale[0], coords[0][1] - vScale[1]],
+                        coords[0], coords[1]]
                     break;
                 case dirEnum.RIGHT:
                     newCoords = [coords[2], 
-                        [coords[2][0] - hScale[0], coords[2][1] - hScale[1]], [coords[3][0] - hScale[0], coords[3][1] - hScale[1]],
-                        coords[3], coords[2]]
+                        [coords[2][0] - hScale[0], coords[2][1] - hScale[1]], [coords[1][0] - hScale[0], coords[1][1] - hScale[1]],
+                        coords[1], coords[2]]
                     break;
                 case dirEnum.DOWN:
-                    newCoords = [coords[1], 
-                        [coords[1][0] + vScale[0], coords[1][1] + vScale[1]], [coords[2][0] + vScale[0], coords[2][1] + vScale[1]],
-                        coords[2], coords[1]]
+                    newCoords = [coords[3], 
+                        [coords[3][0] + vScale[0], coords[3][1] + vScale[1]], [coords[2][0] + vScale[0], coords[2][1] + vScale[1]],
+                        coords[2], coords[3]]
                     break;
             }
             return newCoords;
@@ -486,9 +483,9 @@ function MapInterface() {
         getMaxLandEdge: function(cemGrid, i) {
             // find surrounding cells in each direction
             var left = [], right = [], up = [], down = [];
-            if ((i-1) % this.numCols > 0) { // if not left hand column
+            if (i % this.numCols > 0) { // if not left hand column
                 left.push(cemGrid.features[i-1].properties.mean);
-                if ((i/this.numCols) > 1) {  //if not top row
+                if ((i/this.numCols) > 0) {  //if not top row
                     left.push(cemGrid.features[i-this.numCols-1].properties.mean);
                     up.push(cemGrid.features[i-this.numCols-1].properties.mean);
                 }
@@ -497,21 +494,21 @@ function MapInterface() {
                     down.push(cemGrid.features[i+this.numCols-1].properties.mean);
                 }
             }
-            if ((i+1) % this.numCols < this.numCols-1){ // if not right hand column
+            if (i % this.numCols < this.numCols-1){ // if not right hand column
                 right.push(cemGrid.features[i+1].properties.mean);
-                if ((i/this.numCols) > 1) {  //if not top row
+                if (i/this.numCols > 0) {  //if not top row
                     right.push(cemGrid.features[i-this.numCols+1].properties.mean);
                     up.push(cemGrid.features[i-this.numCols+1].properties.mean);
                 }
-                if ((i/this.numCols) < this.numRows-1) { // if not bottom row
+                if (i/this.numCols < this.numRows-1) { // if not bottom row
                     right.push(cemGrid.features[i+this.numCols+1].properties.mean);
                     down.push(cemGrid.features[i+this.numCols+1].properties.mean);
                 }
             }
-            if ((i/this.numCols) > 1) {  //if not top row
+            if (i/this.numCols > 1) {  //if not top row
                 up.push(cemGrid.features[i-this.numCols].properties.mean);
             }
-            if ((i/this.numCols) < this.numRows-1) { // if not bottom row
+            if (i/this.numCols < this.numRows-1) { // if not bottom row
                 down.push(cemGrid.features[i+this.numCols].properties.mean);
             }
             
