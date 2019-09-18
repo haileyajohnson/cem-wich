@@ -247,7 +247,7 @@ function MapInterface() {
         updateFeature(feature, fill, orientation) {
             var id = feature.get('id');
             var cellCoords = this.polyGrid[Math.floor(id/this.numCols)][id%this.numCols];
-            
+
             if (fill > 0) {
                 var newCoords = this.getNewCoords(cellCoords, fill, orientation);
             } else {
@@ -485,7 +485,7 @@ function MapInterface() {
             var left = [], right = [], up = [], down = [];
             if (i % this.numCols > 0) { // if not left hand column
                 left.push(cemGrid.features[i-1].properties.mean);
-                if ((i/this.numCols) > 0) {  //if not top row
+                if ((i/this.numCols) >= 1) {  //if not top row
                     left.push(cemGrid.features[i-this.numCols-1].properties.mean);
                     up.push(cemGrid.features[i-this.numCols-1].properties.mean);
                 }
@@ -496,7 +496,7 @@ function MapInterface() {
             }
             if (i % this.numCols < this.numCols-1){ // if not right hand column
                 right.push(cemGrid.features[i+1].properties.mean);
-                if (i/this.numCols > 0) {  //if not top row
+                if (i/this.numCols >= 1) {  //if not top row
                     right.push(cemGrid.features[i-this.numCols+1].properties.mean);
                     up.push(cemGrid.features[i-this.numCols+1].properties.mean);
                 }
@@ -505,7 +505,7 @@ function MapInterface() {
                     down.push(cemGrid.features[i+this.numCols+1].properties.mean);
                 }
             }
-            if (i/this.numCols > 1) {  //if not top row
+            if (i/this.numCols >= 1) {  //if not top row
                 up.push(cemGrid.features[i-this.numCols].properties.mean);
             }
             if (i/this.numCols < this.numRows-1) { // if not bottom row
@@ -557,11 +557,22 @@ function MapInterface() {
 
 /**
 TODO
-    comments/organize
+    sensitivity control
+        - connectivity minimum
+    fix button logic (i.e. clear and then load)
+    refactor to tab objects
+
+    wave inputs
+    conrol inputs
+
+    run cem from python
+
+    window resizing
+    comments
     error handling
     image loading
-    sensitivity control (i.e. connectivity minimum)
-        - connectivity minimum
-        - scale
-    fix bug restarting (i.e. clear and then load)
+    improve shoreline detection (KVos)?
+
+    X fix top buttons
+    X manual edits
 */
