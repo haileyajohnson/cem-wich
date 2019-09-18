@@ -27,16 +27,27 @@ html, body {
         color: #000!important;
         width: 100%;
         margin-top: 8px;
+        padding: 0 0.5%;
     }
 
     .tile {
         color: #fff;
-        width: 23%;
+        width: 23.5%;
         float:left;
         margin: 2px 0.5%;
         text-align: center;
         border-width: 2px;
-        border-style: outset;
+        border-style: outset; 
+
+        &:hover {
+            cursor: pointer;
+        }
+
+        &[selected] {
+            cursor: default;
+            border-style: inset;
+            filter: brightness(80%);
+        }
     }
 
     .tile-inner {
@@ -83,10 +94,10 @@ html, body {
 
     .tab-view-container {    
         height: 60%;
-        width: 38%;
+        width: 39%;
         float: left;
         background-color: #fff;
-        margin: 0 1%;
+        margin-left: 1%;
     }
 
     .section-title {
@@ -105,18 +116,6 @@ html, body {
         font-size: 14px;
     }
 
-    .tab {
-        &:hover {
-            cursor: pointer;
-        }
-
-        &[selected] {
-            cursor: default;
-            border-style: inset;
-            filter: brightness(80%);
-        }
-    }
-
     .bounds-table {
         font-size: 16px;
     }
@@ -132,10 +131,79 @@ html, body {
         &[disabled] {
             cursor: default;
         }
+        &[selected] {
+            border-style: inset;
+        }
+    }    
+
+    /* Edit modal window */
+    .modal {
+        display: none; /* Hidden by default */
+        position: absolute; /* Stay in place */
+        z-index: 1; /* Sit on top */
+        padding-top: 100px; /* Location of the box */
+        left: 0;
+        top: 0;
+        width: 100%; /* Full width */
+        height: 100%; /* Full height */
+        overflow: auto; /* Enable scroll if needed */
+        background-color: rgb(0,0,0); /* Fallback color */
+        background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            border: 1px solid #888;
+            width: 360px;
+            
+            .header {                
+                font-size: 18px;
+                color: #fff!important;
+                background-color: #000!important;
+                padding: 5px 10px;
+            }
+
+            .edit-pane{                
+                padding: 20px 30px;
+                width: 300px;
+
+                .cell {
+                    background-color: #333!important;
+                    border: 1px solid #000;
+                    width: 300px;
+                    height: 300px;
+                }
+    
+                .cell-full {
+                    background-color: #fffaaa!important;
+                }
+
+                .alignment-buttons {
+                    margin-left: 35px;
+                }
+
+                .top-button, .bottom-button {
+                    margin-left: 80px;
+                }
+
+                .right-button {
+                    margin-left: 70px;
+                }
+            }            
+
+            .button {
+                width: 75px;
+            }
+
+            .button-container {
+                text-align: right;
+                padding: 10px;
+            }
+        }
     }
 }
 
-/*Sign in stuff*/
+/* Google sign in */
 .hidden {
     display: none;
   }

@@ -355,3 +355,9 @@ BMI_Model *register_bmi_cem(BMI_Model *model) {
 
   return model;
 }
+
+int add_nums(int a, int b);
+
+int testFunc(int a, int b) {
+	return add_nums(a, b);
+}
