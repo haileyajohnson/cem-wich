@@ -36,16 +36,16 @@
             <div class="progress-bar">
             
                 <div class="tile-row">
-                    <div class="tile tile-red tab" id="gridTab">
+                    <div class="tile tile-red tab" id="grid-tab">
                         <div class="tile-inner">Grid</div>
                     </div>
-                    <div class="tile tile-blue tab" id="waveTab">
+                    <div class="tile tile-blue tab" id="wave-tab">
                         <div class="tile-inner">Wave Climate</div>
                     </div>
-                    <div class="tile tile-green tab" id="cotrolTab">
+                    <div class="tile tile-green tab" id="control-tab">
                         <div class="tile-inner">Init. Conds.</div>
                     </div>
-                    <div class="tile tile-yellow tab" id="runTab">
+                    <div class="tile tile-yellow tab" id="run-tab">
                         <div class="tile-inner">Run</div>
                     </div>
                 </div>
@@ -71,7 +71,7 @@
                 </div>
 
                 <div class="grid-tab tab-view">
-                    <div class="grid-content">
+                    <div class="grid-content content-pane">
 
                         <div class="section">
                             <div class="section-title">Rotation:</div>
@@ -111,11 +111,51 @@
                     </div>
                 </div>
 
-                <div class="wave-tab tab-view"></div>
+                <div class="wave-tab tab-view">
+                    <div class="wave-content content-pane">   
+                        <div class="section">  
+                            <div><div class="section-title">Assymetry (%)</div>
+                            <input class="input" type="number" name="a-input" min="0" max = "100" value="50">
+                            </div>
+                            <div><div class="section-title">High angles (%)</div>
+                            <input class="input" type="number" name="u-input" min="0" max = "100" value="50">
+                            </div>
+                        </div>  
+                        <div class="section">  
+                            <div><div class="section-title">Wave height (m)</div>
+                            <input class="input" type="number" name="wave-height" min="0" max = "10" value="2">
+                            </div>  
+                            <div><div class="section-title">Wave period (s)</div>
+                            <input class="input" type="number" name="wave-period" min="5" max = "30" value="20">
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-                <div class="control-tab tab-view"></div>
+                <div class="control-tab tab-view">                    
+                    <div class="control-content content-pane">                           
+                        <div class="section">  
+                            <div class="section-title">Shelf slope</div>
+                            <input class="input" type="number" name="shelf-slope" min="0" max = "1" value="0.001">
+                            <div class="section-title">Shoreface slope</div>
+                            <input class="input" type="number" name="shoreface-slope" min="0" max = "1" value="0.01">
+                        </div>
+                        <div class="section">  
+                            <div class="section-title">End date</div>
+                            <input class="input" type="date" name="end-date" min="1999-04-15">
+                            <div class="section-title">Timestep length</div>
+                            <input class="input" type="number" name="timestep" value="1">
+                            <div class="section-title">Save interval</div>
+                            <input class="input" type="number" name="save-interval" value="365">
+                        </div>
+                    </div>
+                </div>
 
-                <div class="run-tab tab-view"></div>
+                <div class="run-tab tab-view">
+                    <div class="run-content content-pane">                        
+                        <input type="button" class="button run-button" value="Run">
+                    </div>
+                </div>
 
             </div>
 

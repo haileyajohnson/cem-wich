@@ -83,6 +83,7 @@ html, body {
 
     .section {
         margin-bottom: 8px;
+        display: flex;
     }
 
     .map-container {
@@ -115,7 +116,7 @@ html, body {
         padding-top: 10px;
     }
 
-    .grid-content {
+    .content-pane {
         padding: 15px;
     }
 
