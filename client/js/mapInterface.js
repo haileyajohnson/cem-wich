@@ -201,6 +201,13 @@ function MapInterface() {
             for (var i = 0; i < cemGrid.features.length; i++) {
                 var feature = cemGrid.features[i];
                 var fill = feature.properties.mean;
+                /*
+                1. make grid of fill values
+                2. find boundaries
+                3. fill inside boundaries
+                4. make polygons
+                5. which squares can change?!
+                */
 
                 if (fill == 0) {
                     // add invisible feature
