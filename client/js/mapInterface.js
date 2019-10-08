@@ -195,20 +195,35 @@ function MapInterface() {
             });
 
             var cemGrid = dict.getInfo();
-            //var temp = 0;
+            var numCells = cemGrid.features.length;
 
-            // iterate all cell features
-            for (var i = 0; i < cemGrid.features.length; i++) {
+            // get fill of each cell feature
+            var polyFill = [];
+            for (var i = 0; i < numCells; i++) {
                 var feature = cemGrid.features[i];
-                var fill = feature.properties.mean;
-                /*
-                1. make grid of fill values
-                2. find boundaries
-                3. fill inside boundaries
-                4. make polygons
-                5. which squares can change?!
-                */
+                polyFill.push(feature.properties.mean);
+            }
+            // copy of poly fill which can mask already found landmasses
+            var maskfill = polyFill;
 
+            // find all landform outer boundaries; fill inside boundaries
+            // mask once found
+            for (var i = 0; i < numCells; i++) {
+                if (maskFill[i] > 0 && maskFill[i] < 1) {
+                    var start = i;
+                    var cur = i;
+                    while (cur != )
+                    var boundary = [i];
+                    // find full boundary
+                    // fill inside of boundary
+                    // mask boundary and insides
+                }
+            }
+
+            // make polygons
+            for (var i = 0; i < numCells; i++)
+            {
+                var fill = polyFill[i];
                 if (fill == 0) {
                     // add invisible feature
                     this.modelSource.addFeature( new ol.Feature({
