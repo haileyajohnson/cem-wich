@@ -416,7 +416,7 @@ void ReadConfigFile(){
 	if ((elem = lookup("p_asymmetry_decrease")) != NULL) { p_asymmetry_decrease = atof(elem->val); }
 	else { p_asymmetry_decrease = 0.0; }
 	if ((elem = lookup("p_stability_increase")) != NULL) { p_stability_increase = atof(elem->val); }
-	else { p_stability_decrease = 0.0; }
+	else { p_stability_increase = 0.0; }
 	if ((elem = lookup("p_stability_decrease")) != NULL) { p_stability_decrease = atof(elem->val); }
 	else { p_stability_decrease = 0.0; }
 	if ((elem = lookup("wave_height_avg")) != NULL) { wave_height_avg = atof(elem->val); }
@@ -467,7 +467,7 @@ double** SetupCells()
 				int c;
 				for (c = 0; c < c_cols; c++)
 				{
-					if (temp == NULL) { LogError("Expected more columns in input grid", TRUE); }
+					if (!temp) { LogError("Expected more columns in input grid", TRUE); }
 					cells[r][c] = strtod(temp, &ptr);
 					temp = strtok(NULL, "\t");
 				}

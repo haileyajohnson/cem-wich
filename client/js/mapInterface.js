@@ -157,10 +157,8 @@ function MapInterface() {
          * size numRows X numCols
          */
         createGrid: function(image) {
-            this.cemGrid = [];
             var features = [];
             for (r = 0; r < this.numRows; r++) {
-                this.cemGrid.push([]);
                 for (c = 0; c < this.numCols; c++) {
                     // create polygon feature for each cell                    
                     features.push(new ee.Feature(new ee.Geometry.Polygon(this.polyGrid[r][c])));
@@ -204,19 +202,88 @@ function MapInterface() {
                 polyFill.push(feature.properties.mean);
             }
             // copy of poly fill which can mask already found landmasses
-            var maskfill = polyFill;
+            var maskFill = polyFill;
 
             // find all landform outer boundaries; fill inside boundaries
             // mask once found
             for (var i = 0; i < numCells; i++) {
-                if (maskFill[i] > 0 && maskFill[i] < 1) {
+                if (maskFill[i] > 0) {
+                    // start vars
                     var start = i;
+                    start_r_dir = 0;
+                    start_c_dir = 1;
+
+                    // current vars
                     var cur = i;
-                    while (cur != )
-                    var boundary = [i];
-                    // find full boundary
-                    // fill inside of boundary
-                    // mask boundary and insides
+                    r_dir = 0;
+                    c_dir = 1;
+
+                    // boundary indices and extent
+                    var boundary = new Set([]);
+                    var min_r = this.numRows;
+                    var max_r = 0;
+                    var min_c = this.numCols;
+                    var max_c = 0;
+                    do {
+                        // add boundary index
+                        boundary.add(cur);
+
+                        // change value in mask to 0
+                        maskFill[cur] = 0;
+
+                        // expand extent if necessary
+                        var inds = this.indexToRowCol(cur);
+                        min_r = Math.min(min_r, inds[0]);
+                        max_r = Math.max(max_r, inds[0]);
+                        min_c = Math.min(min_c, inds[1]);
+                        max_c = Math.max(max_c, inds[1]);
+                        
+                        // backtrack
+                        r_dir = -r_dir;
+                        c_dir = -c_dir;
+                        var backtrack = [inds[0]+r_dir, inds[1]+c_dir];
+                        var temp = backtrack;
+                        
+                        // find next cell
+                        do {
+                            // turn 45 degrees clockwise to next neighbor
+                            var angle = Math.atan2(temp[0]-inds[0], temp[1] - inds[1]);
+                            angle -= Math.PI/4;
+                            next = [inds[0] + Math.round(Math.sin(angle)), inds[0] + Math.round(Math.cos(angle))];
+
+                            temp = next;
+                            if (polyFill[this.rowColsToIndex(temp[0], temp[1])] > 0) {
+                                // get dir relative to previous neighbor
+                                dir_r = next[0] - temp[0];
+                                dir_c = next[1] - temp[1];
+                                break;
+                            }
+                        } while (temp != backtrack);
+                        
+                        // special case for isolated cell
+                        if (temp == backtrack) { break; }
+
+                        // set next cell
+                        cur = this.rowColsToIndex(temp[0], temp[1]);
+
+                    } while (cur != start || r_dir != start_r_dir || c_dir != start_c_dir);
+                    
+                    // fill & mask inside of boundary
+                    for (var r = min_r; r <= max_r; r++) {
+                        for (var c = min_c; c <= max_c; c++){
+                            var index = this.rowColsToIndex(r, c);
+                            var numIntersect = 0;
+                            for (var offset = 1; offset <= max_c - c; offset++){
+                                if (boundary.has(index+offset)) {
+                                    numIntersect++;
+                                }
+                            }
+                            if (numIntersect%2 > 0) {
+                                polyFill[index] = 1;
+                                maskFill = 0;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -562,6 +629,16 @@ function MapInterface() {
                 }
             }
             return ind;
+        },        
+
+        indexToRowCol: function(i) {
+            r = Math.floor(i/this.numCols);
+            c = i%this.numCols;
+            return [r, c];
+        },
+
+        rowColsToIndex: function(r, c) {
+            return (r*this.numCols) + c;
         },
 
         /**
