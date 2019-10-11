@@ -202,7 +202,34 @@ function MapInterface() {
                 polyFill.push(feature.properties.mean);
             }
             // copy of poly fill which can mask already found landmasses
-            var maskFill = polyFill;
+            var maskFill = polyFill.slice(0);
+
+            /**
+             * TEMPORARY
+             */
+
+            var tempSource = new ol.source.Vector({});
+            var tempFeature = new ol.Feature({
+                geometry: new ol.geom.Point(cemGrid.features[0].geometry.coordinates[0][0]),
+                style: new ol.style.Style({
+                    image: new ol.style.Circle({
+                        radius: 7,
+                        fill: new ol.style.Fill({color: 'red'}),
+                        stroke: new ol.style.Stroke({
+                        color: [255,0,0], width: 2
+                        })
+                    })
+                })
+            });
+            tempSource.addFeature(tempFeature);
+            
+            var tempLayer = new ol.layer.Vector({source: tempSource, 
+                style: function(feature, resolution) {
+                    return feature.get('style');
+            }});
+            
+            tempLayer.setZIndex(9);
+            this.map.addLayer(tempLayer);
 
             // find all landform outer boundaries; fill inside boundaries
             // mask once found
@@ -210,13 +237,13 @@ function MapInterface() {
                 if (maskFill[i] > 0) {
                     // start vars
                     var start = i;
-                    start_r_dir = 0;
-                    start_c_dir = 1;
+                    var start_r_dir = 0;
+                    var start_c_dir = 1;
 
                     // current vars
                     var cur = i;
-                    r_dir = 0;
-                    c_dir = 1;
+                    var r_dir = 0;
+                    var c_dir = 1;
 
                     // boundary indices and extent
                     var boundary = new Set([]);
@@ -227,6 +254,14 @@ function MapInterface() {
                     do {
                         // add boundary index
                         boundary.add(cur);
+
+                        /**
+                         *  TEMPORARY
+                         *  TRACK BOUNDARY TRACING ALGORITHM
+                         */
+                        var coord = cemGrid.features[cur].geometry.coordinates[0][0];
+                        tempFeature.setGeometry(new ol.geom.Point(coord));
+                        tempSource.refresh();
 
                         // change value in mask to 0
                         maskFill[cur] = 0;
@@ -245,23 +280,28 @@ function MapInterface() {
                         var temp = backtrack;
                         
                         // find next cell
+                        var isolated = true;
                         do {
                             // turn 45 degrees clockwise to next neighbor
                             var angle = Math.atan2(temp[0]-inds[0], temp[1] - inds[1]);
-                            angle -= Math.PI/4;
-                            next = [inds[0] + Math.round(Math.sin(angle)), inds[0] + Math.round(Math.cos(angle))];
+                            angle += Math.PI/4;
+                            var next = [inds[0] + Math.round(Math.sin(angle)), inds[1] + Math.round(Math.cos(angle))];
+                            if (inds[0] < 0 || inds[0] >= this.numRows || inds[1] < 0 || inds[1] >= this.numCols) {
+                                continue;
+                            }
 
+                            // track dir relative to previous neighbor
+                            r_dir = next[0] - temp[0];
+                            c_dir = next[1] - temp[1];
                             temp = next;
-                            if (polyFill[this.rowColsToIndex(temp[0], temp[1])] > 0) {
-                                // get dir relative to previous neighbor
-                                dir_r = next[0] - temp[0];
-                                dir_c = next[1] - temp[1];
+                            if (polyFill[this.rowColsToIndex(next[0], next[1])] > 0) {
+                                isolated = false;
                                 break;
                             }
-                        } while (temp != backtrack);
+                        } while (temp[0] != backtrack[0] || temp[1] != backtrack[1]);
                         
                         // special case for isolated cell
-                        if (temp == backtrack) { break; }
+                        if (isolated) { break; }
 
                         // set next cell
                         cur = this.rowColsToIndex(temp[0], temp[1]);
@@ -280,7 +320,7 @@ function MapInterface() {
                             }
                             if (numIntersect%2 > 0) {
                                 polyFill[index] = 1;
-                                maskFill = 0;
+                                maskFill[index] = 0;
                             }
                         }
                     }
@@ -289,7 +329,8 @@ function MapInterface() {
 
             // make polygons
             for (var i = 0; i < numCells; i++)
-            {
+            {                
+                var feature = cemGrid.features[i];
                 var fill = polyFill[i];
                 if (fill == 0) {
                     // add invisible feature
