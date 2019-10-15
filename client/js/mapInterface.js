@@ -204,32 +204,6 @@ function MapInterface() {
             // copy of poly fill which can mask already found landmasses
             var maskFill = polyFill.slice(0);
 
-            /**
-             * TEMPORARY
-             */
-
-            var tempSource = new ol.source.Vector({});
-            var tempFeature = new ol.Feature({
-                geometry: new ol.geom.Point(cemGrid.features[0].geometry.coordinates[0][0]),
-                style: new ol.style.Style({
-                    image: new ol.style.Circle({
-                        radius: 7,
-                        fill: new ol.style.Fill({color: 'red'}),
-                        stroke: new ol.style.Stroke({
-                        color: [255,0,0], width: 2
-                        })
-                    })
-                })
-            });
-            tempSource.addFeature(tempFeature);
-            
-            var tempLayer = new ol.layer.Vector({source: tempSource, 
-                style: function(feature, resolution) {
-                    return feature.get('style');
-            }});
-            
-            tempLayer.setZIndex(9);
-            this.map.addLayer(tempLayer);
 
             // find all landform outer boundaries; fill inside boundaries
             // mask once found
@@ -237,8 +211,6 @@ function MapInterface() {
                 if (maskFill[i] > 0) {
                     // start vars
                     var start = i;
-                    var start_r_dir = 0;
-                    var start_c_dir = 1;
 
                     // current vars
                     var cur = i;
@@ -246,25 +218,18 @@ function MapInterface() {
                     var c_dir = 1;
 
                     // boundary indices and extent
-                    var boundary = new Set([]);
+                    var boundary = new Map();
                     var min_r = this.numRows;
                     var max_r = 0;
                     var min_c = this.numCols;
                     var max_c = 0;
                     do {
                         // add boundary index
-                        boundary.add(cur);
-
-                        /**
-                         *  TEMPORARY
-                         *  TRACK BOUNDARY TRACING ALGORITHM
-                         */
-                        var coord = cemGrid.features[cur].geometry.coordinates[0][0];
-                        tempFeature.setGeometry(new ol.geom.Point(coord));
-                        tempSource.refresh();
-
-                        // change value in mask to 0
-                        maskFill[cur] = 0;
+                        if (boundary.has(cur)) {
+                            boundary.set(cur, boundary.get(cur)+1);
+                        } else {
+                            boundary.set(cur, 1);
+                        }
 
                         // expand extent if necessary
                         var inds = this.indexToRowCol(cur);
@@ -286,7 +251,8 @@ function MapInterface() {
                             var angle = Math.atan2(temp[0]-inds[0], temp[1] - inds[1]);
                             angle += Math.PI/4;
                             var next = [inds[0] + Math.round(Math.sin(angle)), inds[1] + Math.round(Math.cos(angle))];
-                            if (inds[0] < 0 || inds[0] >= this.numRows || inds[1] < 0 || inds[1] >= this.numCols) {
+                            if (next[0] < 0 || next[0] >= this.numRows || next[1] < 0 || next[1] >= this.numCols) {
+                                temp = next;
                                 continue;
                             }
 
@@ -294,7 +260,7 @@ function MapInterface() {
                             r_dir = next[0] - temp[0];
                             c_dir = next[1] - temp[1];
                             temp = next;
-                            if (polyFill[this.rowColsToIndex(next[0], next[1])] > 0) {
+                            if (maskFill[this.rowColsToIndex(next[0], next[1])] > 0) {
                                 isolated = false;
                                 break;
                             }
@@ -306,16 +272,20 @@ function MapInterface() {
                         // set next cell
                         cur = this.rowColsToIndex(temp[0], temp[1]);
 
-                    } while (cur != start || r_dir != start_r_dir || c_dir != start_c_dir);
+                    } while (cur != start);
                     
                     // fill & mask inside of boundary
                     for (var r = min_r; r <= max_r; r++) {
                         for (var c = min_c; c <= max_c; c++){
                             var index = this.rowColsToIndex(r, c);
+                            if (boundary.has(index)) {
+                                maskFill[index] = 0;
+                                continue;
+                            }
                             var numIntersect = 0;
                             for (var offset = 1; offset <= max_c - c; offset++){
                                 if (boundary.has(index+offset)) {
-                                    numIntersect++;
+                                    numIntersect += boundary.get(index+offset);
                                 }
                             }
                             if (numIntersect%2 > 0) {
@@ -366,6 +336,7 @@ function MapInterface() {
                     }));
                 }
             }
+
 
             // add to map
             var vectorLayer = new ol.layer.Vector({source: this.modelSource, 
