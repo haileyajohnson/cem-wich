@@ -5,6 +5,17 @@ dirEnum = {
     DOWN: 3
 }
 
+function BoundaryCell() {
+    this.prev = [];
+    this.next = [];
+    this.addPrev = (prev) => {
+        this.prev.push(prev);
+    };
+    this.addNext = (next) => {
+        this.next.push(next);
+    } 
+}
+
 function MapInterface() {
     return {
         map: null,        
@@ -213,22 +224,24 @@ function MapInterface() {
                     var start = i;
 
                     // current vars
+                    var prev = null;
                     var cur = i;
                     var r_dir = 0;
                     var c_dir = 1;
 
                     // boundary indices and extent
-                    var boundary = new Map();
+                    var boundaryMap = new Map();
                     var min_r = this.numRows;
                     var max_r = 0;
                     var min_c = this.numCols;
                     var max_c = 0;
                     do {
                         // add boundary index
-                        if (boundary.has(cur)) {
-                            boundary.set(cur, boundary.get(cur)+1);
-                        } else {
-                            boundary.set(cur, 1);
+                        if (!boundaryMap.has(cur)) {
+                            boundaryMap.set(cur, new BoundaryCell());
+                        }
+                        if (prev != null) {
+                            boundaryMap.get(cur).addPrev(prev);
                         }
 
                         // expand extent if necessary
@@ -270,22 +283,45 @@ function MapInterface() {
                         if (isolated) { break; }
 
                         // set next cell
+                        prev = cur;
                         cur = this.rowColsToIndex(temp[0], temp[1]);
+                        boundaryMap.get(prev).addNext(cur);
 
                     } while (cur != start);
+
+                    boundaryMap.get(cur).addPrev(prev);
                     
                     // fill & mask inside of boundary
                     for (var r = min_r; r <= max_r; r++) {
                         for (var c = min_c; c <= max_c; c++){
                             var index = this.rowColsToIndex(r, c);
-                            if (boundary.has(index)) {
+                            if (boundaryMap.has(index)) {
                                 maskFill[index] = 0;
                                 continue;
                             }
                             var numIntersect = 0;
                             for (var offset = 1; offset <= max_c - c; offset++){
-                                if (boundary.has(index+offset)) {
-                                    numIntersect += boundary.get(index+offset);
+                                if (boundaryMap.has(index + offset)) {
+                                    var cell = boundaryMap.get(index + offset);
+                                    var nextAligned = (index+offset+1)%this.numCols > 0 && boundaryMap.has(index+offset+1);
+                                    var prevAligned = (index+offset)%this.numCols > 0 && boundaryMap.has(index+offset-1);
+                                    if (nextAligned && prevAligned) { // skip horizontal boundary segments
+                                        continue;
+                                    }
+                                    for (var n = 0; n < cell.next.length; n++) {
+
+                                        var next_inds = this.indexToRowCol(cell.next[n]);
+                                        var prev_inds = this.indexToRowCol(cell.prev[n]);
+
+                                        // skip vertices
+                                        if ((next_inds[0] == r+1 && (prev_inds[0] == r || prev_inds[0] == r+1)) ||
+                                            ((next_inds[0] == r || next_inds[0] == r+1) && prev_inds[0] == r+1) ||
+                                            (next_inds[0] == r-1 && prev_inds[0] == r-1)) {
+                                            continue;
+                                        }
+
+                                        numIntersect++;
+                                    }
                                 }
                             }
                             if (numIntersect%2 > 0) {
@@ -325,8 +361,8 @@ function MapInterface() {
                     var coords = this.polyGrid[Math.floor(i/this.numCols)][i%this.numCols];
 
                     var maxEdge = this.getMaxLandEdge(cemGrid, i);
-                    var newCoords = this.getNewCoords(coords, fill, maxEdge);
-                        
+                    var newCoords = this.getNewCoords(coords, fill, maxEdge);                
+
                     this.modelSource.addFeature( new ol.Feature({
                         geometry: new ol.geom.Polygon([newCoords]),
                         style: style,
