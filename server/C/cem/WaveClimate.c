@@ -40,20 +40,6 @@ static struct WaveClimate * UpdateWaveClimate(struct WaveClimate *this)
 			if (this->stability > 1) { this->stability = 1; }
 		}
 	}
-	//// update wave height
-	//if (this->p_wh_decrease + this->p_wh_increase > 0)
-	//{
-	//	float v = RandZeroToOne();
-	//	if (v <= this->p_wh_decrease)
-	//	{
-	//		this->wave_height -= WAVE_INCREMENT;
-	//		if (this->wave_height < 0.2) { this->wave_height = 0.2; }
-	//	}
-	//	else if (v <= this->p_wh_increase + this->p_wh_increase)
-	//	{
-	//		this->wave_height += WAVE_INCREMENT;
-	//	}
-	// }
 	return this;
 }
 

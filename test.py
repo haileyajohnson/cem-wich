@@ -1,7 +1,8 @@
 from ctypes import *
 
-lib = CDLL("server/C/_build/bmi_cem")
+lib = CDLL("server/C/_build/py_cem")
+#lib = CDLL("server/C/out/build/x86-Debug/Debug/py_cem")
 
-result = lib.testFunc(2, 3)
+print(lib.testFunc(2, 3))
 
-print(result)
+lib.initialize("../../test/inlet_test.xlsx")

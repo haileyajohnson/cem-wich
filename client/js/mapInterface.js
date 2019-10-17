@@ -305,7 +305,8 @@ function MapInterface() {
                                     var cell = boundaryMap.get(index + offset);
                                     var nextAligned = (index+offset+1)%this.numCols > 0 && boundaryMap.has(index+offset+1);
                                     var prevAligned = (index+offset)%this.numCols > 0 && boundaryMap.has(index+offset-1);
-                                    if (nextAligned && prevAligned) { // skip horizontal boundary segments
+                                    // skip horizontal boundary segments
+                                    if (nextAligned && prevAligned) {
                                         continue;
                                     }
                                     for (var n = 0; n < cell.next.length; n++) {
