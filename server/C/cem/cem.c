@@ -173,15 +173,6 @@ int FindBeach()
 						next_c = c + dir_c;
 					}
 
-					if (!BeachNode.isEmpty(curr->prev))
-					{
-						// break if our next cell is also our previous cell; no other beach cells adjacent
-						if (next_r == curr->prev->row && next_c == curr->prev->col)
-						{
-							break;
-						}
-					}
-
 					r = next_r;
 					c = next_c;
 					struct BeachNode* nextNode = g_beachGrid.TryGetNode(&g_beachGrid, r, c);
