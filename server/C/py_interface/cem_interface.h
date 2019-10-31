@@ -10,8 +10,9 @@ extern "C" {
 #define FAILURE (1)
 
 #include "cem_EXPORTS.h"
+#include "cem/config.h"
 
-cem_EXPORT int initialize();
+cem_EXPORT int initialize(Config config);
 cem_EXPORT int update();
 cem_EXPORT int finalize();
 cem_EXPORT int testFunc(int a, int b);

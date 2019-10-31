@@ -6,7 +6,7 @@ project (cem-web VERSION 0.1)
 set (BUILD_SHARED_LIBS ON)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-set(cem_sources py_interface/cem_interface.c cem/cem.c cem/BeachGrid.c cem/BeachNode.c cem/sedtrans.c cem/WaveClimate.c cem/utils.c)
+set(cem_sources py_interface/cem_interface.c cem/cem.c cem/BeachGrid.c cem/BeachNode.c cem/sedtrans.c cem/WaveClimate.c cem/utils.c cem/config.h)
 add_library(py_cem ${cem_sources})
 
 ###### link libm if not using MSVC #######

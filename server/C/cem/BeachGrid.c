@@ -2,7 +2,6 @@
 #include "BeachNode.h"
 #include "BeachGrid.h"
 #include "consts.h"
-#include "globals.h"
 #include "utils.h"
 #include <math.h>
 
@@ -12,10 +11,11 @@ static struct BeachGrid* SetCells(struct BeachGrid* this, struct BeachNode** cel
 	return this;
 }
 
-static struct BeachNode* SetShoreline(struct BeachGrid* this, struct BeachNode** shoreline)
+static struct BeachNode* SetShorelines(struct BeachGrid* this, struct BeachNode** shorelines, int num)
 {
-	this->shoreline = shoreline;
-	return shoreline;
+	this->shoreline = shorelines;
+	this->num_shorelines = num;
+	return shorelines;
 }
 
 static struct BeachNode* TryGetNode(struct BeachGrid* this, int row, int col)
@@ -297,7 +297,8 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 {
 	int row = node->row;
 	int i = 1;
-	int max_i = (ShadowMax * 1000) / (ShadowStepDistance * this->cell_size);
+	// TODO revisit
+	int max_i = (ShadowMax * 1000) / (ShadowStepDistance * this->cell_width);
 
 	while (row < this->rows && i < max_i)
 	{
@@ -323,16 +324,18 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 	return FALSE;
 }
 
-static struct BeachGrid new(int rows, int cols, int cell_size){
+static struct BeachGrid new(int rows, int cols, double cell_width, double cell_length){
 		return (struct BeachGrid) {
-				.cell_size = cell_size,
+				.cell_width = cell_width,
+				.cell_length = cell_length,
 				.rows = rows,
 				.cols = cols,
 				.cells = NULL,
 				.shoreline_change = 0,
 				.shoreline = NULL,
+				.num_shorelines = 0,
 				.SetCells = &SetCells,
-				.SetShoreline = &SetShoreline,
+				.SetShorelines = &SetShorelines,
 				.TryGetNode = &TryGetNode,
 				.GetDistance = &GetDistance,
 				.GetRightAngle = &GetRightAngle,

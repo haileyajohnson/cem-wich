@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include "cem_interface.h"
-#include "cem/globals.h"
+#include "cem/config.h"
 
 #define return_on_error(stmt)                 \
   {                                           \
@@ -12,13 +12,13 @@
     if (status != SUCCESS) return status; \
   }
 
-int cem_initialize(void);
+int cem_initialize(Config config);
 int cem_update(void);
 int cem_finalize(void);
 
 
-int initialize() {
-	int status = cem_initialize();
+int initialize(Config config) {
+	int status = cem_initialize(config);
 
 	if (status == 0)
 		return SUCCESS;
