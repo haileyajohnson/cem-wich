@@ -1,7 +1,6 @@
 
 #include "BeachNode.h"
 #include "consts.h"
-#include "globals.h"
 #include "utils.h"
 
 static FLOW_DIR GetFlowDirection(struct BeachNode *this)
@@ -54,7 +53,7 @@ static FLOW_DIR GetFlowDirection(struct BeachNode *this)
     }
 }
 
-static struct BeachNode new(double frac_full, int r, int c, int cell_size) {
+static struct BeachNode new(double frac_full, int r, int c, double cell_width, double cell_length) {
     return (struct BeachNode){
         .frac_full = frac_full,
         .transport_dir = NONE,
@@ -63,7 +62,8 @@ static struct BeachNode new(double frac_full, int r, int c, int cell_size) {
         .is_beach = FALSE,
         .row = r,
         .col = c,
-        .cell_size = cell_size,
+        .cell_width = cell_width,
+				.cell_length = cell_length,
         .next = NULL,
         .prev = NULL,
         .GetFlowDirection=&GetFlowDirection
@@ -79,7 +79,8 @@ static struct BeachNode empty(){
         .is_beach = EMPTY_INT,
         .row = EMPTY_INT,
         .col = EMPTY_INT,
-        .cell_size = EMPTY_INT,
+        .cell_width = EMPTY_DOUBLE,
+				.cell_length = EMPTY_DOUBLE,
         .next = NULL,
         .prev = NULL,
         .GetFlowDirection=NULL
@@ -100,7 +101,8 @@ static int isEmpty(struct BeachNode *node)
     || node->is_beach != EMPTY_INT
     || node->row != EMPTY_INT
     || node->col != EMPTY_INT
-    || node->cell_size != EMPTY_INT
+    || node->cell_width != EMPTY_DOUBLE
+		|| node->cell_length != EMPTY_DOUBLE
     || node->next != NULL
     || node->prev != NULL
     || node->GetFlowDirection != NULL)
