@@ -28,7 +28,27 @@ function tryParseFloat(input, fallback) {
     }
 }
 
-function displayInputErrors() {
+function displayInputErrors(errorMessage) {
+    console.log(errorMessage);
+}
+
+function validateData(data) {
+    if (!data.grid || data.grid.length == 0) { return -1; }
+    if (!data.nRows || data.nRows <= 0) { return -1; }
+    if (!data.nCols || data.nCols <= 0) { return -1; }
+    if (!data.cellWidth || data.cellWidth <= 0) { return -1; }
+    if (!data.cellLength || data.cellLength <= 0) { return -1; }
+    if (!data.asymmetry) { return -1; }
+    if (!data.stability) { return -1; }
+    if (!data.waveHeight) { return -1; }
+    if (!data.wavePeriod) { return -1; }
+    if (!data.shelfSlope) { return -1; }
+    if (!data.shorefaceSlope) { return -1; }
+    if (!data.numTimesteps || data.numTimesteps <= 0) { return -1; }
+    if (!data.lengthTimestep || data.lengthTimestep <= 0) { return -1; }
+    if (!data.saveInterval || data.saveInterval <=0) { return -1; }
+    // success
+    return 0;
 }
 
 $.prototype.enable = function () {
