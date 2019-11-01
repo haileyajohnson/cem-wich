@@ -91,6 +91,41 @@ function onLoad() {
     $('#file-input').trigger('click');
 }
 
+
+function onRun() {
+    // create payload
+    var input_data = {
+        grid: mapInterface.cemGrid,
+        nRows: mapInterface.numRows,
+        nCols: mapInterface.numCols,
+        cellWidth: mapInterface.getCellWidth(),
+        cellLength: mapInterface.getCellLength(),
+        asymmetry: parseFloat(this.waveTab.a_val),
+        stability: parseFloat(this.waveTab.u_val),
+        waveHeight: parseFloat(this.waveTab.wave_height),
+        wavePeriod: parseFloat(this.waveTab.wave_period),
+        shelfSlope: parseFloat(this.controlTab.shelf_slope),
+        shorefaceSlope: parseFloat(this.controlTab.shoreface_slope),
+        numTimesteps: parseInt(Math.round((this.controlTab.end_year - this.mapInterface.imageYear) * (365/this.controlTab.length_timestep))),
+        lengthTimestep: parseFloat(this.controlTab.length_timestep),
+        saveInterval: parseInt(this.controlTab.save_interval)
+    }
+    // ensure necessary values are present and valid
+    var status = validateData(input_data);
+    if (status == 0) {
+        // pass to python
+        $.post('/senddata', {
+            type: "json",
+            input_data: JSON.stringify(input_data),
+            success: () => { console.log("success!")}
+        });
+    }
+}
+
+function onModelComplete() {
+
+}
+
 /**
  * Save/load functions
  */
@@ -339,9 +374,48 @@ function WaveTab() {
         $elem: $(".wave-tab"),
         $tab: $("#wave-tab"),
 
+        $asymmetry: $("input[name=a-input]"),       
+        $stability: $("input[name=u-input]"),
+        $wave_height: $("input[name=wave-height]"),       
+        $wave_period: $("input[name=wave-period]"),
+
+        a_val: null,
+        u_val: null,
+        wave_height: null,
+        wave_period: null,
+
         init: function() {
             this.$tab.click(() => { onTabChange(this); });
+            // init values
+            this.a_val = this.$asymmetry.val();
+            this.u_val = this.$stability.val();
+            this.wave_height = this.$wave_height.val();
+            this.wave_period = this.$wave_period.val();
+            // attach listeners
+            this.$asymmetry.change(() => { this.onAsymmetryChange(); });
+            this.$stability.change(() => { this.onStabilityChange(); });
+            this.$wave_height.change(() => { this.onWaveHeightChange(); });
+            this.$wave_period.change(() => { this.onWavePeriodChange(); });
+        },
+
+        /** listeners
+         */
+        onAsymmetryChange: function() {
+            this.a_val = this.$asymmetry.val();
+        },
+
+        onStabilityChange: function() {
+            this.u_val = this.$stability.val();
+        },
+
+        onWaveHeightChange: function() {
+            this.wave_height = this.$wave_height.val();
+        },
+
+        onWavePeriodChange: function() {
+            this.wave_period = this.$wave_period.val();
         }
+
     }
 }
 
@@ -353,8 +427,54 @@ function ControlsTab() {
         $elem: $(".control-tab"),
         $tab: $("#control-tab"),
 
+        $shelf_slope: $("input[name=shelf-slope]"),
+        $shoreface_slope: $("input[name=shoreface-slope]"),
+        $end_year: $("input[name=end-date]"),
+        $length_timestep: $("input[name=timestep]"),
+        $save_interval: $("input[name=save-interval]"),
+
+        shelf_slope: null,
+        shoreface_slope: null,
+        end_year: null,
+        length_timestep: null,
+        save_interval: null,
+
         init: function() {
             this.$tab.click(() => { onTabChange(this); });
+            // init values
+            this.shelf_slope = this.$shelf_slope.val();
+            this.shoreface_slope = this.$shoreface_slope.val();
+            this.end_year = this.$end_year.val();
+            this.length_timestep = this.$length_timestep.val();
+            this.save_interval = this.$save_interval.val();
+            // attach listeners
+            this.$shelf_slope.change(() => { this.onShelfSlopeChange(); });
+            this.$shoreface_slope.change(() => { this.onShorefaceSlopeChange(); });
+            this.$end_year.change(() => { this.onEndYearChange(); });
+            this.$length_timestep.change(() => { this.onTimestepLengthChange(); });
+            this.$save_interval.change(() => { this.onSaveIntervalChange(); });
+        },
+
+        /** listeners
+         */
+        onShelfSlopeChange: function() {
+            this.shelf_slope = this.$shelf_slope.val();
+        },
+
+        onShorefaceSlopeChange: function() {
+            this.shoreface_slope = this.$shoreface_slope.val();
+        },
+
+        onEndYearChange: function() {
+            this.end_year = this.$end_year.val();
+        },
+
+        onTimestepLengthChange: function() {
+            this.length_timestep = this.$length_timestep.val();
+        },
+
+        onSaveIntervalChange: function() {
+            this.save_interval = this.$save_interval.val();
         }
     }
 }
@@ -366,9 +486,12 @@ function RunTab() {
     return {
         $elem: $(".run-tab"),
         $tab: $("#run-tab"),
+        
+        $runButton: $(".run-button"),
 
         init: function() {
             this.$tab.click(() => { onTabChange(this); });
+            this.$runButton.click(() => { onRun(); });
         }
     }
 }

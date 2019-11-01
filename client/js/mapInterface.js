@@ -33,7 +33,7 @@ function MapInterface() {
         numCols: 100,
         numRows:  50,
         rotation: 0,
-
+        imageYear: null,
 
         initMap: function() {
             // initialize earth engine
@@ -132,6 +132,7 @@ function MapInterface() {
             var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
 
             var dataset = ee.ImageCollection('LANDSAT/LE07/C01/T1').filterBounds(poly).filterDate('1999-01-01', '1999-12-31');
+            this.imageYear = 1999;
             var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
 
             var water_bands = ['B3', 'B5'];
@@ -170,9 +171,12 @@ function MapInterface() {
         createGrid: function(image) {
             var features = [];
             for (r = 0; r < this.numRows; r++) {
+                this.cemGrid.push([]);
                 for (c = 0; c < this.numCols; c++) {
                     // create polygon feature for each cell                    
                     features.push(new ee.Feature(new ee.Geometry.Polygon(this.polyGrid[r][c])));
+                    // create placeholder for cem grid
+                    this.cemGrid[r].push(-1);
                 }
             }
 
@@ -203,13 +207,13 @@ function MapInterface() {
                 })
             });
 
-            var cemGrid = dict.getInfo();
-            var numCells = cemGrid.features.length;
+            var infoGrid = dict.getInfo();
+            var numCells = infoGrid.features.length;
 
             // get fill of each cell feature
             var polyFill = [];
             for (var i = 0; i < numCells; i++) {
-                var feature = cemGrid.features[i];
+                var feature = infoGrid.features[i];
                 polyFill.push(feature.properties.mean);
             }
             // copy of poly fill which can mask already found landmasses
@@ -336,8 +340,9 @@ function MapInterface() {
 
             // make polygons
             for (var i = 0; i < numCells; i++)
-            {                
-                var feature = cemGrid.features[i];
+            {   
+                var rc = this.indexToRowCol(i);    
+                var feature = infoGrid.features[i];
                 var fill = polyFill[i];
                 if (fill == 0) {
                     // add invisible feature
@@ -359,9 +364,9 @@ function MapInterface() {
                     }));
                 } else {   // determine angle if frac full
                     
-                    var coords = this.polyGrid[Math.floor(i/this.numCols)][i%this.numCols];
+                    var coords = this.polyGrid[rc[0]][rc[1]];
 
-                    var maxEdge = this.getMaxLandEdge(cemGrid, i);
+                    var maxEdge = this.getMaxLandEdge(infoGrid, i);
                     var newCoords = this.getNewCoords(coords, fill, maxEdge);                
 
                     this.modelSource.addFeature( new ol.Feature({
@@ -372,6 +377,7 @@ function MapInterface() {
                         fill: fill
                     }));
                 }
+                this.cemGrid[rc[0]][rc[1]] = fill;
             }
 
 
@@ -386,7 +392,8 @@ function MapInterface() {
 
         updateFeature(feature, fill, orientation) {
             var id = feature.get('id');
-            var cellCoords = this.polyGrid[Math.floor(id/this.numCols)][id%this.numCols];
+            var rc = this.indexToRowCol(id);
+            var cellCoords = this.polyGrid[rc[0]][rc[1]];
 
             if (fill > 0) {
                 var newCoords = this.getNewCoords(cellCoords, fill, orientation);
@@ -401,6 +408,8 @@ function MapInterface() {
                     })
                 }));
             }
+
+            this.cemGrid[rc[0]][rc[1]] = fill;
 
             feature.set('fill', fill);
             feature.set('orientation', orientation);
@@ -619,36 +628,36 @@ function MapInterface() {
             this.editMode = !this.editMode;
         },
 
-        getMaxLandEdge: function(cemGrid, i) {
+        getMaxLandEdge: function(grid, i) {
             // find surrounding cells in each direction
             var left = [], right = [], up = [], down = [];
             if (i % this.numCols > 0) { // if not left hand column
-                left.push(cemGrid.features[i-1].properties.mean);
+                left.push(grid.features[i-1].properties.mean);
                 if ((i/this.numCols) >= 1) {  //if not top row
-                    left.push(cemGrid.features[i-this.numCols-1].properties.mean);
-                    up.push(cemGrid.features[i-this.numCols-1].properties.mean);
+                    left.push(grid.features[i-this.numCols-1].properties.mean);
+                    up.push(grid.features[i-this.numCols-1].properties.mean);
                 }
                 if ((i/this.numCols) < this.numRows-1) { // if not bottom row
-                    left.push(cemGrid.features[i+this.numCols-1].properties.mean);
-                    down.push(cemGrid.features[i+this.numCols-1].properties.mean);
+                    left.push(grid.features[i+this.numCols-1].properties.mean);
+                    down.push(grid.features[i+this.numCols-1].properties.mean);
                 }
             }
             if (i % this.numCols < this.numCols-1){ // if not right hand column
-                right.push(cemGrid.features[i+1].properties.mean);
+                right.push(grid.features[i+1].properties.mean);
                 if (i/this.numCols >= 1) {  //if not top row
-                    right.push(cemGrid.features[i-this.numCols+1].properties.mean);
-                    up.push(cemGrid.features[i-this.numCols+1].properties.mean);
+                    right.push(grid.features[i-this.numCols+1].properties.mean);
+                    up.push(grid.features[i-this.numCols+1].properties.mean);
                 }
                 if (i/this.numCols < this.numRows-1) { // if not bottom row
-                    right.push(cemGrid.features[i+this.numCols+1].properties.mean);
-                    down.push(cemGrid.features[i+this.numCols+1].properties.mean);
+                    right.push(grid.features[i+this.numCols+1].properties.mean);
+                    down.push(grid.features[i+this.numCols+1].properties.mean);
                 }
             }
             if (i/this.numCols >= 1) {  //if not top row
-                up.push(cemGrid.features[i-this.numCols].properties.mean);
+                up.push(grid.features[i-this.numCols].properties.mean);
             }
             if (i/this.numCols < this.numRows-1) { // if not bottom row
-                down.push(cemGrid.features[i+this.numCols].properties.mean);
+                down.push(grid.features[i+this.numCols].properties.mean);
             }
             
             // determine which side has most dense land
@@ -681,13 +690,25 @@ function MapInterface() {
         },        
 
         indexToRowCol: function(i) {
-            r = Math.floor(i/this.numCols);
-            c = i%this.numCols;
+            var r = Math.floor(i/this.numCols);
+            var c = i%this.numCols;
             return [r, c];
         },
 
         rowColsToIndex: function(r, c) {
             return (r*this.numCols) + c;
+        },
+
+        getCellWidth: function() {
+            var coords = this.box.getCoordinates()[0];
+            var dist_cols = Math.sqrt(Math.pow((coords[0][0] - coords[1][0]), 2) + Math.pow((coords[0][1] - coords[1][1]), 2));
+            return dist_cols/this.numCols;
+        },
+
+        getCellLength: function() {
+            var coords = this.box.getCoordinates()[0];
+            var dist_rows = Math.sqrt(Math.pow((coords[0][0] - coords[3][0]), 2) + Math.pow((coords[0][1] - coords[3][1]), 2));
+            return dist_rows/this.numRows;
         },
 
         /**
@@ -699,6 +720,8 @@ function MapInterface() {
             this.modelSource.clear();
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
             this.box = null;
+            this.polyGrid = [];
+            this.cemGrid = [];
         }
 
     }
@@ -708,8 +731,6 @@ function MapInterface() {
 TODO
     sensitivity control
         - connectivity minimum
-    X fix button logic (i.e. clear and then load)
-    X refactor to tab objects
 
     wave inputs
     conrol inputs
@@ -721,7 +742,4 @@ TODO
     error handling
     image loading
     improve shoreline detection (KVos)?
-
-    X fix top buttons
-    X manual edits
 */

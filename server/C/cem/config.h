@@ -15,7 +15,7 @@ extern "C" {
 		double stability;
 		double waveHeight;
 		double wavePeriod;
-		double shelfslope;
+		double shelfSlope;
 		double shorefaceSlope;
 		int numTimesteps;
 		double lengthTimestep;
