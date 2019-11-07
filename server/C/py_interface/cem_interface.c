@@ -6,12 +6,6 @@
 #include "cem_interface.h"
 #include "cem/config.h"
 
-#define return_on_error(stmt)                 \
-  {                                           \
-    const int status = (stmt);                \
-    if (status != SUCCESS) return status; \
-  }
-
 int cem_initialize(Config config);
 int cem_update(void);
 int cem_finalize(void);

@@ -238,9 +238,9 @@ void SedimentTransport()
 {
 	g_wave_climate.SetWaveHeight(&g_wave_climate);
 	WaveTransformation(&g_beachGrid, g_wave_climate.wave_angle, g_wave_climate.wave_period, g_wave_climate.GetWaveHeight(&g_wave_climate), myConfig.lengthTimestep);
-	GetAvailableSupply(&g_beachGrid, c_cross_shore_reference_pos, c_shelf_depth_at_reference_pos, myConfig.shelfSlope, myConfig.shorefaceSlope, c_minimum_shelf_depth_at_closure);
+	GetAvailableSupply(&g_beachGrid, c_cross_shore_reference_pos, c_shelf_depth_at_reference_pos, myConfig.shelfslope, myConfig.shorefaceSlope, c_minimum_shelf_depth_at_closure);
 	NetVolumeChange(&g_beachGrid);
-	TransportSediment(&g_beachGrid, c_cross_shore_reference_pos, c_shelf_depth_at_reference_pos, myConfig.shelfSlope, myConfig.shorefaceSlope, c_minimum_shelf_depth_at_closure);
+	TransportSediment(&g_beachGrid, c_cross_shore_reference_pos, c_shelf_depth_at_reference_pos, myConfig.shelfslope, myConfig.shorefaceSlope, c_minimum_shelf_depth_at_closure);
 	FixBeach(&g_beachGrid);
 }
 
