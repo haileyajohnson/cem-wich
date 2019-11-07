@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 import json
+import numpy as np
 app = Flask(__name__, static_folder="_dist")
 
 import ee
@@ -7,24 +8,22 @@ import os
 
 from ctypes import *
 
-def configFactory(nRows, nCols):
-    class Config(Structure):
-        _fields_ = [
-            ("grid", (c_float * nCols) * nRows),
-            ("nRows", c_int),
-            ("nCols", c_int),
-            ("cellWidth", c_float),
-            ("cellLength", c_float),
-            ("asymmetry", c_double),
-            ("stability", c_double),
-            ("waveHeight", c_double),
-            ("wavePeriod", c_double),
-            ("shelfSlope", c_double),
-            ("shorefaceSlope", c_double),
-            ("numTimesteps", c_int),
-            ("lengthTimestep", c_double),
-            ("saveInterval", c_int)]
-    return Config
+class Config(Structure):
+    _fields_ = [
+        ("grid", POINTER(POINTER(c_float))),
+        ("nRows", c_int),
+        ("nCols", c_int),
+        ("cellWidth", c_float),
+        ("cellLength", c_float),
+        ("asymmetry", c_double),
+        ("stability", c_double),
+        ("waveHeight", c_double),
+        ("wavePeriod", c_double),
+        ("shelfSlope", c_double),
+        ("shorefaceSlope", c_double),
+        ("numTimesteps", c_int),
+        ("lengthTimestep", c_double),
+        ("saveInterval", c_int)]
 
 lib = CDLL("server/C/_build/py_cem")
 
@@ -49,21 +48,21 @@ def get_input_data():
     nRows = input_data['nRows']
     nCols = input_data['nCols']
 
-    Config = configFactory(nRows, nCols)
-    input = Config(nRows = nRows,  nCols = nCols, cellWidth = input_data['cellWidth'], cellLength = input_data['cellLength'],
+    # build cell grid
+    grid = ((POINTER(c_float)) * nRows)()
+    for r in range(nRows):
+        grid[r] = (c_float * nCols)()
+        for c in range(nCols):
+            grid[r][c] = input_data['grid'][r][c]
+
+    input = Config(grid = grid, nRows = nRows,  nCols = nCols, cellWidth = input_data['cellWidth'], cellLength = input_data['cellLength'],
         asymmetry = input_data['asymmetry'], stability = input_data['stability'], waveHeight = input_data['waveHeight'],
         wavePeriod = input_data['wavePeriod'], shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
         numTimesteps = input_data['numTimesteps'], lengthTimestep = input_data['lengthTimestep'], saveInterval = input_data['saveInterval'])
 
-    # for r in range(nRows):
-    #     for c in range(nCols):
-    #         input.grid[r][c] = 0
-
-    print(input.nRows)
-
-    lib.initialize.argtypes = [POINTER(Config)]
+    lib.initialize.argtypes = [Config]
     lib.initialize.restype = c_int
-    status = lib.initialize(byref(input))
+    status = lib.initialize(input)
 
     return json.dumps({'success': True}), 200, {'ContentType':'applicaiton/json'}
 
