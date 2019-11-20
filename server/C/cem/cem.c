@@ -45,6 +45,7 @@ int cem_finalize(void);
 /* Logging and Debugging */
 void Process();
 void test_LogShoreline();
+void test_OutputGrid();
 
 // TODO: Add error and data return
 
@@ -74,13 +75,15 @@ int cem_initialize(Config config)
 }
 
 // Update the CEM by a single time step.
-int cem_update(void) {
+int cem_update() {
 
 	g_wave_climate.FindWaveAngle(&g_wave_climate);
 
 	SedimentTransport();
 
-	//Process();
+	Process();
+
+	test_OutputGrid();
 
 	current_time_step++;
 	current_time += myConfig.lengthTimestep;
@@ -88,7 +91,7 @@ int cem_update(void) {
 	return 0;
 }
 
-int cem_finalize(void) {
+int cem_finalize() {
 	return 0;
 }
 
@@ -117,7 +120,7 @@ int FindBeach()
 	// empty shoreline pointer
 	struct BeachNode** shorelines = malloc(sizeof(struct BeachNode*));
 	int num_landmasses = 0;
-
+	
 	int r, c;
 	for (c = 0; c < myConfig.nCols; c++) {
 		// flag to skip cells within landmasses
@@ -130,6 +133,7 @@ int FindBeach()
 				search = FALSE;
 			}
 			// turn on search when we encounter ocean cell
+
 			if (!search && node->frac_full == 0)
 			{
 				search = TRUE;
@@ -157,6 +161,7 @@ int FindBeach()
 				}
 
 				shorelines[num_landmasses - 1] = startNode;
+				struct BeachNode* endNode = startNode;
 
 				// current cell
 				int cur_r = r;
@@ -166,9 +171,12 @@ int FindBeach()
 				// direction
 				int dir_r = 1; // downward
 				int dir_c = 0;
+
+				// search clockwise, then counterclockwise
+				int search_dir = 1; // clockwise
 				
 				// while not done tracing landmass
-				do
+				while (TRUE)
 				{
 					// mark as beach
 					if (BeachNode.isEmpty(curr)) { return -1; }
@@ -183,9 +191,9 @@ int FindBeach()
 					int foundNextBeach = FALSE;
 					do
 					{
-						// turn 45 degrees clockwise to next neighbor
+						// turn 45 degrees clockwise/counterclockwise to next neighbor
 						double angle = atan2(temp[0] - cur_r, temp[1] - cur_c);
-						angle += (PI / 4);
+						angle += (search_dir) * (PI / 4);
 						int next[2] = { cur_r + round(sin(angle)), cur_c + round(cos(angle)) };
 
 						// break if running off edge of grid
@@ -203,20 +211,73 @@ int FindBeach()
 					} while (temp[0] != backtrack[0] || temp[1] != backtrack[1]);
 
 					// end landmass
-					if (!foundNextBeach) { break; }
+					if (!foundNextBeach) {
+						if (search_dir > 0) {
+							search_dir = -1;
+							curr = startNode;
+							continue;
+						}
+						break; 
+					}
 
 					cur_r = temp[0];
 					cur_c = temp[1];
 
 					struct BeachNode* tempNode = g_beachGrid.TryGetNode(&g_beachGrid, cur_r, cur_c);
 					if (BeachNode.isEmpty(tempNode)) { return -1; }
+					if (search_dir > 0) { // searching clockwise
+						curr->next = tempNode;
+						tempNode->prev = curr;
+						endNode = tempNode;
+					}
+					else { // backtracking
+						curr->prev = tempNode;
+						tempNode->next = curr;
+						shorelines[num_landmasses - 1] = tempNode;
+						startNode = tempNode;
+					}
 					// node already a beach cell, break
-					if (tempNode->is_beach) { break; }
-					curr->next = tempNode;
-					tempNode->prev = curr;
+					if (tempNode->is_beach) {
+						if (search_dir > 0) {
+							search_dir = -1;
+							curr = startNode;
+							continue;
+						}
+						break;
+					}
 					curr = tempNode;
+				}
+				// check start boundary
+				if (BeachNode.isEmpty(startNode->prev))
+				{
+					struct BeachNode* startBoundary = BeachNode.boundary();
+					if (startNode->GetCol(startNode) == 0) { startBoundary->col = -1; }
+					else if (startNode->GetCol(startNode) == myConfig.nCols - 1) { startBoundary->col = myConfig.nCols; }
+					else if (startNode->GetRow(startNode) == 0) { startBoundary->row = -1; }
+					else if (startNode->GetRow(startNode) == myConfig.nRows - 1) { startBoundary->row = myConfig.nRows; }
+					else {
+						// if not an edge node, break: invalid grid
+						return -1;
+					}
+					startNode->prev = startBoundary;
+					startBoundary->next = startNode;
+				}
+				// check end boundary
+				if (BeachNode.isEmpty(endNode->next))
+				{
+					struct BeachNode* endBoundary = BeachNode.boundary();
+					if (endNode->GetCol(endNode) == 0) { endBoundary->col = -1; }
+					else if (endNode->GetCol(endNode) == myConfig.nCols - 1) { endBoundary->col = myConfig.nCols; }
+					else if (endNode->GetRow(endNode) == 0) { endBoundary->row = -1; }
+					else if (endNode->GetRow(endNode) == myConfig.nRows - 1) { endBoundary->row = myConfig.nRows; }
+					else {
+						// if not an edge node, break: invalid grid
+						return -1;
+					}
+					endNode->next = endBoundary;
+					endBoundary->prev = endNode;
+				}
 
-				} while (cur_r != r || cur_c != c);
 				// back track so that search will cross land boundary and set flag to false
 				r--;
 			}
@@ -264,42 +325,7 @@ int IsLandCell(int row, int col)
 /* ----- CONFIGURATION AND OUTPUT FUNCTIONS -----*/
 void Process()
 {
-	// rock grid
-	// sand grid
-	// shoreline position
-	// wave characteristics
-	// miscellaneous data
-	if (current_time_step % myConfig.saveInterval != 0) { return; }
-
-	char savefile_name[40];
-	sprintf(savefile_name, "../output/CEM_%06d.out", current_time_step);
-	printf("Saving as: %s \n \n \n", savefile_name);
-
-	FILE* savefile = fopen(savefile_name, "w");
-	if (!savefile) { // TODO
-	}
-
-	fprintf(savefile, "%f %f\n%f %f\n%f\n\n%d %d\n", g_wave_climate.asymmetry, g_wave_climate.stability, g_wave_climate.wave_angle, g_wave_climate.GetWaveHeight(&g_wave_climate), g_beachGrid.shoreline_change, g_beachGrid.rows, g_beachGrid.cols);
-
-	int r, c;
-	for (r = (g_beachGrid.rows - 1); r >= 0; r--)
-	{
-		for (c = 0; c < g_beachGrid.cols; c++)
-		{
-			struct BeachNode* node = g_beachGrid.TryGetNode(&g_beachGrid, r, c);
-			if (!node)
-			{
-				fprintf(savefile, " --");
-				continue;
-			}
-			fprintf(savefile, " %lf", node->frac_full);
-		}
-		fprintf(savefile, "\n");
-	}
-
-	fclose(savefile);
-
-	printf("file save!\n");
+	// TODO
 }
 
 void test_LogShoreline() {
@@ -318,7 +344,31 @@ void test_LogShoreline() {
 				fprintf(savefile, " --");
 				continue;
 			}
-			fprintf(savefile, " %d", node->is_beach);
+			fprintf(savefile, " %00d", node->is_beach);
+		}
+		fprintf(savefile, "\n");
+	}
+
+	fclose(savefile);
+}
+
+void test_OutputGrid() {
+	char savefile_name[40];
+	sprintf(savefile_name, "server/test/output/CEM_%06d.out", current_time_step);
+	
+	FILE* savefile = fopen(savefile_name, "w");
+	int r, c;
+	for (r = 0; r < myConfig.nRows; r++)
+	{
+		for (c = 0; c < myConfig.nCols; c++)
+		{
+			struct BeachNode* node = g_beachGrid.TryGetNode(&g_beachGrid, r, c);
+			if (!node)
+			{
+				fprintf(savefile, " --");
+				continue;
+			}
+			fprintf(savefile, " %00d", node->frac_full);
 		}
 		fprintf(savefile, "\n");
 	}

@@ -12,3 +12,7 @@ _dist/
 ##############################
 server/C/_build/
 server/C/bmi/bmi_EXPORTS.h
+
+# test files #
+##############
+server/test/

@@ -54,15 +54,20 @@ def get_input_data():
         grid[r] = (c_float * nCols)()
         for c in range(nCols):
             grid[r][c] = input_data['grid'][r][c]
+    
+    numTimesteps = input_data['numTimesteps']
 
     input = Config(grid = grid, nRows = nRows,  nCols = nCols, cellWidth = input_data['cellWidth'], cellLength = input_data['cellLength'],
         asymmetry = input_data['asymmetry'], stability = input_data['stability'], waveHeight = input_data['waveHeight'],
         wavePeriod = input_data['wavePeriod'], shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
-        numTimesteps = input_data['numTimesteps'], lengthTimestep = input_data['lengthTimestep'], saveInterval = input_data['saveInterval'])
+        numTimesteps = numTimesteps, lengthTimestep = input_data['lengthTimestep'], saveInterval = input_data['saveInterval'])
 
     lib.initialize.argtypes = [Config]
     lib.initialize.restype = c_int
     status = lib.initialize(input)
+
+    for i in range(numTimesteps):
+        lib.update()
 
     return json.dumps({'success': True}), 200, {'ContentType':'applicaiton/json'}
 

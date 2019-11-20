@@ -300,16 +300,23 @@ function MapInterface() {
                         for (var c = min_c; c <= max_c; c++){
                             var index = this.rowColsToIndex(r, c);
                             if (boundaryMap.has(index)) {
+                                // special case for grid borders
+                                if ((r == this.numRows-1 || r == 0) && (c == 0 || boundaryMap.has(index-1)) && (c == this.numCols-1 || boundaryMap.has(index+1))
+                                || (c == this.numCols-1 || c == 0) && (r == 0 || boundaryMap.has(index-this.numCols)) && (r == this.numRows-1 || boundaryMap.has(index+this.numCols))) {
+                                    polyFill[index] = 1;
+                                }
+                                // mask other boundary cells
                                 maskFill[index] = 0;
                                 continue;
                             }
                             var numIntersect = 0;
                             for (var offset = 1; offset <= max_c - c; offset++){
                                 if (boundaryMap.has(index + offset)) {
+
                                     var cell = boundaryMap.get(index + offset);
-                                    var nextAligned = (index+offset+1)%this.numCols > 0 && boundaryMap.has(index+offset+1);
-                                    var prevAligned = (index+offset)%this.numCols > 0 && boundaryMap.has(index+offset-1);
-                                    // skip horizontal boundary segments
+                                    var nextAligned = (index+offset+1)%this.numCols == 0 || boundaryMap.has(index+offset+1);
+                                    var prevAligned = (index+offset)%this.numCols == 0 || boundaryMap.has(index+offset-1);
+                                    // skip horizontal boundary segments (including those that run off the grid)
                                     if (nextAligned && prevAligned) {
                                         continue;
                                     }
@@ -329,6 +336,7 @@ function MapInterface() {
                                     }
                                 }
                             }
+
                             if (numIntersect%2 > 0) {
                                 polyFill[index] = 1;
                                 maskFill[index] = 0;
@@ -716,7 +724,7 @@ function MapInterface() {
             var lon1 = coords[0][1];
             var lat2 = coords[3][0];
             var lon2 = coords[3][1];
-                        
+
             var dist_rows = this.getLatLonAsMeters(lat1, lon1, lat2, lon2);
             return dist_rows/this.numRows;
         },
