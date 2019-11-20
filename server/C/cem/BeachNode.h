@@ -20,7 +20,7 @@ struct BeachNode {
 extern const struct BeachNodeClass {
     struct BeachNode (*new)(double frac_full, int row, int col, double cell_width, double cell_length);
     struct BeachNode (*empty)();
-		struct BeachNode*(*boundary)();
+		struct BeachNode* (*boundary)(int r, int c);
     int (*isEmpty)(struct BeachNode *node);
 		double (*GetAngle)(struct BeachNode* node1, struct BeachNode* node2);
 } BeachNode;

@@ -123,11 +123,12 @@ static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* n
 	int curr_col = curr->GetCol(curr);
 
 	struct BeachNode* stopNode = node->next;
-	if (BeachNode.isEmpty(stopNode)) { stopNode = curr; }
+	int stop_row = stopNode->GetRow(stopNode);
+	int stop_col = stopNode->GetCol(stopNode);
 
-	do
+	//while (curr_row != stop_row || curr_col != stop_col)
+	while(TRUE)
 	{
-
 		double angle = atan2(curr_row - row, curr_col - col);
 		angle += (dir * PI / 4);
 		curr_row = row + round(sin(angle));
@@ -136,6 +137,16 @@ static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* n
 		if (curr_row < 0 || curr_row >= this->rows || curr_col < 0 || curr_col >= this->cols) { continue; }
 
 		struct BeachNode* temp = this->TryGetNode(this, curr_row, curr_col);
+		// TODO check if member of another shoreline
+		if (temp->is_beach) {
+			if (temp->row == stop_row && temp->col == stop_col) {
+				curr->next = temp;
+				temp->prev = curr;
+				curr = temp;
+				break;
+			}
+			continue;
+		}
 		if (temp->frac_full > 0)
 		{
 			temp->is_beach = TRUE;
@@ -143,8 +154,11 @@ static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* n
 			temp->prev = curr;
 			curr = temp;
 		}
-	} while (curr != stopNode);
+	}
 
+	node->is_beach = FALSE;
+	node->prev = NULL;
+	node->next = NULL;
 	// return end node of inserted segment
 	return stopNode->prev;
 }

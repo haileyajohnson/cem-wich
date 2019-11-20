@@ -8,6 +8,7 @@ static struct WaveClimate * UpdateWaveClimate(struct WaveClimate *this)
 
 static struct WaveClimate * SetWaveHeight(struct WaveClimate *this)
 {
+	this->wave_height = this->wave_height_avg;
 	return this;
 }
 

@@ -123,24 +123,17 @@ int FindBeach()
 	
 	int r, c;
 	for (c = 0; c < myConfig.nCols; c++) {
-		// flag to skip cells within landmasses
-		int search = TRUE;
 		for (r = 0; r < myConfig.nRows; r++) {
 			// turn off search when we encounter boundary
 			struct BeachNode* node = g_beachGrid.TryGetNode(&g_beachGrid, r, c);
 			if (node->is_beach)
 			{
-				search = FALSE;
+				// don't search below outer shoreline
+				break;
 			}
-			// turn on search when we encounter ocean cell
-
-			if (!search && node->frac_full == 0)
-			{
-				search = TRUE;
-			}
-
+		
 			// start tracing shoreline
-			if (search && IsLandCell(r, c)) {
+			if (IsLandCell(r, c)) {
 				// start cell
 				struct BeachNode* startNode = node;
 				if (BeachNode.isEmpty(startNode)) { return -1; }
@@ -228,18 +221,40 @@ int FindBeach()
 					if (search_dir > 0) { // searching clockwise
 						curr->next = tempNode;
 						tempNode->prev = curr;
+						// end if undercutting
+						if (tempNode->GetCol(tempNode) < curr->GetCol(curr) && tempNode->GetRow(tempNode) <= curr->GetRow(curr))
+						{
+							tempNode->is_boundary = TRUE;
+							search_dir = -1;
+							dir_r = 1;
+							dir_c = 0;
+							cur_r = startNode->GetRow(startNode);
+							cur_c = startNode->GetCol(startNode);
+							curr = startNode;
+							continue;
+						}
 						endNode = tempNode;
 					}
 					else { // backtracking
 						curr->prev = tempNode;
 						tempNode->next = curr;
 						shorelines[num_landmasses - 1] = tempNode;
+						// end if undercutting
+						if (tempNode->GetCol(tempNode) > curr->GetCol(curr) && tempNode->GetRow(tempNode) <= curr->GetRow(curr))
+						{
+							tempNode->is_boundary = TRUE;
+							continue;
+						}
 						startNode = tempNode;
 					}
 					// node already a beach cell, break
 					if (tempNode->is_beach) {
 						if (search_dir > 0) {
 							search_dir = -1;
+							dir_r = 1;
+							dir_c = 0;
+							cur_r = startNode->GetRow(startNode);
+							cur_c = startNode->GetCol(startNode);
 							curr = startNode;
 							continue;
 						}
@@ -250,11 +265,11 @@ int FindBeach()
 				// check start boundary
 				if (BeachNode.isEmpty(startNode->prev))
 				{
-					struct BeachNode* startBoundary = BeachNode.boundary();
-					if (startNode->GetCol(startNode) == 0) { startBoundary->col = -1; }
-					else if (startNode->GetCol(startNode) == myConfig.nCols - 1) { startBoundary->col = myConfig.nCols; }
-					else if (startNode->GetRow(startNode) == 0) { startBoundary->row = -1; }
-					else if (startNode->GetRow(startNode) == myConfig.nRows - 1) { startBoundary->row = myConfig.nRows; }
+					struct BeachNode* startBoundary;
+					if (startNode->GetCol(startNode) == 0) { startBoundary = BeachNode.boundary(EMPTY_INT, -1); }
+					else if (startNode->GetCol(startNode) == myConfig.nCols - 1) { startBoundary = BeachNode.boundary(EMPTY_INT, myConfig.nCols); }
+					else if (startNode->GetRow(startNode) == 0) { startBoundary = BeachNode.boundary(-1, EMPTY_INT); }
+					else if (startNode->GetRow(startNode) == myConfig.nRows - 1) { startBoundary = BeachNode.boundary(myConfig.nRows, EMPTY_INT); }
 					else {
 						// if not an edge node, break: invalid grid
 						return -1;
@@ -265,11 +280,11 @@ int FindBeach()
 				// check end boundary
 				if (BeachNode.isEmpty(endNode->next))
 				{
-					struct BeachNode* endBoundary = BeachNode.boundary();
-					if (endNode->GetCol(endNode) == 0) { endBoundary->col = -1; }
-					else if (endNode->GetCol(endNode) == myConfig.nCols - 1) { endBoundary->col = myConfig.nCols; }
-					else if (endNode->GetRow(endNode) == 0) { endBoundary->row = -1; }
-					else if (endNode->GetRow(endNode) == myConfig.nRows - 1) { endBoundary->row = myConfig.nRows; }
+					struct BeachNode* endBoundary;
+					if (endNode->GetCol(endNode) == 0) { endBoundary = BeachNode.boundary(EMPTY_INT, -1); }
+					else if (endNode->GetCol(endNode) == myConfig.nCols - 1) { endBoundary = BeachNode.boundary(EMPTY_INT, myConfig.nCols);}
+					else if (endNode->GetRow(endNode) == 0) { endBoundary = BeachNode.boundary(-1, EMPTY_INT); }
+					else if (endNode->GetRow(endNode) == myConfig.nRows - 1) { endBoundary = BeachNode.boundary(myConfig.nRows, EMPTY_INT); }
 					else {
 						// if not an edge node, break: invalid grid
 						return -1;
