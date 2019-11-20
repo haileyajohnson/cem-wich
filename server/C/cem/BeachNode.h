@@ -9,7 +9,9 @@ extern "C" {
 	
 struct BeachNode {
     double frac_full, transport_potential, net_volume_change, cell_width, cell_length;
-    int is_beach, row, col;
+		int is_beach, is_boundary, row, col;
+		int (*GetRow)(struct BeachNode* this);
+		int (*GetCol)(struct BeachNode* this);
     FLOW_DIR transport_dir;
     struct BeachNode* next;
     struct BeachNode* prev;
@@ -18,7 +20,9 @@ struct BeachNode {
 extern const struct BeachNodeClass {
     struct BeachNode (*new)(double frac_full, int row, int col, double cell_width, double cell_length);
     struct BeachNode (*empty)();
+		struct BeachNode*(*boundary)();
     int (*isEmpty)(struct BeachNode *node);
+		double (*GetAngle)(struct BeachNode* node1, struct BeachNode* node2);
 } BeachNode;
 
 #if defined(__cplusplus)

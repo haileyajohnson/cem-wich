@@ -25,66 +25,48 @@ static struct BeachNode* TryGetNode(struct BeachGrid* this, int row, int col)
 		return NULL;
 	}
 
-	while (col >= this->cols)
+	if (col < 0 || col >= this->cols)
 	{
-		col = col - this->cols;
-	}
-	while (col < 0)
-	{
-		col = col + this->cols;
+		return NULL;
 	}
 
 	return &(this->cells[row][col]);
 }
 
+static int FindInShorelines(struct BeachGrid* this, struct BeachNode* node) {
+	int i = 0;
+	while (i < this->num_shorelines)
+	{
+		if (this->shoreline[i] == node)
+		{
+			return i;
+		}
+		i++;
+	}
+	return -1;
+}
+
 static double GetDistance(struct BeachGrid* this, struct BeachNode node1, struct BeachNode node2)
 {
-	return sqrt(raise((node2.row - node2.row), 2) + raise(GetColumnwiseDistance(this, node1, node2), 2));
+	return sqrt(raise((node2.GetRow(&node2) - node1.GetRow(&node1)), 2) + raise((node2.GetCol(&node2) - node1.GetCol(&node1)), 2));
 }
 
-static int GetColumnwiseDistance(struct BeachGrid* this, struct BeachNode node1, struct BeachNode node2)
+static double GetPrevAngle(struct BeachGrid* this, struct BeachNode* node)
 {
-	int c1 = node1.col;
-	int c2 = node2.col;
-	if (abs(c2 - c1) >= this->cols / 2)
-	{
-		if (c2 > c1)
-		{
-			c1 += this->cols;
-		}
-		else
-		{
-			c2 += this->cols;
-		}
-	}
-	return c2 - c1;
+	if (BeachNode.isEmpty(node->prev)) { return EMPTY_DOUBLE; }
+	return BeachNode.GetAngle(node->prev, node);
 }
 
-static double GetLeftAngle(struct BeachGrid* this, struct BeachNode* node)
+static double GetNextAngle(struct BeachGrid* this, struct BeachNode* node)
 {
-	if (BeachNode.isEmpty(node->prev))
-	{
-		return EMPTY_DOUBLE;
-	}
-	return (*this).GetAngle(this, node->prev, node);
-}
-
-static double GetRightAngle(struct BeachGrid* this, struct BeachNode* node)
-{
-	if (BeachNode.isEmpty(node->next))
-	{
-		return EMPTY_DOUBLE;
-	}
-	return (*this).GetAngle(this, node, node->next);
+	if (BeachNode.isEmpty(node->next)) { return EMPTY_DOUBLE; }
+	return BeachNode.GetAngle(node, node->next);
 }
 
 static double GetSurroundingAngle(struct BeachGrid* this, struct BeachNode* node)
 {
-	if (BeachNode.isEmpty(node->prev) || BeachNode.isEmpty(node->next))
-	{
-		return EMPTY_DOUBLE;
-	}
-	return ((*this).GetLeftAngle(this, node) + (*this).GetRightAngle(this, node)) / 2;
+	if (BeachNode.isEmpty(node->prev) || BeachNode.isEmpty(node->next)) { return EMPTY_DOUBLE; }
+	return ((*this).GetPrevAngle(this, node) + (*this).GetNextAngle(this, node)) / 2;
 }
 
 static double GetAngleByDifferencingScheme(struct BeachGrid* this, struct BeachNode* node, double wave_angle)
@@ -102,22 +84,23 @@ static double GetAngleByDifferencingScheme(struct BeachGrid* this, struct BeachN
 	if (alpha > 0)
 	{
 		downwind_node = node->prev;
-		upwind_angle = (*this).GetLeftAngle(this, node);
-		downwind_angle = (*this).GetRightAngle(this, node);
+		upwind_angle = (*this).GetPrevAngle(this, node);
+		downwind_angle = (*this).GetNextAngle(this, node);
 		dir = RIGHT;
 	}
 	else
 	{
 		downwind_node = node->next;
-		upwind_angle = (*this).GetRightAngle(this, node);
-		downwind_angle = (*this).GetLeftAngle(this, node);
+		upwind_angle = (*this).GetNextAngle(this, node);
+		downwind_angle = (*this).GetPrevAngle(this, node);
 		dir = LEFT;
 	}
 
 	double instability_threshold = 42 * DEG_TO_RAD;
 	int U = fabs(alpha) >= instability_threshold;
-	int U_downwind = fabs(wave_angle - (*this).GetSurroundingAngle(this, downwind_node)) >= instability_threshold
-		&& !(*this).CheckIfInShadow(this, downwind_node, wave_angle);
+	
+	int U_downwind = !downwind_node->is_boundary ? (fabs(wave_angle - (*this).GetSurroundingAngle(this, downwind_node)) >= instability_threshold
+		&& !(*this).CheckIfInShadow(this, downwind_node, wave_angle)) : U;
 
 	if ((U && !U_downwind) || (!U && U_downwind))
 	{
@@ -130,102 +113,49 @@ static double GetAngleByDifferencingScheme(struct BeachGrid* this, struct BeachN
 	return downwind_angle;
 }
 
-static double GetAngle(struct BeachGrid* this, struct BeachNode* node1, struct BeachNode* node2)
-{
-	double angle = atan2((node2->row + node2->frac_full) - (node1->row + node1->frac_full), GetColumnwiseDistance(this, *node1, *node2));
-	if (node1->col == node2->col)
-	{
-		angle = atan2(node2->row - node1->row, (1 - node2->frac_full) - (1 - node1->frac_full));
-	}
-
-	while (angle > PI)
-	{
-		angle -= 2 * PI;
-	}
-	while (angle < -PI)
-	{
-		angle += 2 * PI;
-	}
-	return angle;
-}
-
 static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* node, int dir)
 {
-	struct BeachNode** neighbors = (*this).Get8Neighbors(this, node, dir);
+	struct BeachNode* curr = node->prev;
+	int row = node->GetRow(node);
+	int col = node->GetCol(node);
 
-	struct BeachNode* firstNode = node->prev;
-	struct BeachNode* curr = firstNode;
-	int i;
-	for (i = 0; i < 8; i++)
+	int curr_row = curr->GetRow(curr);
+	int curr_col = curr->GetCol(curr);
+
+	struct BeachNode* stopNode = node->next;
+	if (BeachNode.isEmpty(stopNode)) { stopNode = curr; }
+
+	do
 	{
-		struct BeachNode* temp = neighbors[i];
-		if (temp == node->next)
+
+		double angle = atan2(curr_row - row, curr_col - col);
+		angle += (dir * PI / 4);
+		curr_row = row + round(sin(angle));
+		curr_col = col + round(cos(angle));
+
+		if (curr_row < 0 || curr_row >= this->rows || curr_col < 0 || curr_col >= this->cols) { continue; }
+
+		struct BeachNode* temp = this->TryGetNode(this, curr_row, curr_col);
+		if (temp->frac_full > 0)
 		{
-			break;
+			temp->is_beach = TRUE;
+			curr->next = temp;
+			temp->prev = curr;
+			curr = temp;
 		}
-		if (BeachNode.isEmpty(temp) || temp->frac_full == 1 || temp->frac_full == 0 || temp->is_beach)
-		{
-			continue;
-		}
-
-		temp->is_beach = TRUE;
-		curr->next = temp;
-		temp->prev = curr;
-		curr = temp;
-	}
-
-	curr->next = node->next;
-	node->next->prev = curr;
-	struct BeachNode* lastNode = curr;
-
-	// remove inset corner nodes
-	curr = firstNode;
-	struct BeachNode* stopNode = lastNode->next->next;
-	while (curr != stopNode)
-	{
-		if (abs(curr->next->col - curr->prev->col) == 1 && abs(curr->next->row - curr->prev->row) == 1)
-		{
-			int r = curr->prev->row == curr->row ? curr->next->row : curr->prev->row;
-			int c = curr->prev->col == curr->col ? curr->next->col : curr->prev->col;
-			struct BeachNode* temp = TryGetNode(this, r, c);
-			if (!BeachNode.isEmpty(temp) && temp->frac_full <= 0)
-			{
-				if (curr == lastNode) { lastNode = lastNode->prev; }
-				struct BeachNode* next_node = (*this).RemoveNode(this, curr);
-				if (curr == this->shoreline) { this->shoreline = next_node; }
-				curr = next_node;
-			}
-		}
-		curr = curr->next;
-	}
-
-	// remove node
-	node->prev = NULL;
-	node->next = NULL;
-	node->is_beach = FALSE;
-	if (node == this->shoreline) { this->shoreline = lastNode; }
-	free(neighbors);
+	} while (curr != stopNode);
 
 	// return end node of inserted segment
-	return lastNode;
-}
-
-static struct BeachNode* RemoveNode(struct BeachGrid* this, struct BeachNode* node)
-{
-	struct BeachNode* next_node = node->next;
-	node->prev->next = next_node;
-	node->next->prev = node->prev;
-	node->prev = NULL;
-	node->next = NULL;
-	node->is_beach = FALSE;
-	return next_node;
+	return stopNode->prev;
 }
 
 static struct BeachNode** Get4Neighbors(struct BeachGrid* this, struct BeachNode* node)
 {
 	struct BeachNode** neighbors = malloc(4 * sizeof(struct BeachNode*));
-	int cols[4] = { node->col - 1, node->col, node->col + 1, node->col };
-	int rows[4] = { node->row, node->row + 1, node->row, node->row - 1 };
+	int myCol = node->GetCol(node);
+	int myRow = node->GetRow(node);
+	int cols[4] = { myCol - 1, myCol, myCol + 1, myCol };
+	int rows[4] = { myRow, myRow + 1, myRow, myRow - 1 };
 
 	int i;
 	for (i = 0; i < 4; i++)
@@ -236,74 +166,17 @@ static struct BeachNode** Get4Neighbors(struct BeachGrid* this, struct BeachNode
 	return neighbors;
 }
 
-static struct BeachNode** Get8Neighbors(struct BeachGrid* this, struct BeachNode* node, int dir)
-{
-	struct BeachNode** neighbors = malloc(8 * sizeof(struct BeachNode*));
-	int cols[8] = { node->col - 1, node->col - 1, node->col, node->col + 1, node->col + 1, node->col + 1, node->col, node->col - 1 };
-	int rows[8] = { node->row, node->row + 1, node->row + 1, node->row + 1, node->row, node->row - 1, node->row - 1, node->row - 1 };
-
-	// reorder
-	int angle = round((*this).GetAngle(this, node->prev, node) / (PI / 4));
-	int start_index = 0;
-	switch (angle) {
-	case (1):
-		start_index = 7;
-		break;
-	case (2):
-		start_index = 6;
-		break;
-	case (3):
-		start_index = 5;
-		break;
-	case (4):
-		start_index = 4;
-		break;
-	case (-4):
-		start_index = 4;
-		break;
-	case (-1):
-		start_index = 1;
-		break;
-	case (-2):
-		start_index = 2;
-		break;
-	case (-3):
-		start_index = 3;
-		break;
-
-	}
-
-	int* new_cols = rotate(cols, start_index, 8);
-	int* new_rows = rotate(rows, start_index, 8);
-
-	// reverse order if shoreline is eroding rather than prograding
-	if (dir < 0)
-	{
-		new_cols = reverse(cols, 8);
-		new_rows = reverse(rows, 8);
-	}
-
-	// get neighbores
-	int i;
-	for (i = 0; i < 8; i++)
-	{
-		neighbors[i] = TryGetNode(this, new_rows[i], new_cols[i]);
-	}
-
-	return neighbors;
-}
-
 static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, double wave_angle)
 {
-	int row = node->row;
+	int row = node->GetRow(node);
 	int i = 1;
 	// TODO revisit
 	int max_i = (ShadowMax * 1000) / (ShadowStepDistance * this->cell_width);
 
 	while (row < this->rows && i < max_i)
 	{
-		row = node->row + trunc(i * ShadowStepDistance * cos(wave_angle));
-		int col = node->col + trunc(-i * ShadowStepDistance * sin(wave_angle));
+		row = node->GetRow(node) + trunc(i * ShadowStepDistance * cos(wave_angle));
+		int col = node->GetCol(node) + trunc(-i * ShadowStepDistance * sin(wave_angle));
 
 		struct BeachNode* temp = TryGetNode(this, row, col);
 		if (BeachNode.isEmpty(temp))
@@ -311,14 +184,11 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 			return FALSE;
 		}
 
-		if (temp->frac_full == 1 && (temp->row + 1) > node->row + node->frac_full + fabs(GetColumnwiseDistance(this, *node, *temp) / tan(wave_angle)))
+		if (temp->frac_full == 1 && (temp->GetRow(temp) + 1) > node->GetRow(node) + node->frac_full + fabs((node->GetCol(node) - temp->GetCol(temp)) / tan(wave_angle)))
 		{
 			return TRUE;
 		}
-		//if (temp->frac_full > 0 && temp->row + temp->frac_full > node->row + node->frac_full + fabs(GetColumnwiseDistance(this, *node, *temp) / tan(wave_angle)))
-		//{
-		//    return TRUE;
-		//}
+
 		i++;
 	}
 	return FALSE;
@@ -331,22 +201,19 @@ static struct BeachGrid new(int rows, int cols, double cell_width, double cell_l
 				.rows = rows,
 				.cols = cols,
 				.cells = NULL,
-				.shoreline_change = 0,
 				.shoreline = NULL,
 				.num_shorelines = 0,
 				.SetCells = &SetCells,
 				.SetShorelines = &SetShorelines,
 				.TryGetNode = &TryGetNode,
+				.FindInShorelines = &FindInShorelines,
 				.GetDistance = &GetDistance,
-				.GetRightAngle = &GetRightAngle,
-				.GetLeftAngle = &GetLeftAngle,
+				.GetPrevAngle = &GetPrevAngle,
+				.GetNextAngle = &GetNextAngle,
 				.GetSurroundingAngle = &GetSurroundingAngle,
 				.GetAngleByDifferencingScheme = &GetAngleByDifferencingScheme,
-				.GetAngle = &GetAngle,
 				.ReplaceNode = &ReplaceNode,
-				.RemoveNode = &RemoveNode,
 				.Get4Neighbors = &Get4Neighbors,
-				.Get8Neighbors = &Get8Neighbors,
 				.CheckIfInShadow = &CheckIfInShadow
 				};
 }

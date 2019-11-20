@@ -4,12 +4,7 @@
 #if defined(__cplusplus)
 extern "C" {
 #endif
-
-
-// slope of continental shelf
-#define SHELF_SLOPE (0.001)
-// for now, linear slope of shoreface
-#define SHOREFACE_SLOPE (0.01)
+	
 // minimum depth of shoreface due to wave action (meters)
 #define DEPTH_SHOREFACE (10.)
 // cell where intial conditions changes from beach to ocean
