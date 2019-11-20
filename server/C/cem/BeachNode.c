@@ -151,17 +151,17 @@ static struct BeachNode empty() {
 	};
 }
 
-static struct BeachNode* boundary() {
-	struct BeachNode* node = malloc(sizeof(struct BeachNode*));
-	node = &(struct BeachNode) {
+static struct BeachNode* boundary(int r, int j) {
+	struct BeachNode* ptr = malloc(sizeof(struct BeachNode));
+	*ptr = (struct BeachNode) {
 		.frac_full = EMPTY_DOUBLE,
 			.transport_dir = EMPTY_INT,
 			.transport_potential = EMPTY_DOUBLE,
 			.net_volume_change = EMPTY_DOUBLE,
 			.is_beach = TRUE,
 			.is_boundary = TRUE,
-			.row = EMPTY_INT,
-			.col = EMPTY_INT,
+			.row = r,
+			.col = j,
 			.cell_width = EMPTY_DOUBLE,
 			.cell_length = EMPTY_DOUBLE,
 			.next = NULL,
@@ -170,7 +170,8 @@ static struct BeachNode* boundary() {
 			.GetCol = &GetBoundaryCol,
 			.GetFlowDirection = &GetBoundaryFlowDirection
 	};
-	return node;
+
+	return ptr;
 }
 
 static int isEmpty(struct BeachNode* node)
