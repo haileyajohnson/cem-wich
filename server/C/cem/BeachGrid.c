@@ -46,11 +46,6 @@ static int FindInShorelines(struct BeachGrid* this, struct BeachNode* node) {
 	return -1;
 }
 
-static double GetDistance(struct BeachGrid* this, struct BeachNode node1, struct BeachNode node2)
-{
-	return sqrt(raise((node2.GetRow(&node2) - node1.GetRow(&node1)), 2) + raise((node2.GetCol(&node2) - node1.GetCol(&node1)), 2));
-}
-
 static double GetPrevAngle(struct BeachGrid* this, struct BeachNode* node)
 {
 	if (BeachNode.isEmpty(node->prev)) { return EMPTY_DOUBLE; }
@@ -113,56 +108,6 @@ static double GetAngleByDifferencingScheme(struct BeachGrid* this, struct BeachN
 	return downwind_angle;
 }
 
-static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* node, int dir)
-{
-	struct BeachNode* curr = node->prev;
-	int row = node->GetRow(node);
-	int col = node->GetCol(node);
-
-	int curr_row = curr->GetRow(curr);
-	int curr_col = curr->GetCol(curr);
-
-	struct BeachNode* stopNode = node->next;
-	int stop_row = stopNode->GetRow(stopNode);
-	int stop_col = stopNode->GetCol(stopNode);
-
-	//while (curr_row != stop_row || curr_col != stop_col)
-	while(TRUE)
-	{
-		double angle = atan2(curr_row - row, curr_col - col);
-		angle += (dir * PI / 4);
-		curr_row = row + round(sin(angle));
-		curr_col = col + round(cos(angle));
-
-		if (curr_row < 0 || curr_row >= this->rows || curr_col < 0 || curr_col >= this->cols) { continue; }
-
-		struct BeachNode* temp = this->TryGetNode(this, curr_row, curr_col);
-		// TODO check if member of another shoreline
-		if (temp->is_beach) {
-			if (temp->row == stop_row && temp->col == stop_col) {
-				curr->next = temp;
-				temp->prev = curr;
-				curr = temp;
-				break;
-			}
-			continue;
-		}
-		if (temp->frac_full > 0)
-		{
-			temp->is_beach = TRUE;
-			curr->next = temp;
-			temp->prev = curr;
-			curr = temp;
-		}
-	}
-
-	node->is_beach = FALSE;
-	node->prev = NULL;
-	node->next = NULL;
-	// return end node of inserted segment
-	return stopNode->prev;
-}
-
 static struct BeachNode** Get4Neighbors(struct BeachGrid* this, struct BeachNode* node)
 {
 	struct BeachNode** neighbors = malloc(4 * sizeof(struct BeachNode*));
@@ -221,12 +166,10 @@ static struct BeachGrid new(int rows, int cols, double cell_width, double cell_l
 				.SetShorelines = &SetShorelines,
 				.TryGetNode = &TryGetNode,
 				.FindInShorelines = &FindInShorelines,
-				.GetDistance = &GetDistance,
 				.GetPrevAngle = &GetPrevAngle,
 				.GetNextAngle = &GetNextAngle,
 				.GetSurroundingAngle = &GetSurroundingAngle,
 				.GetAngleByDifferencingScheme = &GetAngleByDifferencingScheme,
-				.ReplaceNode = &ReplaceNode,
 				.Get4Neighbors = &Get4Neighbors,
 				.CheckIfInShadow = &CheckIfInShadow
 				};

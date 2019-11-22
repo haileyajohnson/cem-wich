@@ -70,6 +70,7 @@ int cem_initialize(Config config)
 	}
 
 	test_LogShoreline();
+	test_OutputGrid();
 
 	return 0;
 }
@@ -83,9 +84,9 @@ int cem_update() {
 
 	Process();
 
+	current_time_step++;
 	test_OutputGrid();
 
-	current_time_step++;
 	current_time += myConfig.lengthTimestep;
 
 	return 0;
@@ -156,9 +157,6 @@ int FindBeach()
 				shorelines[num_landmasses - 1] = startNode;
 				struct BeachNode* endNode = startNode;
 
-				// current cell
-				int cur_r = r;
-				int cur_c = c;
 				struct BeachNode* curr = startNode;
 
 				// direction
@@ -178,19 +176,19 @@ int FindBeach()
 					// backtrack
 					dir_r = -dir_r;
 					dir_c = -dir_c;
-					int backtrack[2] = { cur_r + dir_r, cur_c + dir_c };
+					int backtrack[2] = { curr->GetRow(curr) + dir_r, curr->GetCol(curr) + dir_c };
 					int temp[2] = { backtrack[0], backtrack[1] };
 
 					int foundNextBeach = FALSE;
 					do
 					{
 						// turn 45 degrees clockwise/counterclockwise to next neighbor
-						double angle = atan2(temp[0] - cur_r, temp[1] - cur_c);
+						double angle = atan2(temp[0] - curr->GetRow(curr), temp[1] - curr->GetCol(curr));
 						angle += (search_dir) * (PI / 4);
-						int next[2] = { cur_r + round(sin(angle)), cur_c + round(cos(angle)) };
+						int next[2] = { curr->GetRow(curr) + round(sin(angle)), curr->GetCol(curr) + round(cos(angle)) };
 
 						// break if running off edge of grid
-						if (next[0] < 0 || next[0] >= myConfig.nRows || next[1] < 0 || next[1] > myConfig.nCols) { break; }
+						if (next[0] < 0 || next[0] >= myConfig.nRows || next[1] < 0 || next[1] >= myConfig.nCols) { break; }
 
 						// track dir relative to previous neighbor for backtracking
 						dir_r = next[0] - temp[0];
@@ -207,20 +205,20 @@ int FindBeach()
 					if (!foundNextBeach) {
 						if (search_dir > 0) {
 							search_dir = -1;
+							dir_r = 1;
+							dir_c = 0;
 							curr = startNode;
 							continue;
 						}
 						break; 
 					}
 
-					cur_r = temp[0];
-					cur_c = temp[1];
-
-					struct BeachNode* tempNode = g_beachGrid.TryGetNode(&g_beachGrid, cur_r, cur_c);
+					struct BeachNode* tempNode = g_beachGrid.TryGetNode(&g_beachGrid, temp[0], temp[1]);
 					if (BeachNode.isEmpty(tempNode)) { return -1; }
 					if (search_dir > 0) { // searching clockwise
 						curr->next = tempNode;
 						tempNode->prev = curr;
+
 						// end if undercutting
 						if (tempNode->GetCol(tempNode) < curr->GetCol(curr) && tempNode->GetRow(tempNode) <= curr->GetRow(curr))
 						{
@@ -228,8 +226,6 @@ int FindBeach()
 							search_dir = -1;
 							dir_r = 1;
 							dir_c = 0;
-							cur_r = startNode->GetRow(startNode);
-							cur_c = startNode->GetCol(startNode);
 							curr = startNode;
 							continue;
 						}
@@ -238,13 +234,13 @@ int FindBeach()
 					else { // backtracking
 						curr->prev = tempNode;
 						tempNode->next = curr;
-						shorelines[num_landmasses - 1] = tempNode;
 						// end if undercutting
 						if (tempNode->GetCol(tempNode) > curr->GetCol(curr) && tempNode->GetRow(tempNode) <= curr->GetRow(curr))
 						{
 							tempNode->is_boundary = TRUE;
-							continue;
+							break;
 						}
+						shorelines[num_landmasses - 1] = tempNode;
 						startNode = tempNode;
 					}
 					// node already a beach cell, break
@@ -253,8 +249,6 @@ int FindBeach()
 							search_dir = -1;
 							dir_r = 1;
 							dir_c = 0;
-							cur_r = startNode->GetRow(startNode);
-							cur_c = startNode->GetCol(startNode);
 							curr = startNode;
 							continue;
 						}
@@ -316,8 +310,14 @@ void SedimentTransport()
 	WaveTransformation(&g_beachGrid, g_wave_climate.wave_angle, g_wave_climate.wave_period, g_wave_climate.GetWaveHeight(&g_wave_climate), myConfig.lengthTimestep);
 	GetAvailableSupply(&g_beachGrid, c_cross_shore_reference_pos, c_shelf_depth_at_reference_pos, myConfig.shelfslope, myConfig.shorefaceSlope, c_minimum_shelf_depth_at_closure);
 	NetVolumeChange(&g_beachGrid);
-	TransportSediment(&g_beachGrid, c_cross_shore_reference_pos, c_shelf_depth_at_reference_pos, myConfig.shelfslope, myConfig.shorefaceSlope, c_minimum_shelf_depth_at_closure);
-	FixBeach(&g_beachGrid);
+	int flag = TransportSediment(&g_beachGrid, c_cross_shore_reference_pos, c_shelf_depth_at_reference_pos, myConfig.shelfslope, myConfig.shorefaceSlope, c_minimum_shelf_depth_at_closure);
+	if (flag)
+	{
+		if (FindBeach() < 0)
+		{
+			return -1;
+		}
+	}
 }
 
 /* ----- HELPER FUNCTIONS ----- */
@@ -383,7 +383,7 @@ void test_OutputGrid() {
 				fprintf(savefile, " --");
 				continue;
 			}
-			fprintf(savefile, " %00d", node->frac_full);
+			fprintf(savefile, " %00f", node->frac_full);
 		}
 		fprintf(savefile, "\n");
 	}

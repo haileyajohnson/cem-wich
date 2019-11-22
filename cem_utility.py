@@ -55,7 +55,7 @@ def get_input_data():
         for c in range(nCols):
             grid[r][c] = input_data['grid'][r][c]
     
-    numTimesteps = input_data['numTimesteps']
+    numTimesteps = 1000; #input_data['numTimesteps']
 
     input = Config(grid = grid, nRows = nRows,  nCols = nCols, cellWidth = input_data['cellWidth'], cellLength = input_data['cellLength'],
         asymmetry = input_data['asymmetry'], stability = input_data['stability'], waveHeight = input_data['waveHeight'],

@@ -24,7 +24,7 @@ opts.LeadingDelimitersRule = "ignore";
 
 %% LOOP import + display
 
-for t = (0:1:1)
+for t = (0:1:364)
     filename = sprintf("output/CEM_%06d.out", t);
     % Import the data
     grid = readtable(filename, opts);
@@ -34,6 +34,7 @@ for t = (0:1:1)
     
     pcolor(grid);
     shading flat; axis equal;
-    pause(0.1);
+    disp(t);
+    pause%(0.1);
     
 end
