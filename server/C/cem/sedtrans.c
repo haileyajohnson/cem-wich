@@ -5,9 +5,10 @@
 #include "BeachNode.h"
 #include "BeachGrid.h"
 
+
 double GetTransportVolumePotential(double alpha, double wave_height, double timestep_length);
-struct BeachNode* OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node);
-struct BeachNode* OopsImFull(struct BeachGrid* grid, struct BeachNode* node);
+void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node);
+void OopsImFull(struct BeachGrid* grid, struct BeachNode* node);
 double GetDepthOfClosure(struct BeachNode* node, int ref_pos, double shelf_depth_at_ref_pos, double shelf_slope, double shoreface_slope, double shore_angle, double min_shelf_depth_at_closure, int cell_size);
 double ModTowardZero(double a, double m);
 double RoundRadians(double angle, double round_to, double bias);
@@ -198,8 +199,10 @@ void NetVolumeChange(struct BeachGrid* grid)
 	}
 }
 
-void TransportSediment(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth)
+int TransportSediment(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth)
 {
+
+	int FIND_BEACH_FLAG = FALSE;
 	double cell_area = grid->cell_width * grid->cell_length;
 	int i = 0;
 	while (i < grid->num_shorelines)
@@ -212,24 +215,27 @@ void TransportSediment(struct BeachGrid* grid, int ref_pos, double ref_depth, do
 			double depth = GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
 			double net_area_change = curr->net_volume_change / depth;
 			curr->frac_full = curr->frac_full + net_area_change / cell_area;
+			curr->net_volume_change = 0; // reset in case we revisit
 			if (curr->frac_full < 0)
 			{
-				struct BeachNode* temp = OopsImEmpty(grid, curr);
-				curr = temp;
+				OopsImEmpty(grid, curr);
+				FIND_BEACH_FLAG = TRUE;
 			}
 			else if (curr->frac_full > 1)
 			{
-				struct BeachNode* temp = OopsImFull(grid, curr);
-				curr = temp;
+				OopsImFull(grid, curr);
+				FIND_BEACH_FLAG = TRUE;
 			}
 			curr = curr->next;
 		} while (curr != start && !curr->is_boundary);
 		i++;
 	}
+	return FIND_BEACH_FLAG;
 }
 
-void FixBeach(struct BeachGrid* grid)
+int FixBeach(struct BeachGrid* grid)
 {
+	int FIND_BEACH_FLAG = FALSE;
 	// smooth corners
 	int i = 0;
 	while (i < grid->num_shorelines)
@@ -271,7 +277,6 @@ void FixBeach(struct BeachGrid* grid)
 				}
 
 				curr->frac_full = 0;
-				curr = (*grid).ReplaceNode(grid, curr, -1);
 			}
 			curr = curr->next;
 			free(neighbors);
@@ -282,19 +287,22 @@ void FixBeach(struct BeachGrid* grid)
 		curr = grid->shoreline[i];
 		do {
 			if (curr->frac_full < 0.0) {
-				curr = OopsImEmpty(grid, curr);
+				OopsImEmpty(grid, curr);
+				FIND_BEACH_FLAG = TRUE;
 			}
 			else if (curr->frac_full > 1.0)
 			{
-				curr = OopsImFull(grid, curr);
+				OopsImFull(grid, curr);
+				FIND_BEACH_FLAG = TRUE;
 			}
 			curr = curr->next;
 		} while (curr != start && !curr->is_boundary);
 		i++;
 	}
+	return FIND_BEACH_FLAG;
 }
 
-struct BeachNode* OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
+void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 {
 	struct BeachNode** neighbors = (*grid).Get4Neighbors(grid, node);
 
@@ -335,12 +343,21 @@ struct BeachNode* OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 	{
 		node->frac_full = 0;
 	}
+
+	// recurse through neighbors
+	for (i = 0; i < 4; i++)
+	{
+		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full < 0)
+		{
+			OopsImEmpty(grid, neighbors[i]);
+		}
+	}
 	free(neighbors);
 
-	return (*grid).ReplaceNode(grid, node, -1);
+	return;
 }
 
-struct BeachNode* OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
+void OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 {
 	struct BeachNode** neighbors = (*grid).Get4Neighbors(grid, node);
 
@@ -381,9 +398,19 @@ struct BeachNode* OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 	{
 		node->frac_full = 1;
 	}
+
+	// recurse through neighbors
+	for (i = 0; i < 4; i++)
+	{
+		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 0)
+		{
+			OopsImFull(grid, neighbors[i]);
+		}
+	}
+
 	free(neighbors);
 
-	return (*grid).ReplaceNode(grid, node, 1);
+	return;
 }
 
 

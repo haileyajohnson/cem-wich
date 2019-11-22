@@ -70,14 +70,14 @@ static FLOW_DIR GetFlowDirection(struct BeachNode* this)
 {
 	// get left cell border
 	struct BeachNode* leftBorder = this;
-	while (!BeachNode.isEmpty(leftBorder->prev) && leftBorder->prev != this && leftBorder->transport_dir == NONE)
+	while (!leftBorder->prev->is_boundary && leftBorder->prev != this && leftBorder->transport_dir == NONE)
 	{
 		leftBorder = leftBorder->prev;
 	}
 
 	//get right cell border
 	struct BeachNode* rightBorder = this;
-	while (!BeachNode.isEmpty(rightBorder->next) && rightBorder->next != this && rightBorder->transport_dir == NONE)
+	while (!rightBorder->next->is_boundary && rightBorder->next != this && rightBorder->transport_dir == NONE)
 	{
 		rightBorder = rightBorder->next;
 	}
