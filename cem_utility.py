@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO, emit
 import json
 import numpy as np
 app = Flask(__name__, static_folder="_dist")
@@ -7,6 +8,7 @@ import ee
 import os
 
 from ctypes import *
+from threading import Thread
 
 class Config(Structure):
     _fields_ = [
@@ -26,6 +28,10 @@ class Config(Structure):
         ("saveInterval", c_int)]
 
 lib = CDLL("server/C/_build/py_cem")
+
+def process(grid, timestep):
+     
+
 
 @app.route("/")
 def startup():
@@ -55,7 +61,7 @@ def get_input_data():
         for c in range(nCols):
             grid[r][c] = input_data['grid'][r][c]
     
-    numTimesteps = input_data['numTimesteps']
+    numTimesteps = 1#input_data['numTimesteps']
     saveInterval = input_data['saveInterval']
 
     input = Config(grid = grid, nRows = nRows,  nCols = nCols, cellWidth = input_data['cellWidth'], cellLength = input_data['cellLength'],
@@ -71,9 +77,11 @@ def get_input_data():
     lib.update.restype = POINTER(POINTER(c_double))
     i = 1
     while i < numTimesteps:
-        lib.update(saveInterval)
+        grid = lib.update(saveInterval)
+        t = Thread(target = process, args = (grid, i))
+        t.start()
 
-    return json.dumps({'success': True}), 200, {'ContentType':'application/json'}
+    return json.dumps({'success': True}), 200
 
 
 if __name__ == "__main__":
