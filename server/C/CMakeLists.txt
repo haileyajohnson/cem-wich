@@ -6,20 +6,20 @@ project (cem-web VERSION 0.1)
 set (BUILD_SHARED_LIBS ON)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-set(bmicem_sources bmi/bmi_cem.c cem/cem.c cem/BeachGrid.c cem/BeachNode.c cem/sedtrans.c cem/WaveClimate.c cem/utils.c)
-add_library(bmi_cem ${bmicem_sources})
+set(cem_sources py_interface/cem_interface.c cem/cem.c cem/BeachGrid.c cem/BeachNode.c cem/sedtrans.c cem/WaveClimate.c cem/utils.c cem/config.h)
+add_library(py_cem ${cem_sources})
 
 ###### link libm if not using MSVC #######
 if(NOT MSVC)
-	target_link_libraries(bmi_cem m)
+	target_link_libraries(py_cem m)
 endif()
 
 ######## generate exports for MSVC#######
 include(GenerateExportHeader)
-GENERATE_EXPORT_HEADER (bmi_cem
-	BASE_NAME bmi_cem
-	EXPORT_MACRO_NAME bmi_EXPORT
-	EXPORT_FILE_NAME ${CMAKE_CURRENT_SOURCE_DIR}/bmi/bmi_EXPORTS.h
+GENERATE_EXPORT_HEADER (py_cem
+	BASE_NAME py_cem
+	EXPORT_MACRO_NAME cem_EXPORT
+	EXPORT_FILE_NAME ${CMAKE_CURRENT_SOURCE_DIR}/py_interface/cem_EXPORTS.h
 	STATIC_DEFINE bmi_BUILT_AS_STATIC)
 
 ########### Install files ###############

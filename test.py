@@ -1,7 +1,2 @@
-from ctypes import *
+import cem_utility
 
-lib = CDLL("server/C/_build/bmi_cem")
-
-result = lib.testFunc(2, 3)
-
-print(result)

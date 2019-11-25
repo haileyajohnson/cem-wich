@@ -5,6 +5,17 @@ dirEnum = {
     DOWN: 3
 }
 
+function BoundaryCell() {
+    this.prev = [];
+    this.next = [];
+    this.addPrev = (prev) => {
+        this.prev.push(prev);
+    };
+    this.addNext = (next) => {
+        this.next.push(next);
+    } 
+}
+
 function MapInterface() {
     return {
         map: null,        
@@ -22,7 +33,7 @@ function MapInterface() {
         numCols: 100,
         numRows:  50,
         rotation: 0,
-
+        imageYear: null,
 
         initMap: function() {
             // initialize earth engine
@@ -45,7 +56,9 @@ function MapInterface() {
 
             this.map.getView().on('change:rotation', () => {
                 this.rotation = this.map.getView().getRotation();
-                onRotationChange(this.rotation);
+                if (!this.box){
+                    gridTab.setRotation();
+                }
             });
 
             this.map.on("click", (e) => {
@@ -104,7 +117,7 @@ function MapInterface() {
             this.boundsSource.on('addfeature', (evt) => {
                 var feature = evt.feature;
                 that.box = feature.getGeometry();
-                onBoxChange();
+                gridTab.onBoxDrawn();
                 this.drawGrid();
                 this.toggleDrawMode();
             });
@@ -119,6 +132,7 @@ function MapInterface() {
             var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
 
             var dataset = ee.ImageCollection('LANDSAT/LE07/C01/T1').filterBounds(poly).filterDate('1999-01-01', '1999-12-31');
+            this.imageYear = 1999;
             var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
 
             var water_bands = ['B3', 'B5'];
@@ -155,13 +169,14 @@ function MapInterface() {
          * size numRows X numCols
          */
         createGrid: function(image) {
-            this.cemGrid = [];
             var features = [];
             for (r = 0; r < this.numRows; r++) {
                 this.cemGrid.push([]);
                 for (c = 0; c < this.numCols; c++) {
                     // create polygon feature for each cell                    
                     features.push(new ee.Feature(new ee.Geometry.Polygon(this.polyGrid[r][c])));
+                    // create placeholder for cem grid
+                    this.cemGrid[r].push(-1);
                 }
             }
 
@@ -192,14 +207,151 @@ function MapInterface() {
                 })
             });
 
-            var cemGrid = dict.getInfo();
-            //var temp = 0;
+            var infoGrid = dict.getInfo();
+            var numCells = infoGrid.features.length;
 
-            // iterate all cell features
-            for (var i = 0; i < cemGrid.features.length; i++) {
-                var feature = cemGrid.features[i];
-                var fill = feature.properties.mean;
+            // get fill of each cell feature
+            var polyFill = [];
+            for (var i = 0; i < numCells; i++) {
+                var feature = infoGrid.features[i];
+                polyFill.push(feature.properties.mean);
+            }
+            // copy of poly fill which can mask already found landmasses
+            var maskFill = polyFill.slice(0);
 
+
+            // find all landform outer boundaries; fill inside boundaries
+            // mask once found
+            for (var i = 0; i < numCells; i++) {
+                if (maskFill[i] > 0) {
+                    // start vars
+                    var start = i;
+
+                    // current vars
+                    var prev = null;
+                    var cur = i;
+                    var r_dir = 0;
+                    var c_dir = 1;
+
+                    // boundary indices and extent
+                    var boundaryMap = new Map();
+                    var min_r = this.numRows;
+                    var max_r = 0;
+                    var min_c = this.numCols;
+                    var max_c = 0;
+                    do {
+                        // add boundary index
+                        if (!boundaryMap.has(cur)) {
+                            boundaryMap.set(cur, new BoundaryCell());
+                        }
+                        if (prev != null) {
+                            boundaryMap.get(cur).addPrev(prev);
+                        }
+
+                        // expand extent if necessary
+                        var inds = this.indexToRowCol(cur);
+                        min_r = Math.min(min_r, inds[0]);
+                        max_r = Math.max(max_r, inds[0]);
+                        min_c = Math.min(min_c, inds[1]);
+                        max_c = Math.max(max_c, inds[1]);
+                        
+                        // backtrack
+                        r_dir = -r_dir;
+                        c_dir = -c_dir;
+                        var backtrack = [inds[0]+r_dir, inds[1]+c_dir];
+                        var temp = backtrack;
+                        
+                        // find next cell
+                        var isolated = true;
+                        do {
+                            // turn 45 degrees clockwise to next neighbor
+                            var angle = Math.atan2(temp[0]-inds[0], temp[1] - inds[1]);
+                            angle += Math.PI/4;
+                            var next = [inds[0] + Math.round(Math.sin(angle)), inds[1] + Math.round(Math.cos(angle))];
+                            if (next[0] < 0 || next[0] >= this.numRows || next[1] < 0 || next[1] >= this.numCols) {
+                                temp = next;
+                                continue;
+                            }
+
+                            // track dir relative to previous neighbor
+                            r_dir = next[0] - temp[0];
+                            c_dir = next[1] - temp[1];
+                            temp = next;
+                            if (maskFill[this.rowColsToIndex(next[0], next[1])] > 0) {
+                                isolated = false;
+                                break;
+                            }
+                        } while (temp[0] != backtrack[0] || temp[1] != backtrack[1]);
+                        
+                        // special case for isolated cell
+                        if (isolated) { break; }
+
+                        // set next cell
+                        prev = cur;
+                        cur = this.rowColsToIndex(temp[0], temp[1]);
+                        boundaryMap.get(prev).addNext(cur);
+
+                    } while (cur != start);
+
+                    boundaryMap.get(cur).addPrev(prev);
+                    
+                    // fill & mask inside of boundary
+                    for (var r = min_r; r <= max_r; r++) {
+                        for (var c = min_c; c <= max_c; c++){
+                            var index = this.rowColsToIndex(r, c);
+                            if (boundaryMap.has(index)) {
+                                // special case for grid borders
+                                if ((r == this.numRows-1 || r == 0) && (c == 0 || boundaryMap.has(index-1)) && (c == this.numCols-1 || boundaryMap.has(index+1))
+                                || (c == this.numCols-1 || c == 0) && (r == 0 || boundaryMap.has(index-this.numCols)) && (r == this.numRows-1 || boundaryMap.has(index+this.numCols))) {
+                                    polyFill[index] = 1;
+                                }
+                                // mask other boundary cells
+                                maskFill[index] = 0;
+                                continue;
+                            }
+                            var numIntersect = 0;
+                            for (var offset = 1; offset <= max_c - c; offset++){
+                                if (boundaryMap.has(index + offset)) {
+
+                                    var cell = boundaryMap.get(index + offset);
+                                    var nextAligned = (index+offset+1)%this.numCols == 0 || boundaryMap.has(index+offset+1);
+                                    var prevAligned = (index+offset)%this.numCols == 0 || boundaryMap.has(index+offset-1);
+                                    // skip horizontal boundary segments (including those that run off the grid)
+                                    if (nextAligned && prevAligned) {
+                                        continue;
+                                    }
+                                    for (var n = 0; n < cell.next.length; n++) {
+
+                                        var next_inds = this.indexToRowCol(cell.next[n]);
+                                        var prev_inds = this.indexToRowCol(cell.prev[n]);
+
+                                        // skip vertices
+                                        if ((next_inds[0] == r+1 && (prev_inds[0] == r || prev_inds[0] == r+1)) ||
+                                            ((next_inds[0] == r || next_inds[0] == r+1) && prev_inds[0] == r+1) ||
+                                            (next_inds[0] == r-1 && prev_inds[0] == r-1)) {
+                                            continue;
+                                        }
+
+                                        numIntersect++;
+                                    }
+                                }
+                            }
+
+                            if (numIntersect%2 > 0) {
+                                polyFill[index] = 1;
+                                maskFill[index] = 0;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // make polygons
+            for (var i = 0; i < numCells; i++)
+            {   
+                var rc = this.indexToRowCol(i);    
+                var feature = infoGrid.features[i];
+                var fill = polyFill[i];
                 if (fill == 0) {
                     // add invisible feature
                     this.modelSource.addFeature( new ol.Feature({
@@ -220,11 +372,11 @@ function MapInterface() {
                     }));
                 } else {   // determine angle if frac full
                     
-                    var coords = this.polyGrid[Math.floor(i/this.numCols)][i%this.numCols];
+                    var coords = this.polyGrid[rc[0]][rc[1]];
 
-                    var maxEdge = this.getMaxLandEdge(cemGrid, i);
-                    var newCoords = this.getNewCoords(coords, fill, maxEdge);
-                        
+                    var maxEdge = this.getMaxLandEdge(infoGrid, i);
+                    var newCoords = this.getNewCoords(coords, fill, maxEdge);                
+
                     this.modelSource.addFeature( new ol.Feature({
                         geometry: new ol.geom.Polygon([newCoords]),
                         style: style,
@@ -233,7 +385,9 @@ function MapInterface() {
                         fill: fill
                     }));
                 }
+                this.cemGrid[rc[0]][rc[1]] = fill;
             }
+
 
             // add to map
             var vectorLayer = new ol.layer.Vector({source: this.modelSource, 
@@ -246,7 +400,8 @@ function MapInterface() {
 
         updateFeature(feature, fill, orientation) {
             var id = feature.get('id');
-            var cellCoords = this.polyGrid[Math.floor(id/this.numCols)][id%this.numCols];
+            var rc = this.indexToRowCol(id);
+            var cellCoords = this.polyGrid[rc[0]][rc[1]];
 
             if (fill > 0) {
                 var newCoords = this.getNewCoords(cellCoords, fill, orientation);
@@ -261,6 +416,8 @@ function MapInterface() {
                     })
                 }));
             }
+
+            this.cemGrid[rc[0]][rc[1]] = fill;
 
             feature.set('fill', fill);
             feature.set('orientation', orientation);
@@ -277,7 +434,6 @@ function MapInterface() {
             });
             this.imLayer.setZIndex(2);
             this.map.addLayer(this.imLayer);
-            allowClear();
         },
 
         otsu: function(histogram) {
@@ -480,36 +636,36 @@ function MapInterface() {
             this.editMode = !this.editMode;
         },
 
-        getMaxLandEdge: function(cemGrid, i) {
+        getMaxLandEdge: function(grid, i) {
             // find surrounding cells in each direction
             var left = [], right = [], up = [], down = [];
             if (i % this.numCols > 0) { // if not left hand column
-                left.push(cemGrid.features[i-1].properties.mean);
+                left.push(grid.features[i-1].properties.mean);
                 if ((i/this.numCols) >= 1) {  //if not top row
-                    left.push(cemGrid.features[i-this.numCols-1].properties.mean);
-                    up.push(cemGrid.features[i-this.numCols-1].properties.mean);
+                    left.push(grid.features[i-this.numCols-1].properties.mean);
+                    up.push(grid.features[i-this.numCols-1].properties.mean);
                 }
                 if ((i/this.numCols) < this.numRows-1) { // if not bottom row
-                    left.push(cemGrid.features[i+this.numCols-1].properties.mean);
-                    down.push(cemGrid.features[i+this.numCols-1].properties.mean);
+                    left.push(grid.features[i+this.numCols-1].properties.mean);
+                    down.push(grid.features[i+this.numCols-1].properties.mean);
                 }
             }
             if (i % this.numCols < this.numCols-1){ // if not right hand column
-                right.push(cemGrid.features[i+1].properties.mean);
+                right.push(grid.features[i+1].properties.mean);
                 if (i/this.numCols >= 1) {  //if not top row
-                    right.push(cemGrid.features[i-this.numCols+1].properties.mean);
-                    up.push(cemGrid.features[i-this.numCols+1].properties.mean);
+                    right.push(grid.features[i-this.numCols+1].properties.mean);
+                    up.push(grid.features[i-this.numCols+1].properties.mean);
                 }
                 if (i/this.numCols < this.numRows-1) { // if not bottom row
-                    right.push(cemGrid.features[i+this.numCols+1].properties.mean);
-                    down.push(cemGrid.features[i+this.numCols+1].properties.mean);
+                    right.push(grid.features[i+this.numCols+1].properties.mean);
+                    down.push(grid.features[i+this.numCols+1].properties.mean);
                 }
             }
             if (i/this.numCols >= 1) {  //if not top row
-                up.push(cemGrid.features[i-this.numCols].properties.mean);
+                up.push(grid.features[i-this.numCols].properties.mean);
             }
             if (i/this.numCols < this.numRows-1) { // if not bottom row
-                down.push(cemGrid.features[i+this.numCols].properties.mean);
+                down.push(grid.features[i+this.numCols].properties.mean);
             }
             
             // determine which side has most dense land
@@ -539,6 +695,50 @@ function MapInterface() {
                 }
             }
             return ind;
+        },        
+
+        indexToRowCol: function(i) {
+            var r = Math.floor(i/this.numCols);
+            var c = i%this.numCols;
+            return [r, c];
+        },
+
+        rowColsToIndex: function(r, c) {
+            return (r*this.numCols) + c;
+        },
+
+        getCellWidth: function() {
+            var coords = this.box.getCoordinates()[0];
+            var lat1 = coords[0][0];
+            var lon1 = coords[0][1];
+            var lat2 = coords[1][0];
+            var lon2 = coords[1][1];
+
+            var dist_cols = this.getLatLonAsMeters(lat1, lon1, lat2, lon2);
+            return dist_cols/this.numCols;
+        },
+
+        getCellLength: function() {
+            var coords = this.box.getCoordinates()[0];
+            var lat1 = coords[0][0];
+            var lon1 = coords[0][1];
+            var lat2 = coords[3][0];
+            var lon2 = coords[3][1];
+
+            var dist_rows = this.getLatLonAsMeters(lat1, lon1, lat2, lon2);
+            return dist_rows/this.numRows;
+        },
+
+        getLatLonAsMeters: function(lat1, lon1, lat2, lon2){ 
+            var R = 6378.137; // Radius of earth in KM
+            var dLat = lat2 * Math.PI / 180 - lat1 * Math.PI / 180;
+            var dLon = lon2 * Math.PI / 180 - lon1 * Math.PI / 180;
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            var d = R * c;
+            return d * 1000; // meters
         },
 
         /**
@@ -550,6 +750,8 @@ function MapInterface() {
             this.modelSource.clear();
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
             this.box = null;
+            this.polyGrid = [];
+            this.cemGrid = [];
         }
 
     }
@@ -559,8 +761,6 @@ function MapInterface() {
 TODO
     sensitivity control
         - connectivity minimum
-    fix button logic (i.e. clear and then load)
-    refactor to tab objects
 
     wave inputs
     conrol inputs
@@ -572,7 +772,4 @@ TODO
     error handling
     image loading
     improve shoreline detection (KVos)?
-
-    X fix top buttons
-    X manual edits
 */
