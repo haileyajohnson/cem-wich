@@ -4,31 +4,11 @@
 #if defined(__cplusplus)
 extern "C" {
 #endif
-
-// IMPORTANT -- specify wave transformation routine
-#undef WITH_SWAN
-
-// Aspect Parameters
-// size of cells (meters)
-#define CELL_WIDTH (100.)
-// number of cells in x (cross-shore) direction
-#define X_MAX (103)
-// number of cells in y (longshore) direction
-#define Y_MAX (110)
-
-
-// slope of continental shelf
-#define SHELF_SLOPE (0.001)
-// for now, linear slope of shoreface
-#define SHOREFACE_SLOPE (0.01)
+	
 // minimum depth of shoreface due to wave action (meters)
 #define DEPTH_SHOREFACE (10.)
 // cell where intial conditions changes from beach to ocean
 #define INIT_BEACH (10)
-// cell where initial conditions change from beach to rock LMV
-#define INIT_ROCK (0)
-// Initial pattern of rock types
-#define INITIAL_ROCK_TYPE (1)
 // theoretical depth in meters of continental shelf at x = INIT_BEACH
 #define INITIAL_DEPTH (10.)
 

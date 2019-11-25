@@ -1,8 +1,31 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, jsonify
+import json
+import numpy as np
 app = Flask(__name__, static_folder="_dist")
 
 import ee
 import os
+
+from ctypes import *
+
+class Config(Structure):
+    _fields_ = [
+        ("grid", POINTER(POINTER(c_float))),
+        ("nRows", c_int),
+        ("nCols", c_int),
+        ("cellWidth", c_float),
+        ("cellLength", c_float),
+        ("asymmetry", c_double),
+        ("stability", c_double),
+        ("waveHeight", c_double),
+        ("wavePeriod", c_double),
+        ("shelfSlope", c_double),
+        ("shorefaceSlope", c_double),
+        ("numTimesteps", c_int),
+        ("lengthTimestep", c_double),
+        ("saveInterval", c_int)]
+
+lib = CDLL("server/C/_build/py_cem")
 
 @app.route("/")
 def startup():
@@ -16,6 +39,38 @@ def startup():
         else:
             continue
     return render_template("application.html", distDir=distDir)
+
+@app.route('/senddata', methods = ['POST'])
+def get_input_data():
+    jsdata = request.form['input_data']
+    input_data = json.loads(jsdata)
+
+    nRows = input_data['nRows']
+    nCols = input_data['nCols']
+
+    # build cell grid
+    grid = ((POINTER(c_float)) * nRows)()
+    for r in range(nRows):
+        grid[r] = (c_float * nCols)()
+        for c in range(nCols):
+            grid[r][c] = input_data['grid'][r][c]
+    
+    numTimesteps = 1000; #input_data['numTimesteps']
+
+    input = Config(grid = grid, nRows = nRows,  nCols = nCols, cellWidth = input_data['cellWidth'], cellLength = input_data['cellLength'],
+        asymmetry = input_data['asymmetry'], stability = input_data['stability'], waveHeight = input_data['waveHeight'],
+        wavePeriod = input_data['wavePeriod'], shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
+        numTimesteps = numTimesteps, lengthTimestep = input_data['lengthTimestep'], saveInterval = input_data['saveInterval'])
+
+    lib.initialize.argtypes = [Config]
+    lib.initialize.restype = c_int
+    status = lib.initialize(input)
+
+    for i in range(numTimesteps):
+        lib.update()
+
+    return json.dumps({'success': True}), 200, {'ContentType':'applicaiton/json'}
+
 
 if __name__ == "__main__":
     app.run(host="localhost", port=8080)
