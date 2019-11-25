@@ -55,21 +55,25 @@ def get_input_data():
         for c in range(nCols):
             grid[r][c] = input_data['grid'][r][c]
     
-    numTimesteps = 1000; #input_data['numTimesteps']
+    numTimesteps = input_data['numTimesteps']
+    saveInterval = input_data['saveInterval']
 
     input = Config(grid = grid, nRows = nRows,  nCols = nCols, cellWidth = input_data['cellWidth'], cellLength = input_data['cellLength'],
         asymmetry = input_data['asymmetry'], stability = input_data['stability'], waveHeight = input_data['waveHeight'],
         wavePeriod = input_data['wavePeriod'], shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
-        numTimesteps = numTimesteps, lengthTimestep = input_data['lengthTimestep'], saveInterval = input_data['saveInterval'])
+        numTimesteps = numTimesteps, lengthTimestep = input_data['lengthTimestep'], saveInterval = saveInterval)
 
     lib.initialize.argtypes = [Config]
     lib.initialize.restype = c_int
     status = lib.initialize(input)
 
-    for i in range(numTimesteps):
-        lib.update()
+    lib.update.argtypes = [c_int]
+    lib.update.restype = POINTER(POINTER(c_double))
+    i = 1
+    while i < numTimesteps:
+        lib.update(saveInterval)
 
-    return json.dumps({'success': True}), 200, {'ContentType':'applicaiton/json'}
+    return json.dumps({'success': True}), 200, {'ContentType':'application/json'}
 
 
 if __name__ == "__main__":
