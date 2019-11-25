@@ -215,82 +215,12 @@ int TransportSediment(struct BeachGrid* grid, int ref_pos, double ref_depth, dou
 			double depth = GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
 			double net_area_change = curr->net_volume_change / depth;
 			curr->frac_full = curr->frac_full + net_area_change / cell_area;
-			curr->net_volume_change = 0; // reset in case we revisit
 			if (curr->frac_full < 0)
 			{
 				OopsImEmpty(grid, curr);
 				FIND_BEACH_FLAG = TRUE;
 			}
 			else if (curr->frac_full > 1)
-			{
-				OopsImFull(grid, curr);
-				FIND_BEACH_FLAG = TRUE;
-			}
-			curr = curr->next;
-		} while (curr != start && !curr->is_boundary);
-		i++;
-	}
-	return FIND_BEACH_FLAG;
-}
-
-int FixBeach(struct BeachGrid* grid)
-{
-	int FIND_BEACH_FLAG = FALSE;
-	// smooth corners
-	int i = 0;
-	while (i < grid->num_shorelines)
-	{
-		struct BeachNode* start = grid->shoreline[i];
-		struct BeachNode* curr = start;
-
-		do {
-			struct BeachNode** neighbors = (*grid).Get4Neighbors(grid, curr);
-
-			int needs_fix = TRUE;
-			int num_cells = 0;
-			int j;
-			for (j = 0; j < 4; j++)
-			{
-				if (BeachNode.isEmpty(neighbors[j])) { continue; }
-				if (neighbors[j]->frac_full >= 1.0)
-				{
-					needs_fix = FALSE;
-				}
-				else if (neighbors[j]->frac_full > 0.0)
-				{
-					num_cells++;
-				}
-			}
-			// "floating bit"
-			if (needs_fix && num_cells > 0)
-			{
-				double delta_fill = curr->frac_full / num_cells;
-				double cell_area = grid->cell_width * grid->cell_length;
-				for (j = 0; j < 4; j++)
-				{
-					if (BeachNode.isEmpty(neighbors[j])) { continue; }
-					if (neighbors[j]->frac_full < 1.0 && neighbors[j]->frac_full > 0.0)
-					{
-
-						neighbors[j]->frac_full += delta_fill;
-					}
-				}
-
-				curr->frac_full = 0;
-			}
-			curr = curr->next;
-			free(neighbors);
-		} while (curr != start && !curr->is_boundary);
-
-
-		// one more pass for over/under-filled cells
-		curr = grid->shoreline[i];
-		do {
-			if (curr->frac_full < 0.0) {
-				OopsImEmpty(grid, curr);
-				FIND_BEACH_FLAG = TRUE;
-			}
-			else if (curr->frac_full > 1.0)
 			{
 				OopsImFull(grid, curr);
 				FIND_BEACH_FLAG = TRUE;
@@ -402,7 +332,7 @@ void OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 	// recurse through neighbors
 	for (i = 0; i < 4; i++)
 	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 0)
+		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 1)
 		{
 			OopsImFull(grid, neighbors[i]);
 		}
