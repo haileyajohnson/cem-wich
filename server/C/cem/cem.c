@@ -39,11 +39,11 @@ int IsLandCell(int row, int col);
 
 // Main steps
 int cem_initialize(Config config);
-int cem_update(void);
+double** cem_update(int saveInterval);
 int cem_finalize(void);
 
 /* Logging and Debugging */
-void Process();
+double** Process();
 void test_LogShoreline();
 void test_OutputGrid();
 
@@ -69,27 +69,22 @@ int cem_initialize(Config config)
 		return -1;
 	}
 
-	test_LogShoreline();
-	test_OutputGrid();
-
 	return 0;
 }
 
 // Update the CEM by a single time step.
-int cem_update() {
+float** cem_update(int saveInterval) {
+	int i;
+	for (i = 0; i < saveInterval; i++)
+	{
+		g_wave_climate.FindWaveAngle(&g_wave_climate);
+		SedimentTransport();
 
-	g_wave_climate.FindWaveAngle(&g_wave_climate);
+		current_time_step++;
+		current_time += myConfig.lengthTimestep;
+	}
 
-	SedimentTransport();
-
-	Process();
-
-	current_time_step++;
-	test_OutputGrid();
-
-	current_time += myConfig.lengthTimestep;
-
-	return 0;
+	return Process();
 }
 
 int cem_finalize() {
@@ -401,9 +396,24 @@ int IsLandCell(int row, int col)
 }
 
 /* ----- CONFIGURATION AND OUTPUT FUNCTIONS -----*/
-void Process()
+double** Process()
 {
-	// TODO
+	double** grid = malloc2d(g_beachGrid.rows, g_beachGrid.cols, sizeof(double));
+	int r, c;
+	for (r = 0; r < myConfig.nRows; r++)
+	{
+		for (c = 0; c < myConfig.nCols; c++)
+		{
+			struct BeachNode* node = g_beachGrid.TryGetNode(&g_beachGrid, r, c);
+			if (!node)
+			{
+				continue;
+			}
+			grid[r][c] = node->frac_full;
+		}
+	}
+
+	return grid;
 }
 
 void test_LogShoreline() {

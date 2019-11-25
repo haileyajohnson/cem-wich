@@ -20,11 +20,8 @@ int initialize(Config config) {
 		return FAILURE;
 }
 
-int update() {
-	if (cem_update() == 0)
-		return SUCCESS;
-	else
-		return FAILURE;
+double** update(int saveInterval) {
+	return cem_update(saveInterval);
 }
 
 int finalize() {
