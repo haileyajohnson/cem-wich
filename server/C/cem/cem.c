@@ -73,7 +73,7 @@ int cem_initialize(Config config)
 }
 
 // Update the CEM by a single time step.
-float** cem_update(int saveInterval) {
+double** cem_update(int saveInterval) {
 	int i;
 	for (i = 0; i < saveInterval; i++)
 	{
