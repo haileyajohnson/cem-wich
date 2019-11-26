@@ -106,9 +106,11 @@ function onRun() {
         wavePeriod: parseFloat(this.waveTab.wave_period),
         shelfSlope: parseFloat(this.controlTab.shelf_slope),
         shorefaceSlope: parseFloat(this.controlTab.shoreface_slope),
-        numTimesteps: parseInt(Math.round((this.controlTab.end_year - this.mapInterface.imageYear) * (365/this.controlTab.length_timestep))),
+        numTimesteps: parseInt(Math.round((this.controlTab.end_year - this.mapInterface.source.year) * (365/this.controlTab.length_timestep))),
         lengthTimestep: parseFloat(this.controlTab.length_timestep),
-        saveInterval: parseInt(this.controlTab.save_interval)
+        saveInterval: parseInt(this.controlTab.save_interval),
+        sourceUrl: mapInterface.source.url,
+        start: mapInterface.source.year
     }
     // ensure necessary values are present and valid
     var status = validateData(input_data);
@@ -244,6 +246,12 @@ function GridTab() {
             this.$submitButton.click(() => { this.onSubmitClicked(); });
             this.$clearButton.click(() => { this.onClearClicked(); });
             this.$editButton.click(() => { this.toggleEdit(); });
+
+
+            $('input[type=radio]').click(function(){
+                    mapInterface.source = sources[this.value];
+            });
+            $('input[type=radio]:first').attr("checked", true);
 
             // disable buttons
             this.$submitButton.disable();

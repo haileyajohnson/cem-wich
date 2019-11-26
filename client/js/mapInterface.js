@@ -5,6 +5,40 @@ dirEnum = {
     DOWN: 3
 }
 
+sources = [
+// Landsat 5 access info
+{
+    year: 1985,
+    startFilter: "1985-01-01",
+    endFilter: "185-12-31",
+    url:"LANDSAT/LT05/C01/T1_TOA"
+},
+
+// Landsat 7 access info
+{
+    year: 1999,
+    startFilter: "1999-01-01",
+    endFilter: "1999-12-31",
+    url:"LANDSAT/LE07/C01/T1_TOA"
+},
+
+// Landsat 8 access info
+{
+    year: 2014,
+    startFilter: "2014-01-01",
+    endFilter: "2014-12-31",
+    url:"LANDSAT/LC08/C01/T1_TOA"
+},
+
+// Sentinel 2 access info
+{
+    year: 2015,
+    startFilter: "2016-06-23",
+    endFilter: "2017-06-23",
+    url:"COPERNICUS/S2"
+}];
+
+
 function BoundaryCell() {
     this.prev = [];
     this.next = [];
@@ -33,7 +67,7 @@ function MapInterface() {
         numCols: 100,
         numRows:  50,
         rotation: 0,
-        imageYear: null,
+        source: sources[0],
 
         initMap: function() {
             // initialize earth engine
@@ -128,12 +162,16 @@ function MapInterface() {
             }));
         },        
 
-        mapTransform: function() {
+
+        mapTransform: () => {
             var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
 
-            var dataset = ee.ImageCollection('LANDSAT/LE07/C01/T1').filterBounds(poly).filterDate('1999-01-01', '1999-12-31');
-            this.imageYear = 1999;
-            var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
+            try {
+                var dataset = ee.ImageCollection(this.source.url).filterBounds(poly).filterDate(this.source.startFilter, this.source.endFilter);
+                var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
+            } catch(error) {
+                return error;
+            }
 
             var water_bands = ['B3', 'B5'];
             var ndwi = composite.normalizedDifference(water_bands);
