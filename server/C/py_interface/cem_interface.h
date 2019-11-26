@@ -13,9 +13,8 @@ extern "C" {
 #include "cem/config.h"
 
 cem_EXPORT int initialize(Config config);
-cem_EXPORT double** update(int saveInterval);
+cem_EXPORT double* update(int saveInterval);
 cem_EXPORT int finalize();
-cem_EXPORT int testFunc(int a, int b);
 
 #if defined(__cplusplus)
 }

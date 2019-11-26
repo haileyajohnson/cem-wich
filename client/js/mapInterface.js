@@ -10,8 +10,9 @@ sources = [
 {
     year: 1985,
     startFilter: "1985-01-01",
-    endFilter: "185-12-31",
-    url:"LANDSAT/LT05/C01/T1_TOA"
+    endFilter: "1985-12-31",
+    bands: ['B2', 'B4'],
+    url:"LANDSAT/LT05/C01/T1"
 },
 
 // Landsat 7 access info
@@ -19,7 +20,8 @@ sources = [
     year: 1999,
     startFilter: "1999-01-01",
     endFilter: "1999-12-31",
-    url:"LANDSAT/LE07/C01/T1_TOA"
+    bands: ['B2', 'B4'],
+    url:"LANDSAT/LE07/C01/T1"
 },
 
 // Landsat 8 access info
@@ -27,15 +29,8 @@ sources = [
     year: 2014,
     startFilter: "2014-01-01",
     endFilter: "2014-12-31",
-    url:"LANDSAT/LC08/C01/T1_TOA"
-},
-
-// Sentinel 2 access info
-{
-    year: 2015,
-    startFilter: "2016-06-23",
-    endFilter: "2017-06-23",
-    url:"COPERNICUS/S2"
+    bands: ['B3', 'B5'],
+    url:"LANDSAT/LC08/C01/T1"
 }];
 
 
@@ -163,7 +158,7 @@ function MapInterface() {
         },        
 
 
-        mapTransform: () => {
+        mapTransform: function(){
             var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
 
             try {
@@ -173,7 +168,7 @@ function MapInterface() {
                 return error;
             }
 
-            var water_bands = ['B3', 'B5'];
+            var water_bands = this.source.bands;
             var ndwi = composite.normalizedDifference(water_bands);
 
             var values = ndwi.reduceRegion({

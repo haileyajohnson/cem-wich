@@ -5,6 +5,7 @@
 // config vars
 var configJSON;
 const CLIENT_ID = '762501139172-rjf0ia3vv9edu6gg0m46aoij519khuk7.apps.googleusercontent.com';
+var socket;
 
 // application interface objects
 var mapInterface;
@@ -29,6 +30,12 @@ function loadApp() {
 }
 
 function initialize() {
+    // start up the SocketIO connection to the server
+    socket = io.connect('http://' + document.domain + ':' + location.port + '/request');
+    // this is a callback that triggers when the results event is emitted by the server.
+    socket.on('results_ready', function(msg) {
+        var grid = msg.grid;
+    });
     configJSON = {};
 
     // create applicaiton interfaces
@@ -115,12 +122,13 @@ function onRun() {
     // ensure necessary values are present and valid
     var status = validateData(input_data);
     if (status == 0) {
+        socket.emit('run', input_data);
         // pass to python
-        $.post('/senddata', {
-            type: "json",
-            input_data: JSON.stringify(input_data),
-            success: () => { console.log("success!")}
-        });
+        // $.post('/senddata', {
+        //     type: "json",
+        //     input_data: JSON.stringify(input_data),
+        //     success: () => { console.log("success!")}
+        // });
     }
 }
 

@@ -1,7 +1,10 @@
 from flask import Flask, render_template, request, jsonify
+from flask_socketio import SocketIO, emit
 import json
 import numpy as np
 app = Flask(__name__, static_folder="_dist")
+app.config["SECRET_KEY"] = "secret!"
+socketio = SocketIO(app)
 
 import ee
 import os
@@ -30,8 +33,10 @@ lib = CDLL("server/C/_build/py_cem")
 source = None
 year = None
 
-def process(grid, timestep):
-    return grid   
+def process(grid, timestep, nRows, nCols):
+    ret = np.ctypeslib.as_array(grid, shape=[nRows,nCols])
+    emit('results_ready', {'grid':ret.tolist(), 'time':timestep})
+    print('emitted event')
 
 
 @app.route("/")
@@ -47,10 +52,8 @@ def startup():
             continue
     return render_template("application.html", distDir=distDir)
 
-@app.route('/senddata', methods = ['POST'])
-def get_input_data():
-    jsdata = request.form['input_data']
-    input_data = json.loads(jsdata)
+@socketio.on('run', namespace='/request')
+def get_input_data(input_data):
 
     nRows = input_data['nRows']
     nCols = input_data['nCols']
@@ -65,7 +68,7 @@ def get_input_data():
     numTimesteps = 1#input_data['numTimesteps']
     saveInterval = input_data['saveInterval']
     source = input_data['sourceUrl']
-    year = input_Data['start']
+    year = input_data['start']
 
     input = Config(grid = grid, nRows = nRows,  nCols = nCols, cellWidth = input_data['cellWidth'], cellLength = input_data['cellLength'],
         asymmetry = input_data['asymmetry'], stability = input_data['stability'], waveHeight = input_data['waveHeight'],
@@ -77,15 +80,17 @@ def get_input_data():
     status = lib.initialize(input)
 
     lib.update.argtypes = [c_int]
-    lib.update.restype = POINTER(POINTER(c_double))
-    i = 1
+    lib.update.restype = np.ctypeslib.ndpointer(dtype=np.float64, ndim=2, shape=[nRows, nCols])#POINTER(c_double)
+    i = 0
     while i < numTimesteps:
-        grid = lib.update(saveInterval)
-        t = Thread(target = process, args = (grid, i))
-        t.start()
+        ret = lib.update(saveInterval)
+        process(ret, i, nRows, nCols)
+        # t = Thread(target = process, args = (ret, i, nRows, nCols))
+        # t.start()
+        i+=1
 
-    return json.dumps({'success': True}), 200
+    lib.finalize()
 
 
 if __name__ == "__main__":
-    app.run(host="localhost", port=8080)
+    socketio.run(app, host="localhost", port=8080)
