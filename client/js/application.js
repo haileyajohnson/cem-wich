@@ -519,24 +519,16 @@ function RunTab() {
     return {
         $modal: $(".modal"),
         $fillInput: $("input[name=fill]"),
-        $alignmentButtons: $(".alignment-buttons .button"),
         $cell: $(".cell"),
 
         feature: null,
         percentFull: 0,
-        orientation: 0,
 
         init: function() {
             // set up listeners
             this.$fillInput.change(() => {
                 this.setFill();
                 this.display();
-            });
-            this.$alignmentButtons.each((i, elem) => {
-                $(elem).click(() => {
-                    this.setOrientation(parseInt($(elem).attr('id')));
-                    this.display();
-                });
             });
             this.$modal.find(".modal-ok-button").click(() => { this.onOkClicked(); } );
             this.$modal.find(".modal-cancel-button").click(() => { this.onCancelClicked() });
@@ -546,7 +538,6 @@ function RunTab() {
             this.feature = feature;
             this.$fillInput.val(feature.get("fill")*100);
             this.setFill();
-            this.orientation = feature.get('orientation');
             this.display();
             this.$modal.show();
         },
@@ -555,57 +546,29 @@ function RunTab() {
             this.percentFull = this.$fillInput.val();
         },
 
-        setOrientation(n) {
-            this.orientation = n;
-        },
-
         display: function() {
             this.$cell.empty();
             var $cellFull = $("<div class='cell-full'></div>");
             var $cellEmpty = $("<div class='cell-empty'></div>");
-
-            var horzStyleFull = {
-                "width": "" + this.percentFull + "%",
-                "height": "100%"
-            }
-            var horzStyleEmpty = {
-                "width": "" + (100-this.percentFull) + "%",
-                "height": "100%"
-            }
-            
-            var vertStyleFull = {
+                        
+            var styleFull = {
                 "height": "" + this.percentFull + "%",
                 "width": "100%"
             }
-            var vertStyleEmpty = {
+            var styleEmpty = {
                 "height": "" + (100-this.percentFull) + "%",
                 "width": "100%"
             }
 
-            switch(this.orientation) {
-                case 0:
-                    $cellFull.css(horzStyleFull).appendTo(this.$cell);
-                    $cellEmpty.css(horzStyleEmpty).appendTo(this.$cell);
-                    break;
-                case 1:
-                    $cellFull.css(vertStyleFull).appendTo(this.$cell);
-                    $cellEmpty.css(vertStyleEmpty).appendTo(this.$cell);
-                    break;
-                case 2:
-                    $cellEmpty.css(horzStyleEmpty).css({"float":"left"}).appendTo(this.$cell);
-                    $cellFull.css(horzStyleFull).css({"float":"right"}).appendTo(this.$cell);
-                    break;
-                case 3:
-                    $cellEmpty.css(vertStyleEmpty).css({"float":"left"}).appendTo(this.$cell);
-                    $cellFull.css(vertStyleFull).css({"float":"right"}).appendTo(this.$cell);
-                    break;
-            }
+
+            $cellEmpty.css(styleEmpty).css({"float":"left"}).appendTo(this.$cell);
+            $cellFull.css(styleFull).css({"float":"right"}).appendTo(this.$cell);
         },
 
         save: function() {
             var i = this.feature.get('id');
             mapInterface.cemGrid[i] = this.percentFull/100;
-            mapInterface.updateFeature(this.feature, this.percentFull/100, this.orientation);
+            mapInterface.updateFeature(this.feature, this.percentFull/100);
         },
 
         close: function() {
