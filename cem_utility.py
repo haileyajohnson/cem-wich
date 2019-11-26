@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO, emit
 import json
 import numpy as np
 app = Flask(__name__, static_folder="_dist")
@@ -28,9 +27,11 @@ class Config(Structure):
         ("saveInterval", c_int)]
 
 lib = CDLL("server/C/_build/py_cem")
+source = None
+year = None
 
 def process(grid, timestep):
-     
+    return grid   
 
 
 @app.route("/")
@@ -63,6 +64,8 @@ def get_input_data():
     
     numTimesteps = 1#input_data['numTimesteps']
     saveInterval = input_data['saveInterval']
+    source = input_data['sourceUrl']
+    year = input_Data['start']
 
     input = Config(grid = grid, nRows = nRows,  nCols = nCols, cellWidth = input_data['cellWidth'], cellLength = input_data['cellLength'],
         asymmetry = input_data['asymmetry'], stability = input_data['stability'], waveHeight = input_data['waveHeight'],
