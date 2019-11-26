@@ -1,3 +1,28 @@
+// colormap for grid cells
+function getColor(feature) {
+    var r, g, b;
+    var fill = feature.get('fill');
+    if (fill > 2/3) {
+        var f = (fill-(2/3)) * 3;
+        r = f*255;
+        g = 255;
+        b = 0;
+    }
+    else if (fill > 1/3) {
+        var f = (fill-(1/3)) * 3;
+        r = 0;
+        g = 255;
+        b = f*255;
+    }
+    else {
+        var f = (fill) * 3;
+        r = 0;
+        g = f*255;
+        b = 255;
+    }
+    return [r, g, b, 0.2];
+}
+
 dirEnum = {
     LEFT: 0,
     UP: 1,
@@ -222,24 +247,6 @@ function MapInterface() {
                 scale: 30
             });
 
-            var style = new ol.style.Style({
-                stroke: new ol.style.Stroke({
-                    color: 'yellow',
-                    width: 0.3
-                    }),
-                fill: new ol.style.Fill({
-                    color: [255, 255, 0, 0.15]
-                })
-            });
-            var noStyle = new ol.style.Style({
-                stroke: new ol.style.Stroke({
-                    color: [255, 255, 255, 0]
-                }),
-                fill: new ol.style.Fill({
-                    color: [255, 255, 255, 0]
-                })
-            });
-
             var infoGrid = dict.getInfo();
             var numCells = infoGrid.features.length;
 
@@ -384,40 +391,13 @@ function MapInterface() {
             {   
                 var rc = this.indexToRowCol(i);    
                 var feature = infoGrid.features[i];
-                var fill = polyFill[i];
-                if (fill == 0) {
-                    // add invisible feature
-                    this.modelSource.addFeature( new ol.Feature({
-                        geometry: new ol.geom.Polygon(feature.geometry.coordinates),
-                        style: noStyle,
-                        id: i,
-                        orientation: dirEnum.DOWN,
-                        fill: 0
-                    }));
-                }                
-                else if (fill == 1) {  // add square if cell is full
-                    this.modelSource.addFeature( new ol.Feature({
-                        geometry: new ol.geom.Polygon(feature.geometry.coordinates),
-                        style: style,
-                        id: i,
-                        orientation: dirEnum.DOWN,
-                        fill: 1
-                    }));
-                } else {   // determine angle if frac full
-                    
-                    var coords = this.polyGrid[rc[0]][rc[1]];
+                var fill = polyFill[i];          
 
-                    var maxEdge = this.getMaxLandEdge(infoGrid, i);
-                    var newCoords = this.getNewCoords(coords, fill, maxEdge);                
-
-                    this.modelSource.addFeature( new ol.Feature({
-                        geometry: new ol.geom.Polygon([newCoords]),
-                        style: style,
-                        id: i,
-                        orientation: maxEdge,
-                        fill: fill
-                    }));
-                }
+                this.modelSource.addFeature( new ol.Feature({
+                    geometry: new ol.geom.Polygon(feature.geometry.coordinates),
+                    id: i,
+                    fill: fill
+                }));
                 this.cemGrid[rc[0]][rc[1]] = fill;
             }
 
@@ -425,36 +405,25 @@ function MapInterface() {
             // add to map
             var vectorLayer = new ol.layer.Vector({source: this.modelSource, 
                 style: function(feature, resolution) {
-                    return feature.get('style');
+                    return new ol.style.Style({                        
+                        stroke: new ol.style.Stroke({
+                            color: [255, 255, 255, 0]
+                        }),
+                        fill: new ol.style.Fill({
+                            color: getColor(feature)
+                        })
+                    });
                 }});
             vectorLayer.setZIndex(4);
             this.map.addLayer(vectorLayer);
         },
 
-        updateFeature(feature, fill, orientation) {
+        updateFeature(feature, fill) {
             var id = feature.get('id');
             var rc = this.indexToRowCol(id);
-            var cellCoords = this.polyGrid[rc[0]][rc[1]];
-
-            if (fill > 0) {
-                var newCoords = this.getNewCoords(cellCoords, fill, orientation);
-            } else {
-                var newCoords = cellCoords;
-                feature.setStyle(new ol.style.Style({
-                    stroke: new ol.style.Stroke({
-                        color: [255, 255, 255, 0]
-                    }),
-                    fill: new ol.style.Fill({
-                        color: [255, 255, 255, 0]
-                    })
-                }));
-            }
-
             this.cemGrid[rc[0]][rc[1]] = fill;
 
             feature.set('fill', fill);
-            feature.set('orientation', orientation);
-            feature.setGeometry(new ol.geom.Polygon([newCoords]));
             this.modelSource.refresh();
         },
 
@@ -554,36 +523,6 @@ function MapInterface() {
             }
         },
 
-        getNewCoords: function(coords, fill, dir) {
-            var vScale = [fill*(coords[0][0] - coords[3][0]), fill*(coords[0][1] - coords[3][1])];
-            var hScale = [fill*(coords[1][0] - coords[0][0]), fill*(coords[1][1] - coords[0][1])];
-
-            var newCoords;
-            switch (dir) {
-                case dirEnum.LEFT:
-                    newCoords = [coords[0], 
-                        [coords[0][0] + hScale[0], coords[0][1] + hScale[1]], [coords[3][0] + hScale[0], coords[3][1] + hScale[1]],
-                        coords[3], coords[0]];
-                    break;
-                case dirEnum.UP:
-                    newCoords = [coords[1], 
-                        [coords[1][0] - vScale[0], coords[1][1] - vScale[1]], [coords[0][0] - vScale[0], coords[0][1] - vScale[1]],
-                        coords[0], coords[1]]
-                    break;
-                case dirEnum.RIGHT:
-                    newCoords = [coords[2], 
-                        [coords[2][0] - hScale[0], coords[2][1] - hScale[1]], [coords[1][0] - hScale[0], coords[1][1] - hScale[1]],
-                        coords[1], coords[2]]
-                    break;
-                case dirEnum.DOWN:
-                    newCoords = [coords[3], 
-                        [coords[3][0] + vScale[0], coords[3][1] + vScale[1]], [coords[2][0] + vScale[0], coords[2][1] + vScale[1]],
-                        coords[2], coords[3]]
-                    break;
-            }
-            return newCoords;
-        },
-
         getRectangleVertices: function(first, last) {
             // find distance between corners
             var dLon = last[0] - first[0];
@@ -667,68 +606,7 @@ function MapInterface() {
 
         toggleEditMode: function() {
             this.editMode = !this.editMode;
-        },
-
-        getMaxLandEdge: function(grid, i) {
-            // find surrounding cells in each direction
-            var left = [], right = [], up = [], down = [];
-            if (i % this.numCols > 0) { // if not left hand column
-                left.push(grid.features[i-1].properties.mean);
-                if ((i/this.numCols) >= 1) {  //if not top row
-                    left.push(grid.features[i-this.numCols-1].properties.mean);
-                    up.push(grid.features[i-this.numCols-1].properties.mean);
-                }
-                if ((i/this.numCols) < this.numRows-1) { // if not bottom row
-                    left.push(grid.features[i+this.numCols-1].properties.mean);
-                    down.push(grid.features[i+this.numCols-1].properties.mean);
-                }
-            }
-            if (i % this.numCols < this.numCols-1){ // if not right hand column
-                right.push(grid.features[i+1].properties.mean);
-                if (i/this.numCols >= 1) {  //if not top row
-                    right.push(grid.features[i-this.numCols+1].properties.mean);
-                    up.push(grid.features[i-this.numCols+1].properties.mean);
-                }
-                if (i/this.numCols < this.numRows-1) { // if not bottom row
-                    right.push(grid.features[i+this.numCols+1].properties.mean);
-                    down.push(grid.features[i+this.numCols+1].properties.mean);
-                }
-            }
-            if (i/this.numCols >= 1) {  //if not top row
-                up.push(grid.features[i-this.numCols].properties.mean);
-            }
-            if (i/this.numCols < this.numRows-1) { // if not bottom row
-                down.push(grid.features[i+this.numCols].properties.mean);
-            }
-            
-            // determine which side has most dense land
-            var means = [this.getArrayMean(left), this.getArrayMean(up), this.getArrayMean(right), this.getArrayMean(down)];
-            return this.getArrayMaxIndex(means);
-        },
-
-        editCellFeature(feature) {
-            console.log(feature.get('id'));
-        },
-
-        getArrayMean: function(arr) {
-            var total = 0;
-            for (var i = 0; i < arr.length; i++) {
-                total += arr[i];
-            }
-            return total/arr.length;
-        },
-
-        getArrayMaxIndex: function(arr) {
-            var val = 0;
-            var ind =  0;
-            for (var i = 0; i < arr.length; i++) {
-                if (arr[i] >= val) {
-                    val = arr[i];
-                    ind = i;
-                }
-            }
-            return ind;
-        },        
+        },      
 
         indexToRowCol: function(i) {
             var r = Math.floor(i/this.numCols);
