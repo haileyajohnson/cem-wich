@@ -39,20 +39,16 @@ int IsLandCell(int row, int col);
 
 // Main steps
 int cem_initialize(Config config);
-double** cem_update(int saveInterval);
+double* cem_update(int saveInterval);
 int cem_finalize(void);
 
 /* Logging and Debugging */
-double** Process();
+void Process();
+double* results = NULL;
 void test_LogShoreline();
 void test_OutputGrid();
 
 // TODO: Add error and data return
-
-int add_nums(int a, int b) {
-	return a + b;
-}
-
 int cem_initialize(Config config)
 {
 	srand(time(NULL));
@@ -73,7 +69,7 @@ int cem_initialize(Config config)
 }
 
 // Update the CEM by a single time step.
-double** cem_update(int saveInterval) {
+double* cem_update(int saveInterval) {
 	int i;
 	for (i = 0; i < saveInterval; i++)
 	{
@@ -84,10 +80,15 @@ double** cem_update(int saveInterval) {
 		current_time += myConfig.lengthTimestep;
 	}
 
-	return Process();
+	Process();
+	return results;
 }
 
 int cem_finalize() {
+	// free everything
+	free(results);
+	free(g_beachGrid.shoreline);
+	free(g_beachGrid.cells);
 	return 0;
 }
 
@@ -396,9 +397,10 @@ int IsLandCell(int row, int col)
 }
 
 /* ----- CONFIGURATION AND OUTPUT FUNCTIONS -----*/
-double** Process()
+void Process()
 {
-	double** grid = malloc2d(g_beachGrid.rows, g_beachGrid.cols, sizeof(double));
+	free(results);
+	results = malloc(g_beachGrid.rows *g_beachGrid.cols * sizeof(double));
 	int r, c;
 	for (r = 0; r < myConfig.nRows; r++)
 	{
@@ -409,11 +411,10 @@ double** Process()
 			{
 				continue;
 			}
-			grid[r][c] = node->frac_full;
+			int i = r * myConfig.nCols + c;
+			results[i] = node->frac_full;
 		}
 	}
-
-	return grid;
 }
 
 void test_LogShoreline() {
