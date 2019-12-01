@@ -30,17 +30,23 @@ function loadApp() {
 }
 
 function initialize() {
-    // start up the SocketIO connection to the server
-    socket = io.connect('http://' + document.domain + ':' + location.port + '/request');
-    // this is a callback that triggers when the results event is emitted by the server.
-    socket.on('results_ready', function(msg) {
-        var grid = msg.grid;
-    });
+    // configuration parameters
     configJSON = {};
 
     // create applicaiton interfaces
     mapInterface = MapInterface();
     mapInterface.initMap();
+
+
+    // start up the SocketIO connection to the server
+    socket = io.connect('http://' + document.domain + ':' + location.port + '/request');
+    // this is a callback that triggers when the results event is emitted by the server.
+    socket.on('results_ready', (msg) => {
+        onUpdate(msg);
+    });
+    socket.on('model_complete', (msg) => {
+        onModelComplete(msg);
+    });
     
     // create tabs
     gridTab = GridTab();
@@ -98,13 +104,10 @@ function onLoad() {
     $('#file-input').trigger('click');
 }
 
-
 function onRun() {
     // create payload
     var input_data = {
         grid: mapInterface.cemGrid,
-        nRows: mapInterface.numRows,
-        nCols: mapInterface.numCols,
         cellWidth: mapInterface.getCellWidth(),
         cellLength: mapInterface.getCellLength(),
         asymmetry: parseFloat(this.waveTab.a_val),
@@ -115,24 +118,24 @@ function onRun() {
         shorefaceSlope: parseFloat(this.controlTab.shoreface_slope),
         numTimesteps: parseInt(Math.round((this.controlTab.end_year - this.mapInterface.source.year) * (365/this.controlTab.length_timestep))),
         lengthTimestep: parseFloat(this.controlTab.length_timestep),
-        saveInterval: parseInt(this.controlTab.save_interval),
-        sourceUrl: mapInterface.source.url,
-        start: mapInterface.source.year
+        saveInterval: parseInt(this.controlTab.save_interval)
     }
     // ensure necessary values are present and valid
     var status = validateData(input_data);
     if (status == 0) {
         socket.emit('run', input_data);
-        // pass to python
-        // $.post('/senddata', {
-        //     type: "json",
-        //     input_data: JSON.stringify(input_data),
-        //     success: () => { console.log("success!")}
-        // });
     }
 }
 
-function onModelComplete() {
+function onUpdate(msg) {
+    mapInterface.updateDisplay(msg.grid);
+    $output = $(".output-pane");
+    var text = $output.text();
+    text += msg.time + ": " + msg.dif + "\n";
+    $output.text(text);
+}
+
+function onModelComplete(msg) {
 
 }
 
@@ -280,6 +283,17 @@ function GridTab() {
             $loadButton.disable();
 
             mapInterface.mapTransform();
+            
+            // send to server
+            var grid_data = {
+                nRows: mapInterface.numRows,
+                nCols: mapInterface.numCols,
+                polyGrid: mapInterface.polyGrid,
+                source: mapInterface.source.name,
+                year: mapInterface.source.year,
+                geometry: mapInterface.box.getCoordinates()
+            }
+            socket.emit('submit', grid_data);
             
             this.$editButton.enable();
         },
@@ -550,7 +564,7 @@ function RunTab() {
             this.$cell.empty();
             var $cellFull = $("<div class='cell-full'></div>");
             var $cellEmpty = $("<div class='cell-empty'></div>");
-                        
+
             var styleFull = {
                 "height": "" + this.percentFull + "%",
                 "width": "100%"

@@ -33,6 +33,7 @@ dirEnum = {
 sources = [
 // Landsat 5 access info
 {
+    name: "LS5",
     year: 1985,
     startFilter: "1985-01-01",
     endFilter: "1985-12-31",
@@ -42,6 +43,7 @@ sources = [
 
 // Landsat 7 access info
 {
+    name: "LS7",
     year: 1999,
     startFilter: "1999-01-01",
     endFilter: "1999-12-31",
@@ -51,6 +53,7 @@ sources = [
 
 // Landsat 8 access info
 {
+    name: "LS8",
     year: 2014,
     startFilter: "2014-01-01",
     endFilter: "2014-12-31",
@@ -228,9 +231,9 @@ function MapInterface() {
          */
         createGrid: function(image) {
             var features = [];
-            for (r = 0; r < this.numRows; r++) {
+            for (var r = 0; r < this.numRows; r++) {
                 this.cemGrid.push([]);
-                for (c = 0; c < this.numCols; c++) {
+                for (var c = 0; c < this.numCols; c++) {
                     // create polygon feature for each cell                    
                     features.push(new ee.Feature(new ee.Geometry.Polygon(this.polyGrid[r][c])));
                     // create placeholder for cem grid
@@ -255,152 +258,29 @@ function MapInterface() {
             for (var i = 0; i < numCells; i++) {
                 var feature = infoGrid.features[i];
                 polyFill.push(feature.properties.mean);
+                var rc = this.indexToRowCol(i);    
+                this.cemGrid[rc[0]][rc[1]] = polyFill[i];
             }
-            // copy of poly fill which can mask already found landmasses
-            var maskFill = polyFill.slice(0);
 
+            this.updateDisplay(this.cemGrid);
+        },
 
-            // find all landform outer boundaries; fill inside boundaries
-            // mask once found
-            for (var i = 0; i < numCells; i++) {
-                if (maskFill[i] > 0) {
-                    // start vars
-                    var start = i;
-
-                    // current vars
-                    var prev = null;
-                    var cur = i;
-                    var r_dir = 0;
-                    var c_dir = 1;
-
-                    // boundary indices and extent
-                    var boundaryMap = new Map();
-                    var min_r = this.numRows;
-                    var max_r = 0;
-                    var min_c = this.numCols;
-                    var max_c = 0;
-                    do {
-                        // add boundary index
-                        if (!boundaryMap.has(cur)) {
-                            boundaryMap.set(cur, new BoundaryCell());
-                        }
-                        if (prev != null) {
-                            boundaryMap.get(cur).addPrev(prev);
-                        }
-
-                        // expand extent if necessary
-                        var inds = this.indexToRowCol(cur);
-                        min_r = Math.min(min_r, inds[0]);
-                        max_r = Math.max(max_r, inds[0]);
-                        min_c = Math.min(min_c, inds[1]);
-                        max_c = Math.max(max_c, inds[1]);
-                        
-                        // backtrack
-                        r_dir = -r_dir;
-                        c_dir = -c_dir;
-                        var backtrack = [inds[0]+r_dir, inds[1]+c_dir];
-                        var temp = backtrack;
-                        
-                        // find next cell
-                        var isolated = true;
-                        do {
-                            // turn 45 degrees clockwise to next neighbor
-                            var angle = Math.atan2(temp[0]-inds[0], temp[1] - inds[1]);
-                            angle += Math.PI/4;
-                            var next = [inds[0] + Math.round(Math.sin(angle)), inds[1] + Math.round(Math.cos(angle))];
-                            if (next[0] < 0 || next[0] >= this.numRows || next[1] < 0 || next[1] >= this.numCols) {
-                                temp = next;
-                                continue;
-                            }
-
-                            // track dir relative to previous neighbor
-                            r_dir = next[0] - temp[0];
-                            c_dir = next[1] - temp[1];
-                            temp = next;
-                            if (maskFill[this.rowColsToIndex(next[0], next[1])] > 0) {
-                                isolated = false;
-                                break;
-                            }
-                        } while (temp[0] != backtrack[0] || temp[1] != backtrack[1]);
-                        
-                        // special case for isolated cell
-                        if (isolated) { break; }
-
-                        // set next cell
-                        prev = cur;
-                        cur = this.rowColsToIndex(temp[0], temp[1]);
-                        boundaryMap.get(prev).addNext(cur);
-
-                    } while (cur != start);
-
-                    boundaryMap.get(cur).addPrev(prev);
-                    
-                    // fill & mask inside of boundary
-                    for (var r = min_r; r <= max_r; r++) {
-                        for (var c = min_c; c <= max_c; c++){
-                            var index = this.rowColsToIndex(r, c);
-                            if (boundaryMap.has(index)) {
-                                // special case for grid borders
-                                if ((r == this.numRows-1 || r == 0) && (c == 0 || boundaryMap.has(index-1)) && (c == this.numCols-1 || boundaryMap.has(index+1))
-                                || (c == this.numCols-1 || c == 0) && (r == 0 || boundaryMap.has(index-this.numCols)) && (r == this.numRows-1 || boundaryMap.has(index+this.numCols))) {
-                                    polyFill[index] = 1;
-                                }
-                                // mask other boundary cells
-                                maskFill[index] = 0;
-                                continue;
-                            }
-                            var numIntersect = 0;
-                            for (var offset = 1; offset <= max_c - c; offset++){
-                                if (boundaryMap.has(index + offset)) {
-
-                                    var cell = boundaryMap.get(index + offset);
-                                    var nextAligned = (index+offset+1)%this.numCols == 0 || boundaryMap.has(index+offset+1);
-                                    var prevAligned = (index+offset)%this.numCols == 0 || boundaryMap.has(index+offset-1);
-                                    // skip horizontal boundary segments (including those that run off the grid)
-                                    if (nextAligned && prevAligned) {
-                                        continue;
-                                    }
-                                    for (var n = 0; n < cell.next.length; n++) {
-
-                                        var next_inds = this.indexToRowCol(cell.next[n]);
-                                        var prev_inds = this.indexToRowCol(cell.prev[n]);
-
-                                        // skip vertices
-                                        if ((next_inds[0] == r+1 && (prev_inds[0] == r || prev_inds[0] == r+1)) ||
-                                            ((next_inds[0] == r || next_inds[0] == r+1) && prev_inds[0] == r+1) ||
-                                            (next_inds[0] == r-1 && prev_inds[0] == r-1)) {
-                                            continue;
-                                        }
-
-                                        numIntersect++;
-                                    }
-                                }
-                            }
-
-                            if (numIntersect%2 > 0) {
-                                polyFill[index] = 1;
-                                maskFill[index] = 0;
-                            }
-                        }
-                    }
-                }
-            }
+        updateDisplay: function(grid) {
+            // clear source
+            this.modelSource.clear();
 
             // make polygons
-            for (var i = 0; i < numCells; i++)
-            {   
-                var rc = this.indexToRowCol(i);    
-                var feature = infoGrid.features[i];
-                var fill = polyFill[i];          
-
-                this.modelSource.addFeature( new ol.Feature({
-                    geometry: new ol.geom.Polygon(feature.geometry.coordinates),
-                    id: i,
-                    fill: fill
-                }));
-                this.cemGrid[rc[0]][rc[1]] = fill;
+            for (var r = 0; r < this.numRows; r++)
+            {
+                for (var c = 0; c < this.numCols; c++) {
+                    var i = this.rowColsToIndex(r, c);
+                    this.modelSource.addFeature( new ol.Feature({
+                        geometry: new ol.geom.Polygon([this.polyGrid[r][c]]),
+                        id: i,
+                        fill: grid[r][c]
+                    }));
+                }
             }
-
 
             // add to map
             var vectorLayer = new ol.layer.Vector({source: this.modelSource, 
@@ -418,7 +298,7 @@ function MapInterface() {
             this.map.addLayer(vectorLayer);
         },
 
-        updateFeature(feature, fill) {
+        updateFeature: function(feature, fill) {
             var id = feature.get('id');
             var rc = this.indexToRowCol(id);
             this.cemGrid[rc[0]][rc[1]] = fill;
