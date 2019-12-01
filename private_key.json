@@ -1,4 +1,3 @@
-// contains information for Web Utility service account - TODO check if necessary
 {
   "type": "service_account",
   "project_id": "cem-ee-utility",

@@ -34,8 +34,6 @@ function displayInputErrors(errorMessage) {
 
 function validateData(data) {
     if (!data.grid || data.grid.length == 0) { return -1; }
-    if (!data.nRows || data.nRows <= 0) { return -1; }
-    if (!data.nCols || data.nCols <= 0) { return -1; }
     if (!data.cellWidth || data.cellWidth <= 0) { return -1; }
     if (!data.cellLength || data.cellLength <= 0) { return -1; }
     if (!data.asymmetry) { return -1; }
