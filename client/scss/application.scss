@@ -80,6 +80,7 @@ html, body {
     height: 78%;
     width: 98%;
     padding: 1%;
+    overflow: auto;
 
     .section {
         margin-bottom: 8px;
@@ -118,6 +119,8 @@ html, body {
 
     .content-pane {
         padding: 15px;
+        height: 100%;
+        overflow: auto;
     }
 
     .input {
@@ -146,9 +149,12 @@ html, body {
     }
     
     .output-pane {
-        height: 50%;
-        width: 95%;
-        background-color: lightgrey;
+        background-color: #d3d3d3;
+        overflow: auto;
+        height: 250px;
+        width: 100%;
+        white-space: pre-wrap;
+        padding: 5px 10px;
     }
 
     /* Edit modal window */

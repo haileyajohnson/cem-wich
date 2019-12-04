@@ -4,6 +4,7 @@ import json
 import math
 import numpy as np
 from skimage import filters
+from sklearn.decomposition import PCA
 app = Flask(__name__, static_folder="_dist")
 app.config["SECRET_KEY"] = "secret!"
 socketio = SocketIO(app)
