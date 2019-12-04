@@ -83,6 +83,8 @@ function MapInterface() {
         boundsSource: null,
         gridSource: null,
         modelSource: null,
+        imLayer: null,
+        modelLayer:null,
 
         drawingMode: false,
         editMode: false,
@@ -185,12 +187,13 @@ function MapInterface() {
             }));
         },        
 
+        mapTransform: function(filterDates, makeGrid){
+            if (this.imLayer) { this.map.removeLayer(this.imLayer); }
 
-        mapTransform: function(){
             var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
 
             try {
-                var dataset = ee.ImageCollection(this.source.url).filterBounds(poly).filterDate(this.source.startFilter, this.source.endFilter);
+                var dataset = ee.ImageCollection(this.source.url).filterBounds(poly).filterDate(filterDates[0], filterDates[1]);
                 var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
             } catch(error) {
                 return error;
@@ -222,7 +225,9 @@ function MapInterface() {
             smooth.getThumbURL({dimensions: [800, 800], region: poly.toGeoJSONString() }, (url) => {
                 this.displayPhoto(url);
             })
-            this.createGrid(smooth);
+            if (makeGrid) {
+                this.createGrid(smooth);
+            }
         },
 
         /**
@@ -267,7 +272,8 @@ function MapInterface() {
 
         updateDisplay: function(grid) {
             // clear source
-            this.modelSource.clear();
+            //this.modelSource.clear();
+            if (this.modelLayer) { this.map.removeLayer(this.modelLayer); }
 
             // make polygons
             for (var r = 0; r < this.numRows; r++)
@@ -283,7 +289,7 @@ function MapInterface() {
             }
 
             // add to map
-            var vectorLayer = new ol.layer.Vector({source: this.modelSource, 
+            this.modelLayer = new ol.layer.Vector({source: this.modelSource, 
                 style: function(feature, resolution) {
                     return new ol.style.Style({                        
                         stroke: new ol.style.Stroke({
@@ -294,8 +300,8 @@ function MapInterface() {
                         })
                     });
                 }});
-            vectorLayer.setZIndex(4);
-            this.map.addLayer(vectorLayer);
+            this.modelLayer.setZIndex(4);
+            this.map.addLayer(this.modelLayer);
         },
 
         updateFeature: function(feature, fill) {
@@ -538,8 +544,9 @@ function MapInterface() {
         clearMap: function() {
             this.boundsSource.clear();
             this.gridSource.clear();
-            this.modelSource.clear();
+            //this.modelSource.clear();
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
+            if (this.modelLayer) {this.map.removeLayer(this.modelLayer);}
             this.box = null;
             this.polyGrid = [];
             this.cemGrid = [];

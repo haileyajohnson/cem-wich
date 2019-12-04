@@ -105,6 +105,7 @@ function onLoad() {
 }
 
 function onRun() {
+    disableAll();
     // create payload
     var input_data = {
         grid: mapInterface.cemGrid,
@@ -116,7 +117,7 @@ function onRun() {
         wavePeriod: parseFloat(this.waveTab.wave_period),
         shelfSlope: parseFloat(this.controlTab.shelf_slope),
         shorefaceSlope: parseFloat(this.controlTab.shoreface_slope),
-        numTimesteps: parseInt(Math.round((this.controlTab.end_year - this.mapInterface.source.year) * (365/this.controlTab.length_timestep))),
+        numTimesteps: controlTab.num_timesteps,
         lengthTimestep: parseFloat(this.controlTab.length_timestep),
         saveInterval: parseInt(this.controlTab.save_interval)
     }
@@ -129,15 +130,82 @@ function onRun() {
 
 function onUpdate(msg) {
     mapInterface.updateDisplay(msg.grid);
-    $output = $(".output-pane");
-    var text = $output.text();
-    text += msg.time + ": " + msg.dif + "\n";
-    $output.text(text);
+    runTab.displayTimestep(msg.time);
+    runTab.updateOutput(msg);
 }
 
 function onModelComplete(msg) {
-
+    mapInterface.mapTransform(getEndFilterDates(), false);
+    enableAll();
 }
+
+/**
+ * Helpers
+ */
+
+ function disableAll() {
+    // save config
+    $saveButton.disable();
+
+    // grid tab
+    gridTab.$clearButton.disable();
+    gridTab.$editButton.disable();
+
+    // wave tab
+    waveTab.$asymmetry.disable();
+    waveTab.$stability.disable();
+    waveTab.$wave_height.disable();
+    waveTab.$wave_period.disable();
+
+    // conds tab
+    controlTab.$shelf_slope.disable();
+    controlTab.$shoreface_slope.disable();
+    controlTab.$end_year.disable();
+    controlTab.$length_timestep.disable();
+    controlTab.$save_interval.disable();
+
+    // run tab
+    runTab.$runButton.enable();
+    runTab.$outputButton.disable();
+
+ }
+
+ function enableAll() {
+    // save config
+    $saveButton.enable();
+
+    // grid tab
+    gridTab.$clearButton.enable();
+    gridTab.$editButton.enable();
+
+    // wave tab
+    waveTab.$asymmetry.enable();
+    waveTab.$stability.enable();
+    waveTab.$wave_height.enable();
+    waveTab.$wave_period.enable();
+
+    // conds tab
+    controlTab.$shelf_slope.enable();
+    controlTab.$shoreface_slope.enable();
+    controlTab.$end_year.enable();
+    controlTab.$length_timestep.enable();
+    controlTab.$save_interval.enable();
+
+    // run tab
+    runTab.$runButton.enable();
+    runTab.$outputButton.enable();
+ }
+
+ function getEndFilterDates() {
+    var endYear = this.controlTab.end_year;
+    if (endYear >= 2012 && mapInterface.source.name == "LS5") {
+        mapInterface.source = sources[1];
+    }
+    
+    var start_date = endYear + "-01-01";
+    var end_date = endYear + "-12-01";
+    return [start_date, end_date];
+ }
 
 /**
  * Save/load functions
@@ -281,8 +349,12 @@ function GridTab() {
 
             this.$drawButton.disable();
             $loadButton.disable();
+            $('input[type=radio]').disable();
+            this.$numRows.disable();
+            this.$numCols.disable();
+            this.$submitButton.disable();
 
-            mapInterface.mapTransform();
+            mapInterface.mapTransform([mapInterface.source.startFilter, mapInterface.source.endFilter], true);
             
             // send to server
             var grid_data = {
@@ -296,6 +368,7 @@ function GridTab() {
             socket.emit('submit', grid_data);
             
             this.$editButton.enable();
+            runTab.$runButton.enable();
         },
 
         onClearClicked: function() {
@@ -305,13 +378,21 @@ function GridTab() {
             this.setRotation();
             this.$coords.val("");
             this.$coords.enable();
+            $('input[type=radio]').enable();            
+            this.$numRows.enable();
+            this.$numCols.enable();
             
             this.$drawButton.enable();
             this.$submitButton.disable();
             this.$editButton.disable();
             this.$clearButton.disable();
+
+
             
             $loadButton.enable();
+            runTab.$runButton.disable();
+            runTab.$outputButton.disable();
+            runTab.clearOutput();
         },
 
         onDrawClicked: function() {
@@ -468,6 +549,7 @@ function ControlsTab() {
         end_year: null,
         length_timestep: null,
         save_interval: null,
+        num_timesteps: null,
 
         init: function() {
             this.$tab.click(() => { onTabChange(this); });
@@ -483,6 +565,11 @@ function ControlsTab() {
             this.$end_year.change(() => { this.onEndYearChange(); });
             this.$length_timestep.change(() => { this.onTimestepLengthChange(); });
             this.$save_interval.change(() => { this.onSaveIntervalChange(); });
+            this.getNumTimesteps();
+        },
+
+        getNumTimesteps: function() {
+            this.num_timesteps = parseInt(Math.round((this.end_year - mapInterface.source.year) * (365/this.length_timestep)))
         },
 
         /** listeners
@@ -497,6 +584,8 @@ function ControlsTab() {
 
         onEndYearChange: function() {
             this.end_year = this.$end_year.val();
+            this.getNumTimesteps();
+            runTab.displayTimestep(0);
         },
 
         onTimestepLengthChange: function() {
@@ -517,11 +606,33 @@ function RunTab() {
         $elem: $(".run-tab"),
         $tab: $("#run-tab"),
         
+        $output: $(".output-pane"),
+        $timestep: $(".timestep"),
         $runButton: $(".run-button"),
+        $outputButton: $(".output-button"),
 
         init: function() {
             this.$tab.click(() => { onTabChange(this); });
             this.$runButton.click(() => { onRun(); });
+
+            this.$runButton.disable();
+            this.$outputButton.disable();
+
+            this.displayTimestep(0);
+        },
+
+        updateOutput: function(msg) {
+            var text = this.$output.text();
+            text += msg.time + ": " + (100*msg.dif).toFixed(4) + "\n";
+            this.$output.text(text);
+        },
+
+        clearOutput: function() {
+            this.$output.text("");
+        },
+
+        displayTimestep: function(t) {
+            this.$timestep.text("T = " + t + " out of " + controlTab.num_timesteps);
         }
     }
 }
