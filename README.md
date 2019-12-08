@@ -4,6 +4,7 @@
 The Coastline Evolution Model (CEM) Web Utility is a graphical user interface web app which serves two purposes:
 1. Simplifies the generation of CEM inputs
 2. Automatically compares CEM outputs to Landsat images provided by Google Earth Engine (GEE)
+
 The purpose ot the CEM web util it to estimate the extent to which wave climate controls local shoreline morhpology at a location of interest.
 
 ## Getting started
