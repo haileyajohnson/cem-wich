@@ -10,8 +10,6 @@ const autoprefixer = require('autoprefixer');
 const cssnano = require('cssnano');
 const clean = require('gulp-clean');
 
-
-
 // File paths
 const files = { 
   scssPath: 'client/scss/**/*.scss',
@@ -38,26 +36,31 @@ function jsTask(){
   );
 }
 
+// serves files without concat and minify
 function debugTask() {
   return src(files.jsPath)
       .pipe(dest('_dist'));
 }
 
+// include external libraries
 function includeExternsTask() {
   return src('client/extern/**/*')
       .pipe(dest('_dist/extern'));
 }
 
+// clean distribution folder
 function cleanTask() {
   return src('_dist', {read: false, allowEmpty: true})
       .pipe(clean());
 }
 
+// production build task
 exports.build = series(
     cleanTask,
     parallel(scssTask, jsTask, includeExternsTask)
   );
 
+// dev build task
 exports.debug = series(
     cleanTask,
     parallel(scssTask, debugTask, includeExternsTask)
