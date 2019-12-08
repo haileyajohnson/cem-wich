@@ -13,6 +13,7 @@ void WaveTransformation(struct BeachGrid *grid, double wave_angle, double wave_p
 void GetAvailableSupply(struct BeachGrid *grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth);
 void NetVolumeChange(struct BeachGrid *grid);
 int TransportSediment(struct BeachGrid *grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth);
+int FixBeach(struct BeachGrid* grid);
 
 #if defined(__cplusplus)
 }

@@ -113,24 +113,20 @@ void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, double ref_depth, d
 			double volume_needed_right = 0.0;
 
 			struct BeachNode* prev = curr->prev;
-			if (BeachNode.isEmpty(prev))
-			{
-				prev = curr;
-			}
 
 			FLOW_DIR dir = (*curr).GetFlowDirection(curr);
 			switch (dir) {
 			case RIGHT:
-				volume_needed_right = curr->transport_potential;
+				volume_needed_right = curr->GetTransportPotential(curr);
 				break;
 			case DIVERGENT:
-				volume_needed_right = curr->transport_potential;
-				volume_needed_left = prev->transport_potential;
+				volume_needed_right = curr->GetTransportPotential(curr);
+				volume_needed_left = prev->GetTransportPotential(prev);
 				break;
 			case CONVERGENT:
 				break;
 			case LEFT:
-				volume_needed_left = prev->transport_potential;
+				volume_needed_left = prev->GetTransportPotential(prev);
 				break;
 			}
 
@@ -169,27 +165,23 @@ void NetVolumeChange(struct BeachGrid* grid)
 			double volume_out = 0.0;
 
 			struct BeachNode* prev = curr->prev;
-			if (BeachNode.isEmpty(prev))
-			{
-				prev = curr;
-			}
 
 			FLOW_DIR dir = (*curr).GetFlowDirection(curr);
 			switch (dir)
 			{
 			case RIGHT:
-				volume_in = prev->transport_potential;
-				volume_out = curr->transport_potential;
+				volume_in = prev->GetTransportPotential(prev);
+				volume_out = curr->GetTransportPotential(curr);
 				break;
 			case DIVERGENT:
-				volume_out = curr->transport_potential + prev->transport_potential;
+				volume_out = curr->GetTransportPotential(curr) + prev->GetTransportPotential(prev);
 				break;
 			case CONVERGENT:
-				volume_in = curr->transport_potential + prev->transport_potential;
+				volume_in = curr->GetTransportPotential(curr) + prev->GetTransportPotential(prev);
 				break;
 			case LEFT:
-				volume_in = curr->transport_potential;
-				volume_out = prev->transport_potential;
+				volume_in = curr->GetTransportPotential(curr);
+				volume_out = prev->GetTransportPotential(prev);
 				break;
 			}
 			curr->net_volume_change = volume_in - volume_out;
@@ -343,6 +335,80 @@ void OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 	return;
 }
 
+int FixBeach(struct BeachGrid* grid)
+{
+	int FIND_BEACH_FLAG = FALSE;
+	// smooth corners
+	int i = 0;
+	while (i < grid->num_shorelines)
+	{
+		struct BeachNode* start = grid->shoreline[i];
+		struct BeachNode* curr = start;
+
+		do {
+			struct BeachNode** neighbors = (*grid).Get4Neighbors(grid, curr);
+
+			int needs_fix = TRUE;
+			int num_cells = 0;
+			int j;
+			for (j = 0; j < 4; j++)
+			{
+				if (BeachNode.isEmpty(neighbors[j])) { continue; }
+				if (neighbors[j]->frac_full >= 1.0)
+				{
+					needs_fix = FALSE;
+				}
+				else if (neighbors[j]->frac_full > 0.0)
+				{
+					num_cells++;
+				}
+			}
+			// "floating bit"
+			if (needs_fix && num_cells > 0)
+			{
+				double delta_fill = curr->frac_full / num_cells;
+				double cell_area = grid->cell_width * grid->cell_length;
+				for (j = 0; j < 4; j++)
+				{
+					if (BeachNode.isEmpty(neighbors[j])) { continue; }
+					if (neighbors[j]->frac_full < 1.0 && neighbors[j]->frac_full > 0.0)
+					{
+
+						neighbors[j]->frac_full += delta_fill;
+						if (neighbors[j]->frac_full > 1.0)
+						{
+							OopsImFull(grid, neighbors[j]);
+							FIND_BEACH_FLAG = TRUE;
+						}
+					}
+				}
+
+				curr->frac_full = 0;
+			}
+			curr = curr->next;
+			free(neighbors);
+		} while (curr != start && !curr->is_boundary);
+
+
+		// one more pass for over/under-filled cells
+		curr = grid->shoreline[i];
+		do {
+			if (curr->frac_full < 0.0) {
+				OopsImEmpty(grid, curr);
+				FIND_BEACH_FLAG = TRUE;
+			}
+			else if (curr->frac_full > 1.0)
+			{
+				OopsImFull(grid, curr);
+				FIND_BEACH_FLAG = TRUE;
+			}
+			curr = curr->next;
+		} while (curr != start && !curr->is_boundary);
+		i++;
+	}
+	return FIND_BEACH_FLAG;
+}
+
 
 /* ---- SEDIMENT TRANSPORT HELPERS ------- */
 double GetDepthOfClosure(struct BeachNode* node, int ref_pos, double shelf_depth_at_ref_pos, double shelf_slope, double shoreface_slope, double shore_angle, double min_shelf_depth_at_closure, int cell_length)
@@ -423,11 +489,11 @@ struct BeachNode* GetNodeInDir(struct BeachGrid* grid, struct BeachNode* node, d
 
 	if (sin(dir) > 1e-6)
 	{
-		row = r + 1;
+		row = r - 1;
 	}
 	else if (sin(dir) < -1e-6)
 	{
-		row = r - 1;
+		row = r + 1;
 	}
 	else
 	{

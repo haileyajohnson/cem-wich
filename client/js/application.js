@@ -1,7 +1,8 @@
 
-/**
+/******************
  * Global variables
- */
+ ******************/
+
 // config vars
 var configJSON;
 const CLIENT_ID = '762501139172-rjf0ia3vv9edu6gg0m46aoij519khuk7.apps.googleusercontent.com';
@@ -9,8 +10,6 @@ var socket;
 
 // application interface objects
 var mapInterface;
-var modelInterface;
-
 
 // views
 var selectedTab;
@@ -70,6 +69,9 @@ function initialize() {
     onTabChange(gridTab);
 }
 
+/**
+ * Google sign in
+ */
 function googleSignIn() {
     $('.g-sign-in').removeClass('hidden');
     $('.output').text('(Log in to see the result.)');
@@ -82,9 +84,10 @@ function googleSignIn() {
     });
 }
 
-/**
+/*******************
  *  Event listeners 
- */
+ *******************/
+
 function onTabChange(newTab){
     if (selectedTab) {
         selectedTab.$tab.removeAttr("selected");
@@ -139,9 +142,9 @@ function onModelComplete(msg) {
     enableAll();
 }
 
-/**
+/*********
  * Helpers
- */
+ *********/
 
  function disableAll() {
     // save config
@@ -207,9 +210,9 @@ function onModelComplete(msg) {
     return [start_date, end_date];
  }
 
-/**
+/*********************
  * Save/load functions
- */
+ *********************/
 
 function updateJSON() {
     // save view settings
@@ -232,9 +235,9 @@ function updateJSON() {
     }
     configJSON.gridConfig = gridConfig;
 
-    // save wave inputs
+    // TODO save wave inputs
 
-    // save config inputs
+    // TODO save config inputs
 }
 
 function importJSON(newContent) {
@@ -259,9 +262,9 @@ function importJSON(newContent) {
     }
     gridTab.setAllValues();
 
-    // load wave inpts
+    // TODO: load wave inpts
 
-    // load config inputs
+    // TODO: load config inputs
 }
 
 function saveConfig() {    
@@ -341,9 +344,9 @@ function GridTab() {
             this.setAllValues();
         },
         
-        /**
+        /*****************
          * click listeners
-         */
+         *****************/
         onSubmitClicked: function() {
             this.$coords.disable();
 
@@ -404,9 +407,9 @@ function GridTab() {
             mapInterface.toggleEditMode();
         },
 
-        /**
+        /*****************
          * input listeners 
-         */
+         *****************/
         onCoordsChange: function() {
             var coords = mapInterface.box ? mapInterface.box.getCoordinates()[0] : [["", ""], [], ["", ""]];
             var lon1 = tryParseFloat(this.$lon1.val(), coords[0][0]);
@@ -440,9 +443,9 @@ function GridTab() {
                 deg_to_rad(tryParseFloat(this.$rotation.val()), mapInterface.rotation));
         },
 
-        /**
+        /*********
          * setters
-         */        
+         *********/        
         setAllValues: function() {
             this.setRotation();
             this.$numRows.val(mapInterface.numRows);
@@ -463,10 +466,9 @@ function GridTab() {
             $("input[name=lat2]").val(coords[2][1]);
         },
 
-        /**
+        /***************
          * map listeners
-         */
-
+         ***************/
         onBoxDrawn: function() {
             this.setRotation();
             this.setCoords();
@@ -509,8 +511,9 @@ function WaveTab() {
             this.$wave_period.change(() => { this.onWavePeriodChange(); });
         },
 
-        /** listeners
-         */
+        /***********
+         * listeners
+         ***********/
         onAsymmetryChange: function() {
             this.a_val = this.$asymmetry.val();
         },
@@ -572,8 +575,9 @@ function ControlsTab() {
             this.num_timesteps = parseInt(Math.round((this.end_year - mapInterface.source.year) * (365/this.length_timestep)))
         },
 
-        /** listeners
-         */
+        /***********
+         * listeners
+         ***********/
         onShelfSlopeChange: function() {
             this.shelf_slope = this.$shelf_slope.val();
         },
@@ -619,11 +623,22 @@ function RunTab() {
             this.$outputButton.disable();
 
             this.displayTimestep(0);
+            this.$output.text('t \tdif  \t\tPCA\n');
         },
 
+        /***********
+         * callbacks
+         ***********/
         updateOutput: function(msg) {
             var text = this.$output.text();
-            text += msg.time + ": " + (100*msg.dif).toFixed(4) + "\n";
+            var pca = msg.sp_pca;
+            var pca_str = "";
+            for (var i = 0; i < 2; i++) {
+                num = pca[i]*100;
+                num = num.toPrecision(4);
+                pca_str += num + ", "
+            }
+            text += msg.time + ":\t" + (100*msg.dif).toFixed(4) + '\t' + pca_str + "\n";
             this.$output.text(text);
         },
 

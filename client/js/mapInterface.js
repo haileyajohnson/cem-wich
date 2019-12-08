@@ -23,13 +23,6 @@ function getColor(feature) {
     return [r, g, b, 0.2];
 }
 
-dirEnum = {
-    LEFT: 0,
-    UP: 1,
-    RIGHT: 2,
-    DOWN: 3
-}
-
 sources = [
 // Landsat 5 access info
 {
@@ -61,18 +54,6 @@ sources = [
     url:"LANDSAT/LC08/C01/T1"
 }];
 
-
-function BoundaryCell() {
-    this.prev = [];
-    this.next = [];
-    this.addPrev = (prev) => {
-        this.prev.push(prev);
-    };
-    this.addNext = (next) => {
-        this.next.push(next);
-    } 
-}
-
 function MapInterface() {
     return {
         map: null,        
@@ -89,6 +70,7 @@ function MapInterface() {
         drawingMode: false,
         editMode: false,
         draw: null,
+
         numCols: 100,
         numRows:  50,
         rotation: 0,
@@ -106,10 +88,8 @@ function MapInterface() {
                 target: 'map',
                 view: new ol.View({
                     projection: "EPSG:4326",
-                    center: [-75.5, 35.25],
-                    zoom:6
-                    // center: [0, 0],
-                    // zoom: 2
+                    center: [0, 0],
+                    zoom: 2
                 })
             });
 
@@ -187,18 +167,23 @@ function MapInterface() {
             }));
         },        
 
+        /**
+         * Convert image to CEM grid
+         */
         mapTransform: function(filterDates, makeGrid){
+            // clear
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
 
             var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
-
+            // get image
             try {
                 var dataset = ee.ImageCollection(this.source.url).filterBounds(poly).filterDate(filterDates[0], filterDates[1]);
                 var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
             } catch(error) {
                 return error;
             }
-
+            
+            // Otsu thresholding to classify as land/water
             var water_bands = this.source.bands;
             var ndwi = composite.normalizedDifference(water_bands);
 
@@ -212,19 +197,23 @@ function MapInterface() {
             var water = ndwi.gt(this.otsu(values.get('nd')));
             var minConnectivity = 50;
             var connectCount = water.connectedPixelCount(minConnectivity, true);
+            // create mask
             var land_pix = water.eq(0).and(connectCount.lt(minConnectivity));
             var water_pix = water.eq(1).and(connectCount.lt(minConnectivity)).multiply(-1);
             var mask = water.add(land_pix).add(water_pix).not();
 
+            // smooth
             var gaussian = ee.Kernel.gaussian({
                 radius: 1
-            });
-            
+            });            
             var smooth = mask.convolve(gaussian).clip(poly);
 
+            // get mask image
             smooth.getThumbURL({dimensions: [800, 800], region: poly.toGeoJSONString() }, (url) => {
                 this.displayPhoto(url);
             })
+
+            // create model input grid
             if (makeGrid) {
                 this.createGrid(smooth);
             }
@@ -232,7 +221,6 @@ function MapInterface() {
 
         /**
          * convert Otsu image into CEM input grid
-         * size numRows X numCols
          */
         createGrid: function(image) {
             var features = [];
@@ -304,6 +292,9 @@ function MapInterface() {
             this.map.addLayer(this.modelLayer);
         },
 
+        /**
+         * Update feature properties and redraw
+         */
         updateFeature: function(feature, fill) {
             var id = feature.get('id');
             var rc = this.indexToRowCol(id);
@@ -313,6 +304,9 @@ function MapInterface() {
             this.modelSource.refresh();
         },
 
+        /**
+         * Show land/water mask on map
+         */
         displayPhoto: function(photoUrl) {
             this.imLayer = new ol.layer.Image({
                 source: new ol.source.ImageStatic({
@@ -324,6 +318,9 @@ function MapInterface() {
             this.map.addLayer(this.imLayer);
         },
 
+        /**
+         * Classify pixels based on thresholding
+         */
         otsu: function(histogram) {
             var counts = ee.Array(ee.Dictionary(histogram).get('histogram'));
             var means = ee.Array(ee.Dictionary(histogram).get('bucketMeans'));
@@ -352,6 +349,9 @@ function MapInterface() {
             return means.sort(bss).get([-1]);
         },
 
+        /**
+         * Draw grid lines on map
+         */
         drawGrid: function() {
             this.gridSource.clear();
 
@@ -409,6 +409,10 @@ function MapInterface() {
             }
         },
 
+        /**
+         * Get coordinates of vertices of the geometry region
+         * Coordinates ordered clockwise from top left
+         */
         getRectangleVertices: function(first, last) {
             // find distance between corners
             var dLon = last[0] - first[0];
@@ -439,6 +443,9 @@ function MapInterface() {
             return coordinates
         },
 
+        /**
+         * draw geometry region
+         */
         updateBox: function(lon1, lat1, lon2, lat2) {
             this.toggleDrawMode();
             var coordinates = this.getRectangleVertices([lon1, lat1], [lon2, lat2])
@@ -446,10 +453,9 @@ function MapInterface() {
             this.boundsSource.addFeature(new ol.Feature({ geometry: geometry}));
         },
 
-        /**
+        /*********************
          * Getters and setters
-         */
-
+         *********************/
         setNumRows: function(rows) {
             this.numRows = rows;
         },
@@ -459,9 +465,13 @@ function MapInterface() {
         },
 
 
-        /***
+        /*************
          * Helpers
-         */
+         *************/
+
+         /**
+          * Get N linearly spaced coordinates between start and stop
+          */
         linspace: function(start, stop, N) {
             var difLon = stop[0] - start[0];
             var dLon = difLon/N;
@@ -475,6 +485,9 @@ function MapInterface() {
             return coords;
         },
 
+        /**
+         * allow user to draw domain on map
+         */
         toggleDrawMode: function() {
             this.drawingMode = !this.drawingMode;
             if (this.drawingMode) {
@@ -490,20 +503,32 @@ function MapInterface() {
             }
         },
 
+        /**
+         * allow user to change cell values
+         */
         toggleEditMode: function() {
             this.editMode = !this.editMode;
         },      
 
+        /**
+         * convert index to row and column
+         */
         indexToRowCol: function(i) {
             var r = Math.floor(i/this.numCols);
             var c = i%this.numCols;
             return [r, c];
         },
 
+        /**
+         * convert row and column to index
+         */
         rowColsToIndex: function(r, c) {
             return (r*this.numCols) + c;
         },
 
+        /**
+         * Get cell width in meters
+         */
         getCellWidth: function() {
             var coords = this.box.getCoordinates()[0];
             var lat1 = coords[0][0];
@@ -515,6 +540,9 @@ function MapInterface() {
             return dist_cols/this.numCols;
         },
 
+        /**
+         * Get cell length in meters
+         */
         getCellLength: function() {
             var coords = this.box.getCoordinates()[0];
             var lat1 = coords[0][0];
@@ -526,6 +554,9 @@ function MapInterface() {
             return dist_rows/this.numRows;
         },
 
+        /**
+         * Get distance between two coordinate points in meters
+         */
         getLatLonAsMeters: function(lat1, lon1, lat2, lon2){ 
             var R = 6378.137; // Radius of earth in KM
             var dLat = lat2 * Math.PI / 180 - lat1 * Math.PI / 180;
@@ -551,23 +582,5 @@ function MapInterface() {
             this.polyGrid = [];
             this.cemGrid = [];
         }
-
     }
 }
-
-/**
-TODO
-    sensitivity control
-        - connectivity minimum
-
-    wave inputs
-    conrol inputs
-
-    run cem from python
-
-    window resizing
-    comments
-    error handling
-    image loading
-    improve shoreline detection (KVos)?
-*/
