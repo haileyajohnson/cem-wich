@@ -80,6 +80,7 @@ html, body {
     height: 78%;
     width: 98%;
     padding: 1%;
+    overflow: auto;
 
     .section {
         margin-bottom: 8px;
@@ -105,6 +106,7 @@ html, body {
 
         .tab-view {
             display: none;
+            height: 100%;
         }
     }
 
@@ -117,6 +119,8 @@ html, body {
 
     .content-pane {
         padding: 15px;
+        height: 100%;
+        overflow: auto;
     }
 
     .input {
@@ -142,7 +146,16 @@ html, body {
         &[selected] {
             border-style: inset;
         }
-    }    
+    }
+    
+    .output-pane {
+        background-color: #d3d3d3;
+        overflow: auto;
+        height: 250px;
+        width: 95%;
+        white-space: pre;
+        padding: 5px 10px;
+    }
 
     /* Edit modal window */
     .modal {

@@ -39,20 +39,16 @@ int IsLandCell(int row, int col);
 
 // Main steps
 int cem_initialize(Config config);
-int cem_update(void);
+double* cem_update(int saveInterval);
 int cem_finalize(void);
 
 /* Logging and Debugging */
 void Process();
+double* results = NULL;
 void test_LogShoreline();
 void test_OutputGrid();
 
 // TODO: Add error and data return
-
-int add_nums(int a, int b) {
-	return a + b;
-}
-
 int cem_initialize(Config config)
 {
 	srand(time(NULL));
@@ -69,30 +65,30 @@ int cem_initialize(Config config)
 		return -1;
 	}
 
-	test_LogShoreline();
-	test_OutputGrid();
-
 	return 0;
 }
 
 // Update the CEM by a single time step.
-int cem_update() {
+double* cem_update(int saveInterval) {
+	int i;
+	for (i = 0; i < saveInterval; i++)
+	{
+		g_wave_climate.FindWaveAngle(&g_wave_climate);
+		SedimentTransport();
 
-	g_wave_climate.FindWaveAngle(&g_wave_climate);
-
-	SedimentTransport();
+		current_time_step++;
+		current_time += myConfig.lengthTimestep;
+	}
 
 	Process();
-
-	current_time_step++;
-	test_OutputGrid();
-
-	current_time += myConfig.lengthTimestep;
-
-	return 0;
+	return results;
 }
 
 int cem_finalize() {
+	// free everything
+	free(results);
+	free(g_beachGrid.shoreline);
+	free(g_beachGrid.cells);
 	return 0;
 }
 
@@ -139,6 +135,7 @@ int FindBeach()
 					}
 					else {
 						curr->prev->is_beach = FALSE;
+						curr->prev->is_boundary = FALSE;
 					}
 				}
 				curr->prev = NULL;
@@ -154,6 +151,7 @@ int FindBeach()
 				}
 				else {
 					curr->is_beach = FALSE;
+					curr->is_boundary = FALSE;
 				}
 			}
 			i++;
@@ -169,7 +167,7 @@ int FindBeach()
 	
 	int r, c;
 	for (c = 0; c < myConfig.nCols; c++) {
-		for (r = 0; r < myConfig.nRows; r++) {
+		for (r = 1; r < myConfig.nRows; r++) {
 			// turn off search when we encounter boundary
 			struct BeachNode* node = g_beachGrid.TryGetNode(&g_beachGrid, r, c);
 			if (node->is_beach)
@@ -184,23 +182,6 @@ int FindBeach()
 				struct BeachNode* startNode = node;
 				if (BeachNode.isEmpty(startNode)) { return -1; }
 
-				// add to shorelines array
-				num_landmasses++;
-				if (num_landmasses > 1)
-				{
-					// grow shorelines array
-					struct BeachNode** temp = realloc(shorelines, num_landmasses * sizeof(struct BeachNode*));
-					if (temp)
-					{
-						shorelines = temp;
-					}
-					else {
-						// deal with error
-						free(shorelines);
-					}
-				}
-
-				shorelines[num_landmasses - 1] = startNode;
 				struct BeachNode* endNode = startNode;
 
 				struct BeachNode* curr = startNode;
@@ -249,12 +230,9 @@ int FindBeach()
 
 					// end landmass
 					if (!foundNextBeach) {
-						if (search_dir > 0) {
-							search_dir = -1;
-							dir_r = 1;
-							dir_c = 0;
-							curr = startNode;
-							continue;
+						if (curr == startNode && search_dir > 0)
+						{
+							curr->is_beach = FALSE;
 						}
 						break; 
 					}
@@ -264,26 +242,18 @@ int FindBeach()
 					if (search_dir > 0) { // searching clockwise
 					// node already a beach cell, add boundary cell and break
 						if (tempNode->is_beach) {
-							double angle = atan2(curr->GetRow(curr) - curr->prev->GetRow(curr->prev), curr->GetCol(curr) - curr->prev->GetCol(curr->prev));
-							int next[2] = { curr->GetRow(curr) + round(sin(angle)), curr->GetCol(curr) + round(cos(angle)) };
-							struct BeachNode* boundary = g_beachGrid.TryGetNode(&g_beachGrid, next[0], next[1]);
-							curr->next = boundary;
-							boundary->prev = curr;
-							boundary->is_beach = TRUE;
-							boundary->is_boundary = TRUE;
-							search_dir = -1;
-							dir_r = 1;
-							dir_c = 0;
+							curr->next = NULL;
 							curr = startNode;
+							search_dir = -1;
 							continue;
 						}
 						curr->next = tempNode;
 						tempNode->prev = curr;
 
 						// end if undercutting
-						if (tempNode->GetCol(tempNode) < curr->GetCol(curr) && tempNode->GetRow(tempNode) <= curr->GetRow(curr))
+						if (tempNode->GetCol(tempNode) < curr->GetCol(curr) && tempNode->GetRow(tempNode) >= curr->GetRow(curr))
 						{
-							tempNode->is_beach = TRUE;
+							tempNode->is_beach = FALSE;
 							tempNode->is_boundary = TRUE;
 							search_dir = -1;
 							dir_r = 1;
@@ -296,31 +266,25 @@ int FindBeach()
 					else { // backtracking
 					// node already a beach cell, add boundary cell and break
 						if (tempNode->is_beach) {
-							double angle = atan2(curr->GetRow(curr) - curr->next->GetRow(curr->next), curr->GetCol(curr) - curr->next->GetCol(curr->next));
-							int prev[2] = { curr->GetRow(curr) + round(sin(angle)), curr->GetCol(curr) + round(cos(angle)) };
-							struct BeachNode* boundary = g_beachGrid.TryGetNode(&g_beachGrid, prev[0], prev[1]);
-							curr->prev = boundary;
-							boundary->next = curr;
-							boundary->is_beach = TRUE;
-							boundary->is_boundary = TRUE;
+							curr->prev = NULL;
 							break;
 						}
 						curr->prev = tempNode;
 						tempNode->next = curr;
 						// end if undercutting
-						if (tempNode->GetCol(tempNode) > curr->GetCol(curr) && tempNode->GetRow(tempNode) <= curr->GetRow(curr))
+						if (tempNode->GetCol(tempNode) > curr->GetCol(curr) && tempNode->GetRow(tempNode) >= curr->GetRow(curr))
 						{
 							tempNode->is_beach = TRUE;
 							tempNode->is_boundary = TRUE;
 							break;
 						}
-						shorelines[num_landmasses - 1] = tempNode;
 						startNode = tempNode;
 					}
 					curr = tempNode;
 				}
+				
 				// check start boundary
-				if (BeachNode.isEmpty(startNode->prev))
+				if (BeachNode.isEmpty(startNode->prev) && !BeachNode.isEmpty(startNode->next))
 				{
 					struct BeachNode* startBoundary;
 					if (startNode->GetCol(startNode) == 0) { startBoundary = BeachNode.boundary(EMPTY_INT, -1); }
@@ -328,14 +292,16 @@ int FindBeach()
 					else if (startNode->GetRow(startNode) == 0) { startBoundary = BeachNode.boundary(-1, EMPTY_INT); }
 					else if (startNode->GetRow(startNode) == myConfig.nRows - 1) { startBoundary = BeachNode.boundary(myConfig.nRows, EMPTY_INT); }
 					else {
-						// if not an edge node, break: invalid grid
-						return -1;
+						startNode->is_boundary = TRUE;
+						startBoundary = startNode;
+						startNode = startNode->next;
+
 					}
 					startNode->prev = startBoundary;
 					startBoundary->next = startNode;
 				}
 				// check end boundary
-				if (BeachNode.isEmpty(endNode->next))
+				if (BeachNode.isEmpty(endNode->next) && !BeachNode.isEmpty(endNode->prev))
 				{
 					struct BeachNode* endBoundary;
 					if (endNode->GetCol(endNode) == 0) { endBoundary = BeachNode.boundary(EMPTY_INT, -1); }
@@ -343,15 +309,37 @@ int FindBeach()
 					else if (endNode->GetRow(endNode) == 0) { endBoundary = BeachNode.boundary(-1, EMPTY_INT); }
 					else if (endNode->GetRow(endNode) == myConfig.nRows - 1) { endBoundary = BeachNode.boundary(myConfig.nRows, EMPTY_INT); }
 					else {
-						// if not an edge node, break: invalid grid
-						return -1;
+						endNode->is_boundary = TRUE;
+						endBoundary = endNode;
+						endNode = endNode->prev;
 					}
 					endNode->next = endBoundary;
 					endBoundary->prev = endNode;
 				}
 
-				// back track so that search will cross land boundary and set flag to false
-				r--;
+				if (!startNode->next || !startNode->prev)
+				{
+					r = startNode->GetRow(startNode) + 1;
+					continue;
+				}
+				if (num_landmasses > 0)
+				{
+					// grow shorelines array
+					struct BeachNode** temp = realloc(shorelines, (num_landmasses+1) * sizeof(struct BeachNode*));
+					if (temp)
+					{
+						shorelines = temp;
+					}
+					else {
+						// deal with error
+						free(shorelines);
+						return -1;
+					}
+				}
+
+				shorelines[num_landmasses] = startNode;
+				num_landmasses++;
+				break;
 			}
 		}
 	}
@@ -373,8 +361,10 @@ void SedimentTransport()
 	WaveTransformation(&g_beachGrid, g_wave_climate.wave_angle, g_wave_climate.wave_period, g_wave_climate.GetWaveHeight(&g_wave_climate), myConfig.lengthTimestep);
 	GetAvailableSupply(&g_beachGrid, c_cross_shore_reference_pos, c_shelf_depth_at_reference_pos, myConfig.shelfslope, myConfig.shorefaceSlope, c_minimum_shelf_depth_at_closure);
 	NetVolumeChange(&g_beachGrid);
-	int flag = TransportSediment(&g_beachGrid, c_cross_shore_reference_pos, c_shelf_depth_at_reference_pos, myConfig.shelfslope, myConfig.shorefaceSlope, c_minimum_shelf_depth_at_closure);
-	if (flag)
+	int flag1 = TransportSediment(&g_beachGrid, c_cross_shore_reference_pos, c_shelf_depth_at_reference_pos, myConfig.shelfslope, myConfig.shorefaceSlope, c_minimum_shelf_depth_at_closure);
+	int flag2 = FixBeach(&g_beachGrid);
+
+	if (flag1 || flag2)
 	{
 		if (FindBeach() < 0)
 		{
@@ -403,7 +393,24 @@ int IsLandCell(int row, int col)
 /* ----- CONFIGURATION AND OUTPUT FUNCTIONS -----*/
 void Process()
 {
-	// TODO
+	if (results) {
+		free(results);
+	}
+	results = malloc(g_beachGrid.rows *g_beachGrid.cols * sizeof(double));
+	int r, c;
+	for (r = 0; r < myConfig.nRows; r++)
+	{
+		for (c = 0; c < myConfig.nCols; c++)
+		{
+			struct BeachNode* node = g_beachGrid.TryGetNode(&g_beachGrid, r, c);
+			if (!node)
+			{
+				continue;
+			}
+			int i = r * myConfig.nCols + c;
+			results[i] = node->frac_full;
+		}
+	}
 }
 
 void test_LogShoreline() {
