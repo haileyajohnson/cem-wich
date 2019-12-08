@@ -16,3 +16,7 @@ server/C/bmi/bmi_EXPORTS.h
 # test files #
 ##############
 server/test/output
+
+# private key *
+###############
+private_key.json
