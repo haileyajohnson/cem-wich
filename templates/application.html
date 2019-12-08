@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Raleway">    
     <!-- Load JQuery from CDN -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+    <!-- Load socket.io from CDN -->
+    <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js"></script>
     <script>
       var map;
       function initMap() {}
@@ -61,7 +63,7 @@
             </div>
 
             <div class="tab-view-container">
-                        
+                <!-- Google sign in -->
                 <div class="g-sign-in hidden">
                     <span class="label">Sign in with:</span>
                     <div class="button">
@@ -70,6 +72,7 @@
                     </div>
                 </div>
 
+                <!-- grid input tab -->
                 <div class="grid-tab tab-view">
                     <div class="grid-content content-pane">
 
@@ -102,6 +105,13 @@
                             <div class="section-title">Num cols:</div>
                             <input class="input" type="number" name="numCols" min="0" max="1000">
                         </div>
+
+                        <div class="section">
+                            <div class="section-title">Source:</div><br>                            
+                            <input type="radio" name="source" value="0">Landsat 5
+                            <input type="radio" name="source" value="1">Landsat 7
+                            <input type="radio" name="source" value="2">Landsat 8
+                        </div>
                         
                         <div class="section">  
                             <input type="button" class="button submit-button" value="Submit">
@@ -111,6 +121,7 @@
                     </div>
                 </div>
 
+                <!-- Wave inputs tab -->
                 <div class="wave-tab tab-view">
                     <div class="wave-content content-pane">   
                         <div class="section">  
@@ -128,6 +139,7 @@
                     </div>
                 </div>
 
+                <!-- run controls inputs tab -->
                 <div class="control-tab tab-view">                    
                     <div class="control-content content-pane">                           
                         <div class="section">  
@@ -149,9 +161,16 @@
                     </div>
                 </div>
 
+                <!-- model run tab -->
                 <div class="run-tab tab-view">
                     <div class="run-content content-pane">                        
                         <input type="button" class="button run-button" value="Run">
+                        <div class="section timestep"></div>
+                        <div class="section">  
+                            <div class="section-title">Output</div>
+                            <div class="output-pane"></div>
+                        </div>
+                        <input type="button" class="button output-button" value="Save output">
                     </div>
                 </div>
 
@@ -166,15 +185,6 @@
                     <div class="section">  
                         <div class="section-title">Fill percent:</div>
                         <input class="input" type="number" name="fill" min="0" max="100">
-                    </div>
-                    <div class="section">  
-                        <div class="section-title">Alignment:</div>
-                        <div class="alignment-buttons">                        
-                            <input type="button" class="button top-button" id="1" value="Top"> <br>
-                            <input type="button" class="button left-button" id="0" value="Left">
-                            <input type="button" class="button right-button" id="2" value="Right"> <br>
-                            <input type="button" class="button bottom-button" id="3" value="Bottom">
-                        </div>
                     </div>
                     <div class="section">  
                         <div class="cell">

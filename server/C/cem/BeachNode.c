@@ -15,6 +15,11 @@ static int GetCol(struct BeachNode* this)
 	return this->col;
 }
 
+static double GetTransportPotential(struct BeachNode* this)
+{
+	return this->transport_potential;
+}
+
 static int GetBoundaryRow(struct BeachNode* this)
 {
 	if (this->row != EMPTY_INT) { return this->row; }
@@ -59,11 +64,21 @@ static int GetBoundaryCol(struct BeachNode* this)
 	return otherNode->GetCol(otherNode) + cdist;
 }
 
+static double GetBoundaryTransportPotential(struct BeachNode* this)
+{
+	if (this->next)
+	{
+		return this->next->transport_potential;
+	}
+	return this->prev->transport_potential;
+}
+
 static FLOW_DIR GetBoundaryFlowDirection(struct BeachNode* this)
 {
-	if (!BeachNode.isEmpty(this->next)) { return this->next->GetFlowDirection(this->next); }
-	if (!BeachNode.isEmpty(this->prev)) { return this->prev->GetFlowDirection(this->prev); }
-	return -1;
+	if (this->next) {
+		return RIGHT;
+	}
+	return LEFT;
 }
 
 static FLOW_DIR GetFlowDirection(struct BeachNode* this)
@@ -127,7 +142,8 @@ static struct BeachNode new(double frac_full, int r, int c, double cell_width, d
 				.prev = NULL,
 				.GetRow = &GetRow,
 				.GetCol = &GetCol,
-				.GetFlowDirection = &GetFlowDirection
+				.GetFlowDirection = &GetFlowDirection,
+				.GetTransportPotential = &GetTransportPotential
 				};
 }
 
@@ -147,7 +163,8 @@ static struct BeachNode empty() {
 			.prev = NULL,
 			.GetRow = NULL,
 			.GetCol = NULL,
-			.GetFlowDirection = NULL
+			.GetFlowDirection = NULL,
+			.GetTransportPotential = NULL
 	};
 }
 
@@ -168,7 +185,8 @@ static struct BeachNode* boundary(int r, int j) {
 			.prev = NULL,
 			.GetRow = &GetBoundaryRow,
 			.GetCol = &GetBoundaryCol,
-			.GetFlowDirection = &GetBoundaryFlowDirection
+			.GetFlowDirection = &GetBoundaryFlowDirection,
+			.GetTransportPotential = &GetBoundaryTransportPotential
 	};
 
 	return ptr;
@@ -194,7 +212,8 @@ static int isEmpty(struct BeachNode* node)
 		|| node->prev != NULL
 		|| node->GetRow != NULL
 		|| node->GetCol != NULL
-		|| node->GetFlowDirection != NULL)
+		|| node->GetFlowDirection != NULL
+		|| node->GetTransportPotential != NULL)
 	{
 		return FALSE;
 	}

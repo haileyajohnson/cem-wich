@@ -134,7 +134,7 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 
 	while (row < this->rows && i < max_i)
 	{
-		row = node->GetRow(node) + trunc(i * ShadowStepDistance * cos(wave_angle));
+		row = node->GetRow(node) - trunc(i * ShadowStepDistance * cos(wave_angle));
 		int col = node->GetCol(node) + trunc(-i * ShadowStepDistance * sin(wave_angle));
 
 		struct BeachNode* temp = TryGetNode(this, row, col);
@@ -143,7 +143,7 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 			return FALSE;
 		}
 
-		if (temp->frac_full == 1 && (temp->GetRow(temp) + 1) > node->GetRow(node) + node->frac_full + fabs((node->GetCol(node) - temp->GetCol(temp)) / tan(wave_angle)))
+		if (temp->frac_full == 1 && (temp->GetRow(temp) - 1) > node->GetRow(node) + node->frac_full + fabs((node->GetCol(node) - temp->GetCol(temp)) / tan(wave_angle)))
 		{
 			return TRUE;
 		}

@@ -1,20 +1,58 @@
-dirEnum = {
-    LEFT: 0,
-    UP: 1,
-    RIGHT: 2,
-    DOWN: 3
+// colormap for grid cells
+function getColor(feature) {
+    var r, g, b;
+    var fill = feature.get('fill');
+    if (fill > 2/3) {
+        var f = (fill-(2/3)) * 3;
+        r = f*255;
+        g = 255;
+        b = 0;
+    }
+    else if (fill > 1/3) {
+        var f = (fill-(1/3)) * 3;
+        r = 0;
+        g = 255;
+        b = f*255;
+    }
+    else {
+        var f = (fill) * 3;
+        r = 0;
+        g = f*255;
+        b = 255;
+    }
+    return [r, g, b, 0.2];
 }
 
-function BoundaryCell() {
-    this.prev = [];
-    this.next = [];
-    this.addPrev = (prev) => {
-        this.prev.push(prev);
-    };
-    this.addNext = (next) => {
-        this.next.push(next);
-    } 
-}
+sources = [
+// Landsat 5 access info
+{
+    name: "LS5",
+    year: 1985,
+    startFilter: "1985-01-01",
+    endFilter: "1985-12-31",
+    bands: ['B2', 'B4'],
+    url:"LANDSAT/LT05/C01/T1"
+},
+
+// Landsat 7 access info
+{
+    name: "LS7",
+    year: 1999,
+    startFilter: "1999-01-01",
+    endFilter: "1999-12-31",
+    bands: ['B2', 'B4'],
+    url:"LANDSAT/LE07/C01/T1"
+},
+
+// Landsat 8 access info
+{
+    name: "LS8",
+    year: 2014,
+    startFilter: "2014-01-01",
+    endFilter: "2014-12-31",
+    bands: ['B3', 'B5'],
+    url:"LANDSAT/LC08/C01/T1"
+}];
 
 function MapInterface() {
     return {
@@ -26,14 +64,17 @@ function MapInterface() {
         boundsSource: null,
         gridSource: null,
         modelSource: null,
+        imLayer: null,
+        modelLayer:null,
 
         drawingMode: false,
         editMode: false,
         draw: null,
+
         numCols: 100,
         numRows:  50,
         rotation: 0,
-        imageYear: null,
+        source: sources[0],
 
         initMap: function() {
             // initialize earth engine
@@ -47,10 +88,8 @@ function MapInterface() {
                 target: 'map',
                 view: new ol.View({
                     projection: "EPSG:4326",
-                    center: [-75.5, 35.25],
-                    zoom:6
-                    // center: [0, 0],
-                    // zoom: 2
+                    center: [0, 0],
+                    zoom: 2
                 })
             });
 
@@ -128,14 +167,24 @@ function MapInterface() {
             }));
         },        
 
-        mapTransform: function() {
+        /**
+         * Convert image to CEM grid
+         */
+        mapTransform: function(filterDates, makeGrid){
+            // clear
+            if (this.imLayer) { this.map.removeLayer(this.imLayer); }
+
             var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
-
-            var dataset = ee.ImageCollection('LANDSAT/LE07/C01/T1').filterBounds(poly).filterDate('1999-01-01', '1999-12-31');
-            this.imageYear = 1999;
-            var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
-
-            var water_bands = ['B3', 'B5'];
+            // get image
+            try {
+                var dataset = ee.ImageCollection(this.source.url).filterBounds(poly).filterDate(filterDates[0], filterDates[1]);
+                var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
+            } catch(error) {
+                return error;
+            }
+            
+            // Otsu thresholding to classify as land/water
+            var water_bands = this.source.bands;
             var ndwi = composite.normalizedDifference(water_bands);
 
             var values = ndwi.reduceRegion({
@@ -148,31 +197,36 @@ function MapInterface() {
             var water = ndwi.gt(this.otsu(values.get('nd')));
             var minConnectivity = 50;
             var connectCount = water.connectedPixelCount(minConnectivity, true);
+            // create mask
             var land_pix = water.eq(0).and(connectCount.lt(minConnectivity));
             var water_pix = water.eq(1).and(connectCount.lt(minConnectivity)).multiply(-1);
             var mask = water.add(land_pix).add(water_pix).not();
 
+            // smooth
             var gaussian = ee.Kernel.gaussian({
                 radius: 1
-            });
-            
+            });            
             var smooth = mask.convolve(gaussian).clip(poly);
 
+            // get mask image
             smooth.getThumbURL({dimensions: [800, 800], region: poly.toGeoJSONString() }, (url) => {
                 this.displayPhoto(url);
             })
-            this.createGrid(smooth);
+
+            // create model input grid
+            if (makeGrid) {
+                this.createGrid(smooth);
+            }
         },
 
         /**
          * convert Otsu image into CEM input grid
-         * size numRows X numCols
          */
         createGrid: function(image) {
             var features = [];
-            for (r = 0; r < this.numRows; r++) {
+            for (var r = 0; r < this.numRows; r++) {
                 this.cemGrid.push([]);
-                for (c = 0; c < this.numCols; c++) {
+                for (var c = 0; c < this.numCols; c++) {
                     // create polygon feature for each cell                    
                     features.push(new ee.Feature(new ee.Geometry.Polygon(this.polyGrid[r][c])));
                     // create placeholder for cem grid
@@ -189,24 +243,6 @@ function MapInterface() {
                 scale: 30
             });
 
-            var style = new ol.style.Style({
-                stroke: new ol.style.Stroke({
-                    color: 'yellow',
-                    width: 0.3
-                    }),
-                fill: new ol.style.Fill({
-                    color: [255, 255, 0, 0.15]
-                })
-            });
-            var noStyle = new ol.style.Style({
-                stroke: new ol.style.Stroke({
-                    color: [255, 255, 255, 0]
-                }),
-                fill: new ol.style.Fill({
-                    color: [255, 255, 255, 0]
-                })
-            });
-
             var infoGrid = dict.getInfo();
             var numCells = infoGrid.features.length;
 
@@ -215,216 +251,62 @@ function MapInterface() {
             for (var i = 0; i < numCells; i++) {
                 var feature = infoGrid.features[i];
                 polyFill.push(feature.properties.mean);
-            }
-            // copy of poly fill which can mask already found landmasses
-            var maskFill = polyFill.slice(0);
-
-
-            // find all landform outer boundaries; fill inside boundaries
-            // mask once found
-            for (var i = 0; i < numCells; i++) {
-                if (maskFill[i] > 0) {
-                    // start vars
-                    var start = i;
-
-                    // current vars
-                    var prev = null;
-                    var cur = i;
-                    var r_dir = 0;
-                    var c_dir = 1;
-
-                    // boundary indices and extent
-                    var boundaryMap = new Map();
-                    var min_r = this.numRows;
-                    var max_r = 0;
-                    var min_c = this.numCols;
-                    var max_c = 0;
-                    do {
-                        // add boundary index
-                        if (!boundaryMap.has(cur)) {
-                            boundaryMap.set(cur, new BoundaryCell());
-                        }
-                        if (prev != null) {
-                            boundaryMap.get(cur).addPrev(prev);
-                        }
-
-                        // expand extent if necessary
-                        var inds = this.indexToRowCol(cur);
-                        min_r = Math.min(min_r, inds[0]);
-                        max_r = Math.max(max_r, inds[0]);
-                        min_c = Math.min(min_c, inds[1]);
-                        max_c = Math.max(max_c, inds[1]);
-                        
-                        // backtrack
-                        r_dir = -r_dir;
-                        c_dir = -c_dir;
-                        var backtrack = [inds[0]+r_dir, inds[1]+c_dir];
-                        var temp = backtrack;
-                        
-                        // find next cell
-                        var isolated = true;
-                        do {
-                            // turn 45 degrees clockwise to next neighbor
-                            var angle = Math.atan2(temp[0]-inds[0], temp[1] - inds[1]);
-                            angle += Math.PI/4;
-                            var next = [inds[0] + Math.round(Math.sin(angle)), inds[1] + Math.round(Math.cos(angle))];
-                            if (next[0] < 0 || next[0] >= this.numRows || next[1] < 0 || next[1] >= this.numCols) {
-                                temp = next;
-                                continue;
-                            }
-
-                            // track dir relative to previous neighbor
-                            r_dir = next[0] - temp[0];
-                            c_dir = next[1] - temp[1];
-                            temp = next;
-                            if (maskFill[this.rowColsToIndex(next[0], next[1])] > 0) {
-                                isolated = false;
-                                break;
-                            }
-                        } while (temp[0] != backtrack[0] || temp[1] != backtrack[1]);
-                        
-                        // special case for isolated cell
-                        if (isolated) { break; }
-
-                        // set next cell
-                        prev = cur;
-                        cur = this.rowColsToIndex(temp[0], temp[1]);
-                        boundaryMap.get(prev).addNext(cur);
-
-                    } while (cur != start);
-
-                    boundaryMap.get(cur).addPrev(prev);
-                    
-                    // fill & mask inside of boundary
-                    for (var r = min_r; r <= max_r; r++) {
-                        for (var c = min_c; c <= max_c; c++){
-                            var index = this.rowColsToIndex(r, c);
-                            if (boundaryMap.has(index)) {
-                                // special case for grid borders
-                                if ((r == this.numRows-1 || r == 0) && (c == 0 || boundaryMap.has(index-1)) && (c == this.numCols-1 || boundaryMap.has(index+1))
-                                || (c == this.numCols-1 || c == 0) && (r == 0 || boundaryMap.has(index-this.numCols)) && (r == this.numRows-1 || boundaryMap.has(index+this.numCols))) {
-                                    polyFill[index] = 1;
-                                }
-                                // mask other boundary cells
-                                maskFill[index] = 0;
-                                continue;
-                            }
-                            var numIntersect = 0;
-                            for (var offset = 1; offset <= max_c - c; offset++){
-                                if (boundaryMap.has(index + offset)) {
-
-                                    var cell = boundaryMap.get(index + offset);
-                                    var nextAligned = (index+offset+1)%this.numCols == 0 || boundaryMap.has(index+offset+1);
-                                    var prevAligned = (index+offset)%this.numCols == 0 || boundaryMap.has(index+offset-1);
-                                    // skip horizontal boundary segments (including those that run off the grid)
-                                    if (nextAligned && prevAligned) {
-                                        continue;
-                                    }
-                                    for (var n = 0; n < cell.next.length; n++) {
-
-                                        var next_inds = this.indexToRowCol(cell.next[n]);
-                                        var prev_inds = this.indexToRowCol(cell.prev[n]);
-
-                                        // skip vertices
-                                        if ((next_inds[0] == r+1 && (prev_inds[0] == r || prev_inds[0] == r+1)) ||
-                                            ((next_inds[0] == r || next_inds[0] == r+1) && prev_inds[0] == r+1) ||
-                                            (next_inds[0] == r-1 && prev_inds[0] == r-1)) {
-                                            continue;
-                                        }
-
-                                        numIntersect++;
-                                    }
-                                }
-                            }
-
-                            if (numIntersect%2 > 0) {
-                                polyFill[index] = 1;
-                                maskFill[index] = 0;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // make polygons
-            for (var i = 0; i < numCells; i++)
-            {   
                 var rc = this.indexToRowCol(i);    
-                var feature = infoGrid.features[i];
-                var fill = polyFill[i];
-                if (fill == 0) {
-                    // add invisible feature
-                    this.modelSource.addFeature( new ol.Feature({
-                        geometry: new ol.geom.Polygon(feature.geometry.coordinates),
-                        style: noStyle,
-                        id: i,
-                        orientation: dirEnum.DOWN,
-                        fill: 0
-                    }));
-                }                
-                else if (fill == 1) {  // add square if cell is full
-                    this.modelSource.addFeature( new ol.Feature({
-                        geometry: new ol.geom.Polygon(feature.geometry.coordinates),
-                        style: style,
-                        id: i,
-                        orientation: dirEnum.DOWN,
-                        fill: 1
-                    }));
-                } else {   // determine angle if frac full
-                    
-                    var coords = this.polyGrid[rc[0]][rc[1]];
-
-                    var maxEdge = this.getMaxLandEdge(infoGrid, i);
-                    var newCoords = this.getNewCoords(coords, fill, maxEdge);                
-
-                    this.modelSource.addFeature( new ol.Feature({
-                        geometry: new ol.geom.Polygon([newCoords]),
-                        style: style,
-                        id: i,
-                        orientation: maxEdge,
-                        fill: fill
-                    }));
-                }
-                this.cemGrid[rc[0]][rc[1]] = fill;
+                this.cemGrid[rc[0]][rc[1]] = polyFill[i];
             }
 
-
-            // add to map
-            var vectorLayer = new ol.layer.Vector({source: this.modelSource, 
-                style: function(feature, resolution) {
-                    return feature.get('style');
-                }});
-            vectorLayer.setZIndex(4);
-            this.map.addLayer(vectorLayer);
+            this.updateDisplay(this.cemGrid);
         },
 
-        updateFeature(feature, fill, orientation) {
-            var id = feature.get('id');
-            var rc = this.indexToRowCol(id);
-            var cellCoords = this.polyGrid[rc[0]][rc[1]];
+        updateDisplay: function(grid) {
+            // clear source
+            //this.modelSource.clear();
+            if (this.modelLayer) { this.map.removeLayer(this.modelLayer); }
 
-            if (fill > 0) {
-                var newCoords = this.getNewCoords(cellCoords, fill, orientation);
-            } else {
-                var newCoords = cellCoords;
-                feature.setStyle(new ol.style.Style({
-                    stroke: new ol.style.Stroke({
-                        color: [255, 255, 255, 0]
-                    }),
-                    fill: new ol.style.Fill({
-                        color: [255, 255, 255, 0]
-                    })
-                }));
+            // make polygons
+            for (var r = 0; r < this.numRows; r++)
+            {
+                for (var c = 0; c < this.numCols; c++) {
+                    var i = this.rowColsToIndex(r, c);
+                    this.modelSource.addFeature( new ol.Feature({
+                        geometry: new ol.geom.Polygon([this.polyGrid[r][c]]),
+                        id: i,
+                        fill: grid[r][c]
+                    }));
+                }
             }
 
+            // add to map
+            this.modelLayer = new ol.layer.Vector({source: this.modelSource, 
+                style: function(feature, resolution) {
+                    return new ol.style.Style({                        
+                        stroke: new ol.style.Stroke({
+                            color: [255, 255, 255, 0]
+                        }),
+                        fill: new ol.style.Fill({
+                            color: getColor(feature)
+                        })
+                    });
+                }});
+            this.modelLayer.setZIndex(4);
+            this.map.addLayer(this.modelLayer);
+        },
+
+        /**
+         * Update feature properties and redraw
+         */
+        updateFeature: function(feature, fill) {
+            var id = feature.get('id');
+            var rc = this.indexToRowCol(id);
             this.cemGrid[rc[0]][rc[1]] = fill;
 
             feature.set('fill', fill);
-            feature.set('orientation', orientation);
-            feature.setGeometry(new ol.geom.Polygon([newCoords]));
             this.modelSource.refresh();
         },
 
+        /**
+         * Show land/water mask on map
+         */
         displayPhoto: function(photoUrl) {
             this.imLayer = new ol.layer.Image({
                 source: new ol.source.ImageStatic({
@@ -436,6 +318,9 @@ function MapInterface() {
             this.map.addLayer(this.imLayer);
         },
 
+        /**
+         * Classify pixels based on thresholding
+         */
         otsu: function(histogram) {
             var counts = ee.Array(ee.Dictionary(histogram).get('histogram'));
             var means = ee.Array(ee.Dictionary(histogram).get('bucketMeans'));
@@ -464,6 +349,9 @@ function MapInterface() {
             return means.sort(bss).get([-1]);
         },
 
+        /**
+         * Draw grid lines on map
+         */
         drawGrid: function() {
             this.gridSource.clear();
 
@@ -521,36 +409,10 @@ function MapInterface() {
             }
         },
 
-        getNewCoords: function(coords, fill, dir) {
-            var vScale = [fill*(coords[0][0] - coords[3][0]), fill*(coords[0][1] - coords[3][1])];
-            var hScale = [fill*(coords[1][0] - coords[0][0]), fill*(coords[1][1] - coords[0][1])];
-
-            var newCoords;
-            switch (dir) {
-                case dirEnum.LEFT:
-                    newCoords = [coords[0], 
-                        [coords[0][0] + hScale[0], coords[0][1] + hScale[1]], [coords[3][0] + hScale[0], coords[3][1] + hScale[1]],
-                        coords[3], coords[0]];
-                    break;
-                case dirEnum.UP:
-                    newCoords = [coords[1], 
-                        [coords[1][0] - vScale[0], coords[1][1] - vScale[1]], [coords[0][0] - vScale[0], coords[0][1] - vScale[1]],
-                        coords[0], coords[1]]
-                    break;
-                case dirEnum.RIGHT:
-                    newCoords = [coords[2], 
-                        [coords[2][0] - hScale[0], coords[2][1] - hScale[1]], [coords[1][0] - hScale[0], coords[1][1] - hScale[1]],
-                        coords[1], coords[2]]
-                    break;
-                case dirEnum.DOWN:
-                    newCoords = [coords[3], 
-                        [coords[3][0] + vScale[0], coords[3][1] + vScale[1]], [coords[2][0] + vScale[0], coords[2][1] + vScale[1]],
-                        coords[2], coords[3]]
-                    break;
-            }
-            return newCoords;
-        },
-
+        /**
+         * Get coordinates of vertices of the geometry region
+         * Coordinates ordered clockwise from top left
+         */
         getRectangleVertices: function(first, last) {
             // find distance between corners
             var dLon = last[0] - first[0];
@@ -581,6 +443,9 @@ function MapInterface() {
             return coordinates
         },
 
+        /**
+         * draw geometry region
+         */
         updateBox: function(lon1, lat1, lon2, lat2) {
             this.toggleDrawMode();
             var coordinates = this.getRectangleVertices([lon1, lat1], [lon2, lat2])
@@ -588,10 +453,9 @@ function MapInterface() {
             this.boundsSource.addFeature(new ol.Feature({ geometry: geometry}));
         },
 
-        /**
+        /*********************
          * Getters and setters
-         */
-
+         *********************/
         setNumRows: function(rows) {
             this.numRows = rows;
         },
@@ -601,9 +465,13 @@ function MapInterface() {
         },
 
 
-        /***
+        /*************
          * Helpers
-         */
+         *************/
+
+         /**
+          * Get N linearly spaced coordinates between start and stop
+          */
         linspace: function(start, stop, N) {
             var difLon = stop[0] - start[0];
             var dLon = difLon/N;
@@ -617,6 +485,9 @@ function MapInterface() {
             return coords;
         },
 
+        /**
+         * allow user to draw domain on map
+         */
         toggleDrawMode: function() {
             this.drawingMode = !this.drawingMode;
             if (this.drawingMode) {
@@ -632,81 +503,32 @@ function MapInterface() {
             }
         },
 
+        /**
+         * allow user to change cell values
+         */
         toggleEditMode: function() {
             this.editMode = !this.editMode;
-        },
+        },      
 
-        getMaxLandEdge: function(grid, i) {
-            // find surrounding cells in each direction
-            var left = [], right = [], up = [], down = [];
-            if (i % this.numCols > 0) { // if not left hand column
-                left.push(grid.features[i-1].properties.mean);
-                if ((i/this.numCols) >= 1) {  //if not top row
-                    left.push(grid.features[i-this.numCols-1].properties.mean);
-                    up.push(grid.features[i-this.numCols-1].properties.mean);
-                }
-                if ((i/this.numCols) < this.numRows-1) { // if not bottom row
-                    left.push(grid.features[i+this.numCols-1].properties.mean);
-                    down.push(grid.features[i+this.numCols-1].properties.mean);
-                }
-            }
-            if (i % this.numCols < this.numCols-1){ // if not right hand column
-                right.push(grid.features[i+1].properties.mean);
-                if (i/this.numCols >= 1) {  //if not top row
-                    right.push(grid.features[i-this.numCols+1].properties.mean);
-                    up.push(grid.features[i-this.numCols+1].properties.mean);
-                }
-                if (i/this.numCols < this.numRows-1) { // if not bottom row
-                    right.push(grid.features[i+this.numCols+1].properties.mean);
-                    down.push(grid.features[i+this.numCols+1].properties.mean);
-                }
-            }
-            if (i/this.numCols >= 1) {  //if not top row
-                up.push(grid.features[i-this.numCols].properties.mean);
-            }
-            if (i/this.numCols < this.numRows-1) { // if not bottom row
-                down.push(grid.features[i+this.numCols].properties.mean);
-            }
-            
-            // determine which side has most dense land
-            var means = [this.getArrayMean(left), this.getArrayMean(up), this.getArrayMean(right), this.getArrayMean(down)];
-            return this.getArrayMaxIndex(means);
-        },
-
-        editCellFeature(feature) {
-            console.log(feature.get('id'));
-        },
-
-        getArrayMean: function(arr) {
-            var total = 0;
-            for (var i = 0; i < arr.length; i++) {
-                total += arr[i];
-            }
-            return total/arr.length;
-        },
-
-        getArrayMaxIndex: function(arr) {
-            var val = 0;
-            var ind =  0;
-            for (var i = 0; i < arr.length; i++) {
-                if (arr[i] >= val) {
-                    val = arr[i];
-                    ind = i;
-                }
-            }
-            return ind;
-        },        
-
+        /**
+         * convert index to row and column
+         */
         indexToRowCol: function(i) {
             var r = Math.floor(i/this.numCols);
             var c = i%this.numCols;
             return [r, c];
         },
 
+        /**
+         * convert row and column to index
+         */
         rowColsToIndex: function(r, c) {
             return (r*this.numCols) + c;
         },
 
+        /**
+         * Get cell width in meters
+         */
         getCellWidth: function() {
             var coords = this.box.getCoordinates()[0];
             var lat1 = coords[0][0];
@@ -718,6 +540,9 @@ function MapInterface() {
             return dist_cols/this.numCols;
         },
 
+        /**
+         * Get cell length in meters
+         */
         getCellLength: function() {
             var coords = this.box.getCoordinates()[0];
             var lat1 = coords[0][0];
@@ -729,6 +554,9 @@ function MapInterface() {
             return dist_rows/this.numRows;
         },
 
+        /**
+         * Get distance between two coordinate points in meters
+         */
         getLatLonAsMeters: function(lat1, lon1, lat2, lon2){ 
             var R = 6378.137; // Radius of earth in KM
             var dLat = lat2 * Math.PI / 180 - lat1 * Math.PI / 180;
@@ -747,29 +575,12 @@ function MapInterface() {
         clearMap: function() {
             this.boundsSource.clear();
             this.gridSource.clear();
-            this.modelSource.clear();
+            //this.modelSource.clear();
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
+            if (this.modelLayer) {this.map.removeLayer(this.modelLayer);}
             this.box = null;
             this.polyGrid = [];
             this.cemGrid = [];
         }
-
     }
 }
-
-/**
-TODO
-    sensitivity control
-        - connectivity minimum
-
-    wave inputs
-    conrol inputs
-
-    run cem from python
-
-    window resizing
-    comments
-    error handling
-    image loading
-    improve shoreline detection (KVos)?
-*/
