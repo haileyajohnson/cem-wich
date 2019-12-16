@@ -8,6 +8,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
 set(cem_sources py_interface/cem_interface.c cem/cem.c cem/BeachGrid.c cem/BeachNode.c cem/sedtrans.c cem/WaveClimate.c cem/utils.c cem/config.h)
 add_library(py_cem ${cem_sources})
+SET_TARGET_PROPERTIES(py_cem PROPERTIES PREFIX "")
 
 ###### link libm if not using MSVC #######
 if(NOT MSVC)
