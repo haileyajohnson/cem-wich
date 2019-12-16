@@ -1,4 +1,4 @@
-Flask==0.10.1
+Flask==1.0
 gunicorn==19.3.0
 asn1crypto==0.24.0
 attrs==19.1.0
