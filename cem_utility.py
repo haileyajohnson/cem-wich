@@ -32,7 +32,11 @@ class Config(Structure):
         ("lengthTimestep", c_double),
         ("saveInterval", c_int)]
 
-lib = CDLL("server/C/_build/py_cem")
+import platform
+lib_path = "server/C/_build/py_cem.so"
+if platform.system() == "Windows":
+    lib_path = "server/C/_build/py_cem"
+lib = CDLL(lib_path)
 
 # globals
 source = None
