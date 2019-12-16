@@ -138,4 +138,4 @@ python-engineio==3.10.0
 python-socketio==4.4.0
 rsa==4.0
 uritemplate==3.0.0
-werkzeug==0.15.2
+werkzeug==0.15.3
