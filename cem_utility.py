@@ -71,7 +71,7 @@ def finalize():
 @app.route("/")
 def startup():
     service_account = 'cem-ee-utility@cem-ee-utility.iam.gserviceaccount.com'    
-    credentials = ee.ServiceAccountCredentials(service_account, 'private_key.json')
+    credentials = ee.ServiceAccountCredentials(service_account, '../private_key.json')
     ee.Initialize(credentials)
     distDir = []
     for filename in os.listdir('_dist'):
