@@ -18,7 +18,7 @@ The purpose ot the CEM web util it to estimate the extent to which wave climate 
     
 3. The Flask server requires a Google Cloud service account to fufill Earth Engine requests.
     1. Follow instructions [here](https://cloud.google.com/iam/docs/creating-managing-service-account-keys) to create a service account
-    2. Place your `private_key.json` in the main project directory
+    2. Place your `private_key.json` in the parent directory of the project
 
 ## Build
 1. Build the C binary library using cmake:
