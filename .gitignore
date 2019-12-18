@@ -11,12 +11,8 @@ _dist/
 # server side compiles files #
 ##############################
 server/C/_build/
-server/C/bmi/bmi_EXPORTS.h
+server/C/py_interface/cem_EXPORTS.h
 
 # test files #
 ##############
 server/test/output
-
-# private key *
-###############
-private_key.json
