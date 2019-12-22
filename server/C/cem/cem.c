@@ -24,11 +24,6 @@ struct WaveClimate g_wave_climate;
 /* Config parameter */
 Config myConfig;
 
-/*TODO constants */
-const int c_cross_shore_reference_pos = 10;
-const double c_shelf_depth_at_reference_pos = 10;
-const double c_minimum_shelf_depth_at_closure = 10;
-
 /* Functions */
 void InitializeBeachGrid();
 int FindBeach();
@@ -39,12 +34,10 @@ int IsLandCell(int row, int col);
 
 // Main steps
 int cem_initialize(Config config);
-double* cem_update(int saveInterval);
+int cem_update(int saveInterval);
 int cem_finalize(void);
 
 /* Logging and Debugging */
-void Process();
-double* results = NULL;
 void test_LogShoreline();
 void test_OutputGrid();
 
@@ -56,7 +49,7 @@ int cem_initialize(Config config)
 	current_time = 0.0;
 
 	myConfig = config;
-	g_wave_climate = WaveClimate.new(myConfig.asymmetry, myConfig.stability, myConfig.waveHeight, myConfig.wavePeriod);
+	g_wave_climate = WaveClimate.new(myConfig.wavePeriods, myConfig.waveAngles, myConfig.waveHeights);
 
 	InitializeBeachGrid();
 
@@ -64,29 +57,27 @@ int cem_initialize(Config config)
 	{
 		return -1;
 	}
-
+	test_LogShoreline();
 	return 0;
 }
 
 // Update the CEM by a single time step.
-double* cem_update(int saveInterval) {
+int cem_update(int saveInterval) {
 	int i;
 	for (i = 0; i < saveInterval; i++)
 	{
-		g_wave_climate.FindWaveAngle(&g_wave_climate);
 		SedimentTransport();
 
 		current_time_step++;
 		current_time += myConfig.lengthTimestep;
 	}
 
-	Process();
-	return results;
+	test_OutputGrid();
+	return 0;
 }
 
 int cem_finalize() {
 	// free everything
-	free(results);
 	free(g_beachGrid.shoreline);
 	free(g_beachGrid.cells);
 	return 0;
@@ -104,7 +95,7 @@ void InitializeBeachGrid()
 	{
 		for (c = 0; c < myConfig.nCols; c++)
 		{
-			float val = myConfig.grid[r][c];
+			double val = myConfig.grid[myConfig.nRows-1-r][c];
 			nodes[r][c] = BeachNode.new(val, r, c, myConfig.cellWidth, myConfig.cellLength);
 		}
 	}
@@ -357,11 +348,25 @@ int FindBeach()
 
 void SedimentTransport()
 {
-	g_wave_climate.SetWaveHeight(&g_wave_climate);
-	WaveTransformation(&g_beachGrid, g_wave_climate.wave_angle, g_wave_climate.wave_period, g_wave_climate.GetWaveHeight(&g_wave_climate), myConfig.lengthTimestep);
-	GetAvailableSupply(&g_beachGrid, c_cross_shore_reference_pos, c_shelf_depth_at_reference_pos, myConfig.shelfslope, myConfig.shorefaceSlope, c_minimum_shelf_depth_at_closure);
+	WaveTransformation(&g_beachGrid,
+		g_wave_climate.GetWaveAngle(&g_wave_climate, current_time_step),
+		g_wave_climate.GetWavePeriod(&g_wave_climate, current_time_step),
+		g_wave_climate.GetWaveHeight(&g_wave_climate, current_time_step),
+		myConfig.lengthTimestep);
+	GetAvailableSupply(&g_beachGrid,
+		myConfig.crossShoreReferencePos,
+		myConfig.shelfDepthAtReferencePos,
+		myConfig.shelfSlope,
+		myConfig.shorefaceSlope,
+		myConfig.minimumShelfDepthAtClosure);
 	NetVolumeChange(&g_beachGrid);
-	int flag1 = TransportSediment(&g_beachGrid, c_cross_shore_reference_pos, c_shelf_depth_at_reference_pos, myConfig.shelfslope, myConfig.shorefaceSlope, c_minimum_shelf_depth_at_closure);
+
+	int flag1 = TransportSediment(&g_beachGrid,
+		myConfig.crossShoreReferencePos,
+		myConfig.shelfDepthAtReferencePos,
+		myConfig.shelfSlope,
+		myConfig.shorefaceSlope,
+		myConfig.minimumShelfDepthAtClosure);
 	int flag2 = FixBeach(&g_beachGrid);
 
 	if (flag1 || flag2)
@@ -390,31 +395,8 @@ int IsLandCell(int row, int col)
 	return (temp->frac_full > 0);
 }
 
-/* ----- CONFIGURATION AND OUTPUT FUNCTIONS -----*/
-void Process()
-{
-	if (results) {
-		free(results);
-	}
-	results = malloc(g_beachGrid.rows *g_beachGrid.cols * sizeof(double));
-	int r, c;
-	for (r = 0; r < myConfig.nRows; r++)
-	{
-		for (c = 0; c < myConfig.nCols; c++)
-		{
-			struct BeachNode* node = g_beachGrid.TryGetNode(&g_beachGrid, r, c);
-			if (!node)
-			{
-				continue;
-			}
-			int i = r * myConfig.nCols + c;
-			results[i] = node->frac_full;
-		}
-	}
-}
-
 void test_LogShoreline() {
-	char savefile_name[40] = "server/test/shoreline.txt";
+	char savefile_name[40] = "test/new_shoreline.txt";
 
 	FILE* savefile = fopen(savefile_name, "w");
 
@@ -429,7 +411,7 @@ void test_LogShoreline() {
 				fprintf(savefile, " --");
 				continue;
 			}
-			fprintf(savefile, " %00d", node->is_beach);
+			fprintf(savefile, " %d", node->is_beach);
 		}
 		fprintf(savefile, "\n");
 	}
@@ -439,7 +421,7 @@ void test_LogShoreline() {
 
 void test_OutputGrid() {
 	char savefile_name[40];
-	sprintf(savefile_name, "server/test/output/CEM_%06d.out", current_time_step);
+	sprintf(savefile_name, "test/output/new/CEM_%06d.out", current_time_step-1);
 	
 	FILE* savefile = fopen(savefile_name, "w");
 	int r, c;
@@ -453,7 +435,7 @@ void test_OutputGrid() {
 				fprintf(savefile, " --");
 				continue;
 			}
-			fprintf(savefile, " %00f", node->frac_full);
+			fprintf(savefile, " %lf", node->frac_full);
 		}
 		fprintf(savefile, "\n");
 	}

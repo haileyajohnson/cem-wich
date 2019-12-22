@@ -30,22 +30,10 @@ void WaveTransformation(struct BeachGrid* grid, double wave_angle, double wave_p
 
 		do {
 			curr->transport_potential = 0;
-			if ((*grid).CheckIfInShadow(grid, curr, wave_angle))
-			{
-				curr = curr->next;
-				continue;
-			}
 
 			double alpha_deep;
 			double shore_angle = (*grid).GetAngleByDifferencingScheme(grid, curr, wave_angle);
-			if (shore_angle == EMPTY_DOUBLE)
-			{
-				alpha_deep = PI / 4;
-			}
-			else
-			{
-				alpha_deep = wave_angle - shore_angle;
-			}
+			alpha_deep = wave_angle - shore_angle;
 
 			if (fabs(alpha_deep) > (0.995 * PI / 2))
 			{
@@ -79,9 +67,7 @@ void WaveTransformation(struct BeachGrid* grid, double wave_angle, double wave_p
 				local_wave_height = wave_height * sqrt(fabs((c_deep * cos(alpha_deep)) / (local_c * 2.0 * n * cos(local_alpha))));
 
 			} while (local_wave_height <= k_break * local_depth && local_depth >= refract_step);
-
-			curr->transport_dir = (wave_angle - (*grid).GetNextAngle(grid, curr)) > 0 ? RIGHT : LEFT;
-
+			
 			// sed transport_potential
 			curr->transport_potential = GetTransportVolumePotential(local_alpha, local_wave_height, timestep_length);
 
@@ -142,8 +128,21 @@ void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, double ref_depth, d
 
 			if (total_volume_needed > volume_available)
 			{
-				curr->prev->transport_potential = total_volume_needed == 0 ? 0.0 : (volume_needed_left / total_volume_needed) * volume_available;
-				curr->transport_potential = total_volume_needed == 0 ? 0.0 : (volume_needed_right / total_volume_needed) * volume_available;
+				if (dir == DIVERGENT)
+				{
+					curr->prev->transport_potential = total_volume_needed == 0 ? 0.0 : (volume_needed_left / total_volume_needed) * volume_available;
+					curr->transport_potential = total_volume_needed == 0 ? 0.0 : (volume_needed_right / total_volume_needed) * volume_available;
+				}
+				else if (dir == RIGHT)
+				{
+					volume_available += prev->GetTransportPotential(prev);
+					curr->transport_potential = volume_available < curr->GetTransportPotential(curr) ? volume_available : curr->GetTransportPotential(curr);
+				}
+				else if (dir == LEFT)
+				{
+					volume_available += curr->GetTransportPotential(curr);
+					prev->transport_potential = volume_available < prev->GetTransportPotential(prev) ? volume_available : prev->GetTransportPotential(prev);
+				}
 			}
 
 			curr = curr->next;
@@ -415,7 +414,7 @@ double GetDepthOfClosure(struct BeachNode* node, int ref_pos, double shelf_depth
 {
 	int x = node->row;
 	// Eq 1
-	double local_shelf_depth = shelf_depth_at_ref_pos + ((x - ref_pos) * cell_length * shelf_slope);
+	double local_shelf_depth = shelf_depth_at_ref_pos + ((ref_pos - x) * cell_length * shelf_slope);
 
 	// Eq 2
 	double cross_shore_distance_to_closure = local_shelf_depth / (shoreface_slope - (cos(shore_angle) * shelf_slope));
@@ -489,11 +488,11 @@ struct BeachNode* GetNodeInDir(struct BeachGrid* grid, struct BeachNode* node, d
 
 	if (sin(dir) > 1e-6)
 	{
-		row = r - 1;
+		row = r + 1;
 	}
 	else if (sin(dir) < -1e-6)
 	{
-		row = r + 1;
+		row = r - 1;
 	}
 	else
 	{

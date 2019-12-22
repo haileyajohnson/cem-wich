@@ -16,7 +16,6 @@ struct BeachGrid {
     struct BeachGrid* (*SetCells)(struct BeachGrid *this, struct BeachNode **cells);
     struct BeachNode* (*SetShorelines)(struct BeachGrid *this, struct BeachNode **shorelines, int num);
     struct BeachNode* (*TryGetNode)(struct BeachGrid *this, int row, int col);
-		int (*FindInShorelines)(struct BeachGrid* this, struct BeachNode* node);
     double (*GetPrevAngle)(struct BeachGrid *this, struct BeachNode *node);
     double (*GetNextAngle)(struct BeachGrid *this, struct BeachNode *node);
     double (*GetSurroundingAngle)(struct BeachGrid *this, struct BeachNode *node);

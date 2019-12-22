@@ -1,4 +1,3 @@
-#include <float.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,7 +6,7 @@
 #include "cem/config.h"
 
 int cem_initialize(Config config);
-double* cem_update(int saveInterval);
+int cem_update(int saveInterval);
 int cem_finalize(void);
 
 
@@ -20,7 +19,7 @@ int initialize(Config config) {
 		return FAILURE;
 }
 
-double* update(int saveInterval) {
+int update(int saveInterval) {
 	return cem_update(saveInterval);
 }
 

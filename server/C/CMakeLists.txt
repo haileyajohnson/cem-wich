@@ -20,8 +20,7 @@ include(GenerateExportHeader)
 GENERATE_EXPORT_HEADER (py_cem
 	BASE_NAME py_cem
 	EXPORT_MACRO_NAME cem_EXPORT
-	EXPORT_FILE_NAME ${CMAKE_CURRENT_SOURCE_DIR}/py_interface/cem_EXPORTS.h
-	STATIC_DEFINE bmi_BUILT_AS_STATIC)
+	EXPORT_FILE_NAME ${CMAKE_CURRENT_SOURCE_DIR}/py_interface/cem_EXPORTS.h)
 
 ########### Install files ###############
 #install(TARGETS bmi_cem DESTINATION lib)
