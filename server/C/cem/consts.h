@@ -4,19 +4,6 @@
 #if defined(__cplusplus)
 extern "C" {
 #endif
-	
-// minimum depth of shoreface due to wave action (meters)
-#define DEPTH_SHOREFACE (10.)
-// cell where intial conditions changes from beach to ocean
-#define INIT_BEACH (10)
-// theoretical depth in meters of continental shelf at x = INIT_BEACH
-#define INITIAL_DEPTH (10.)
-
-
-// step size for shadow cell checking
-#define ShadowStepDistance (0.2)
-// max distance for an obstacle to shadow a cell (km)
-#define ShadowMax (10)
 
 typedef enum {
   RIGHT,

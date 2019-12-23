@@ -33,74 +33,171 @@ static struct BeachNode* TryGetNode(struct BeachGrid* this, int row, int col)
 	return &(this->cells[row][col]);
 }
 
-static int FindInShorelines(struct BeachGrid* this, struct BeachNode* node) {
-	int i = 0;
-	while (i < this->num_shorelines)
-	{
-		if (this->shoreline[i] == node)
-		{
-			return i;
-		}
-		i++;
-	}
-	return -1;
-}
-
 static double GetPrevAngle(struct BeachGrid* this, struct BeachNode* node)
 {
-	if (BeachNode.isEmpty(node->prev)) { return EMPTY_DOUBLE; }
+	// error: node is null
+	if (BeachNode.isEmpty(node))
+	{
+		return EMPTY_DOUBLE;
+	}
+	if (node->is_boundary)
+	{
+		// start boundary node: prev is same as next->next
+		if (BeachNode.isEmpty(node->prev) && !BeachNode.isEmpty(node->next))
+		{
+			return (*this).GetNextAngle(this, node->next);
+		}
+		// end boundary node: prev is same as prev->prev
+		if (BeachNode.isEmpty(node->next) && !BeachNode.isEmpty(node->prev))
+		{
+			return (*this).GetPrevAngle(this, node->prev);
+		}
+				// error: no valid neighbors
+		return EMPTY_DOUBLE;
+	}
+	if (node->prev->is_boundary)
+	{
+		// error: no valid neighbors
+		if (BeachNode.isEmpty(node->next) || node->next->is_boundary)
+		{
+			return EMPTY_DOUBLE;
+		}
+		// start node: prev is same as next
+		return BeachNode.GetAngle(node, node->next);
+	}
+	// main case
 	return BeachNode.GetAngle(node->prev, node);
 }
 
 static double GetNextAngle(struct BeachGrid* this, struct BeachNode* node)
 {
-	if (BeachNode.isEmpty(node->next)) { return EMPTY_DOUBLE; }
+	// error: node is null
+	if (BeachNode.isEmpty(node))
+	{
+		return EMPTY_DOUBLE;
+	}
+	if (node->is_boundary)
+	{
+		// start boundary node: next is same as next->next
+		if (BeachNode.isEmpty(node->prev) && !BeachNode.isEmpty(node->next))
+		{
+			return (*this).GetNextAngle(this, node->next);
+		}
+		// end boundary node: next is same as prev->prev
+		if (BeachNode.isEmpty(node->next) && !BeachNode.isEmpty(node->prev))
+		{
+			return (*this).GetPrevAngle(this, node->prev);
+		}
+		// error: no valid neighbors
+		return EMPTY_DOUBLE;
+	}
+	if (node->next->is_boundary)
+	{
+		// error: no valid neighbors
+		if (BeachNode.isEmpty(node->prev) || node->prev->is_boundary)
+		{
+			return EMPTY_DOUBLE;
+		}
+		// end node: next is same as prev
+		return BeachNode.GetAngle(node->prev, node);
+	}
+	// main case
 	return BeachNode.GetAngle(node, node->next);
 }
 
 static double GetSurroundingAngle(struct BeachGrid* this, struct BeachNode* node)
 {
-	if (BeachNode.isEmpty(node->prev) || BeachNode.isEmpty(node->next)) { return EMPTY_DOUBLE; }
+	// error: node is null
+	if (BeachNode.isEmpty(node))
+	{
+		return EMPTY_DOUBLE;
+	}
+	if (node->is_boundary)
+	{
+		if (BeachNode.isEmpty(node->prev))
+		{
+			// error: next node is null
+			if (BeachNode.isEmpty(node->next) || node->next->is_boundary)
+			{
+				return EMPTY_DOUBLE;
+			}
+			// start boundary: surrounding is same as next
+			return (*this).GetNextAngle(this, node->next);
+		}
+		if (BeachNode.isEmpty(node->next))
+		{
+			// error: prev node is null
+			if (BeachNode.isEmpty(node->prev) || node->prev->is_boundary)
+			{
+				return EMPTY_DOUBLE;
+			}
+			// end boundary: surrounding is same as prev
+			return (*this).GetPrevAngle(this, node->prev);
+		}
+	}
+	// error: next or prev is null
+	if (BeachNode.isEmpty(node->prev) || BeachNode.isEmpty(node->next))
+	{
+		return EMPTY_DOUBLE;
+	}
+	// main case
 	return ((*this).GetPrevAngle(this, node) + (*this).GetNextAngle(this, node)) / 2;
 }
 
 static double GetAngleByDifferencingScheme(struct BeachGrid* this, struct BeachNode* node, double wave_angle)
 {
-	double alpha = wave_angle - (*this).GetSurroundingAngle(this, node);
-
-	if (alpha == 0)
-	{
-		return 0;
-	}
-
+	double alpha = wave_angle - (*this).GetNextAngle(this, node);
 	struct BeachNode* downwind_node;
+	struct BeachNode* upwind_node;
+	struct BeachNode* calc_node;
 	double upwind_angle, downwind_angle;
-	FLOW_DIR dir;
-	if (alpha > 0)
+	if (alpha > 0) // transport going right
 	{
-		downwind_node = node->prev;
-		upwind_angle = (*this).GetPrevAngle(this, node);
-		downwind_angle = (*this).GetNextAngle(this, node);
-		dir = RIGHT;
+		calc_node = node;
+		downwind_node = node->next;
+		upwind_node = node->prev;
+		upwind_angle = (*this).GetPrevAngle(this, calc_node);
+		downwind_angle = (*this).GetNextAngle(this, calc_node);
+		node->transport_dir = RIGHT;
 	}
 	else
 	{
-		downwind_node = node->next;
-		upwind_angle = (*this).GetNextAngle(this, node);
-		downwind_angle = (*this).GetPrevAngle(this, node);
-		dir = LEFT;
+		calc_node = node->next;
+		downwind_node = node;
+		upwind_node = calc_node->is_boundary ? calc_node : calc_node->next;
+		upwind_angle = (*this).GetNextAngle(this, calc_node);
+		downwind_angle = (*this).GetPrevAngle(this, calc_node);
+		node->transport_dir = LEFT;
 	}
+
+	if ((*this).CheckIfInShadow(this, calc_node, wave_angle))
+	{
+		return wave_angle - (PI / 2);
+	}
+
+	int downwindInShadow = (*this).CheckIfInShadow(this, downwind_node, wave_angle);
+	int upwindInShadow = (*this).CheckIfInShadow(this, upwind_node, wave_angle);
 
 	double instability_threshold = 42 * DEG_TO_RAD;
-	int U = fabs(alpha) >= instability_threshold;
-	
-	int U_downwind = !downwind_node->is_boundary ? (fabs(wave_angle - (*this).GetSurroundingAngle(this, downwind_node)) >= instability_threshold
-		&& !(*this).CheckIfInShadow(this, downwind_node, wave_angle)) : U;
+	int U = fabs(wave_angle - (*this).GetSurroundingAngle(this, calc_node)) >= instability_threshold;
+	int U_downwind = !downwind_node->is_boundary ? (fabs(wave_angle - (*this).GetSurroundingAngle(this, downwind_node)) >= instability_threshold) : U;
+	int U_upwind = !upwind_node->is_boundary ? (fabs(wave_angle - (*this).GetSurroundingAngle(this, upwind_node)) >= instability_threshold) : U;
 
-	if ((U && !U_downwind) || (!U && U_downwind))
+	if (!U && ((U_downwind && !downwindInShadow) || (U_upwind && ! upwindInShadow)))
 	{
-		return EMPTY_DOUBLE;
+		return wave_angle - (45 * DEG_TO_RAD);
 	}
+
+	if (downwindInShadow)
+	{
+		U = TRUE;
+	}
+
+	if (U && upwindInShadow)
+	{
+		return wave_angle - (PI / 2);
+	}
+
 	else if (U)
 	{
 		return upwind_angle;
@@ -128,22 +225,28 @@ static struct BeachNode** Get4Neighbors(struct BeachGrid* this, struct BeachNode
 static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, double wave_angle)
 {
 	int row = node->GetRow(node);
+	int col = node->GetCol(node);
 	int i = 1;
-	// TODO revisit
-	int max_i = (ShadowMax * 1000) / (ShadowStepDistance * this->cell_width);
 
-	while (row < this->rows && i < max_i)
+	double shadow_step = 0.2;
+	
+	while (TRUE)
 	{
-		row = node->GetRow(node) - trunc(i * ShadowStepDistance * cos(wave_angle));
-		int col = node->GetCol(node) + trunc(-i * ShadowStepDistance * sin(wave_angle));
+		int r = row - (int)rint(i * shadow_step * cos(wave_angle));
+		int c = col - (int)rint(i * shadow_step * sin(wave_angle));
 
-		struct BeachNode* temp = TryGetNode(this, row, col);
+		if (r < 0 || r >= (*this).rows || c < 0 || c >= (*this).cols)
+		{
+			return FALSE;
+		}
+
+		struct BeachNode* temp = TryGetNode(this, r, c);
 		if (BeachNode.isEmpty(temp))
 		{
 			return FALSE;
 		}
 
-		if (temp->frac_full == 1 && (temp->GetRow(temp) - 1) > node->GetRow(node) + node->frac_full + fabs((node->GetCol(node) - temp->GetCol(temp)) / tan(wave_angle)))
+		if (temp->frac_full == 1 && (r - 1) < (row - (node->frac_full + fabs((c - col) / tan(wave_angle)))))
 		{
 			return TRUE;
 		}
@@ -165,7 +268,6 @@ static struct BeachGrid new(int rows, int cols, double cell_width, double cell_l
 				.SetCells = &SetCells,
 				.SetShorelines = &SetShorelines,
 				.TryGetNode = &TryGetNode,
-				.FindInShorelines = &FindInShorelines,
 				.GetPrevAngle = &GetPrevAngle,
 				.GetNextAngle = &GetNextAngle,
 				.GetSurroundingAngle = &GetSurroundingAngle,

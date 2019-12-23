@@ -6,18 +6,21 @@ extern "C" {
 #endif
 
 	typedef struct _Config {
-		float** grid;
-		int nRows;
-		int nCols;
-		float cellWidth;
-		float cellLength;
+		double** grid;
+		double* waveHeights;
+		double* waveAngles;
+		double* wavePeriods;
 		double asymmetry;
 		double stability;
-		double waveHeight;
-		double wavePeriod;
-		double shelfslope;
+		int nRows;
+		int nCols;
+		double cellWidth;
+		double cellLength;
+		double shelfSlope;
 		double shorefaceSlope;
-		int numTimesteps;
+		int crossShoreReferencePos;
+		double shelfDepthAtReferencePos;
+		double minimumShelfDepthAtClosure;
 		double lengthTimestep;
 		int saveInterval;
 	} Config;
