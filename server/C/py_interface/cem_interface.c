@@ -6,7 +6,7 @@
 #include "cem/config.h"
 
 int cem_initialize(Config config);
-int cem_update(int saveInterval);
+double* cem_update(int saveInterval);
 int cem_finalize(void);
 
 
@@ -19,7 +19,7 @@ int initialize(Config config) {
 		return FAILURE;
 }
 
-int update(int saveInterval) {
+double* update(int saveInterval) {
 	return cem_update(saveInterval);
 }
 

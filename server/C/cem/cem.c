@@ -34,10 +34,12 @@ int IsLandCell(int row, int col);
 
 // Main steps
 int cem_initialize(Config config);
-int cem_update(int saveInterval);
+double* cem_update(int saveInterval);
 int cem_finalize(void);
 
 /* Logging and Debugging */
+void Process();
+double* results = NULL;
 void test_LogShoreline();
 void test_OutputGrid();
 
@@ -49,7 +51,7 @@ int cem_initialize(Config config)
 	current_time = 0.0;
 
 	myConfig = config;
-	g_wave_climate = WaveClimate.new(myConfig.wavePeriods, myConfig.waveAngles, myConfig.waveHeights);
+	g_wave_climate = WaveClimate.new(myConfig.wavePeriods, myConfig.waveAngles, myConfig.waveHeights, myConfig.asymmetry, myConfig.stability);
 
 	InitializeBeachGrid();
 
@@ -57,12 +59,12 @@ int cem_initialize(Config config)
 	{
 		return -1;
 	}
-	test_LogShoreline();
+
 	return 0;
 }
 
 // Update the CEM by a single time step.
-int cem_update(int saveInterval) {
+double* cem_update(int saveInterval) {
 	int i;
 	for (i = 0; i < saveInterval; i++)
 	{
@@ -71,13 +73,13 @@ int cem_update(int saveInterval) {
 		current_time_step++;
 		current_time += myConfig.lengthTimestep;
 	}
-
-	test_OutputGrid();
-	return 0;
+	Process();
+	return results;
 }
 
 int cem_finalize() {
 	// free everything
+	free(results);
 	free(g_beachGrid.shoreline);
 	free(g_beachGrid.cells);
 	return 0;
@@ -95,7 +97,7 @@ void InitializeBeachGrid()
 	{
 		for (c = 0; c < myConfig.nCols; c++)
 		{
-			double val = myConfig.grid[myConfig.nRows-1-r][c];
+			double val = myConfig.grid[r][c];
 			nodes[r][c] = BeachNode.new(val, r, c, myConfig.cellWidth, myConfig.cellLength);
 		}
 	}
@@ -393,6 +395,29 @@ int IsLandCell(int row, int col)
 	}
 
 	return (temp->frac_full > 0);
+}
+
+/* ----- CONFIGURATION AND OUTPUT FUNCTIONS -----*/
+void Process()
+{
+	if (results) {
+		free(results);
+	}
+	results = malloc(g_beachGrid.rows * g_beachGrid.cols * sizeof(double));
+	int r, c;
+	for (r = 0; r < myConfig.nRows; r++)
+	{
+		for (c = 0; c < myConfig.nCols; c++)
+		{
+			struct BeachNode* node = g_beachGrid.TryGetNode(&g_beachGrid, r, c);
+			if (!node)
+			{
+				continue;
+			}
+			int i = r * myConfig.nCols + c;
+			results[i] = node->frac_full;
+		}
+	}
 }
 
 void test_LogShoreline() {

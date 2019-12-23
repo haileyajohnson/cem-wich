@@ -8,6 +8,7 @@ extern "C" {
 #include "consts.h"
 
 	struct WaveClimate {
+		double asymmetry, stability;
 		double* wave_periods;
 		double* wave_angles;
 		double* wave_heights;
@@ -16,7 +17,7 @@ extern "C" {
 		double (*GetWaveAngle)(struct WaveClimate* this, int timestep);
 	};
 	extern const struct WaveClimateClass {
-		struct WaveClimate(*new)(double* wave_periods, double* wave_angles, double* wave_heights);
+		struct WaveClimate(*new)(double* wave_periods, double* wave_angles, double* wave_heights, double asymmetry, double stability);
 	} WaveClimate;
 
 #endif

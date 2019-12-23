@@ -10,6 +10,8 @@ extern "C" {
 		double* waveHeights;
 		double* waveAngles;
 		double* wavePeriods;
+		double asymmetry;
+		double stability;
 		int nRows;
 		int nCols;
 		double cellWidth;
