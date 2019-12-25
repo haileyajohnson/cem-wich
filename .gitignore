@@ -12,7 +12,13 @@ _dist/
 ##############################
 server/C/_build/
 server/C/py_interface/cem_EXPORTS.h
+tests/cem_orig/_build/
+tests/cem_boundary_conds/_build
 
 # test files #
 ##############
-server/test/output
+tests/test/output/
+
+# autosave #
+############
+**/*.asv

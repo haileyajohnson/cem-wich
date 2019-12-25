@@ -10,7 +10,7 @@ extern "C" {
 #define FAILURE (1)
 
 #include "cem_EXPORTS.h"
-#include "cem/config.h"
+#include "config.h"
 
 cem_EXPORT int run_test(Config config, int numTimesteps, int saveInterval);
 cem_EXPORT int initialize(Config config);

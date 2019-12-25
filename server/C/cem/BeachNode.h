@@ -16,7 +16,7 @@ struct BeachNode {
     struct BeachNode* next;
     struct BeachNode* prev;
     FLOW_DIR (*GetFlowDirection)(struct BeachNode *this);
-	double (*GetTransportPotential)(struct BeachNode* this);
+		double (*GetTransportPotential)(struct BeachNode* this);
 };
 extern const struct BeachNodeClass {
     struct BeachNode (*new)(double frac_full, int row, int col, double cell_width, double cell_length);
