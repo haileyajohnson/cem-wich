@@ -3,6 +3,9 @@
 node_modules/
 .vs/
 .vscode/
+server/C/CMakeSettings.json
+tests/cem_orig/CMakeSettings.json
+tests/cem_boundary_conds/CMakeSettings.json
 
 # client side dist files #
 ##########################
