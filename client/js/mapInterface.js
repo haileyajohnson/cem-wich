@@ -26,6 +26,7 @@ function getColor(feature) {
 sources = [
 // Landsat 5 access info
 {
+    id: 0,
     name: "LS5",
     year: 1985,
     startFilter: "1985-01-01",
@@ -36,6 +37,7 @@ sources = [
 
 // Landsat 7 access info
 {
+    id: 1,
     name: "LS7",
     year: 1999,
     startFilter: "1999-01-01",
@@ -46,6 +48,7 @@ sources = [
 
 // Landsat 8 access info
 {
+    id: 2,
     name: "LS8",
     year: 2014,
     startFilter: "2014-01-01",
@@ -65,7 +68,6 @@ function MapInterface() {
         gridSource: null,
         modelSource: null,
         imLayer: null,
-        modelLayer:null,
 
         drawingMode: false,
         editMode: false,
@@ -119,6 +121,20 @@ function MapInterface() {
              
             // create CEM source
             this.modelSource = new ol.source.Vector({}); 
+            // add to map
+            var modelLayer = new ol.layer.Vector({source: this.modelSource, 
+                style: function(feature, resolution) {
+                    return new ol.style.Style({                        
+                        stroke: new ol.style.Stroke({
+                            color: [255, 255, 255, 0]
+                        }),
+                        fill: new ol.style.Fill({
+                            color: getColor(feature)
+                        })
+                    });
+                }});
+            modelLayer.setZIndex(4);
+            this.map.addLayer(modelLayer);
 
             // create Bing Maps layer
             var bingLayer = new ol.layer.Tile({
@@ -260,8 +276,8 @@ function MapInterface() {
 
         updateDisplay: function(grid) {
             // clear source
-            //this.modelSource.clear();
-            if (this.modelLayer) { this.map.removeLayer(this.modelLayer); }
+            this.modelSource.clear();
+            //if (this.modelLayer) { this.map.removeLayer(this.modelLayer); }
 
             // make polygons
             for (var r = 0; r < this.numRows; r++)
@@ -275,21 +291,7 @@ function MapInterface() {
                     }));
                 }
             }
-
-            // add to map
-            this.modelLayer = new ol.layer.Vector({source: this.modelSource, 
-                style: function(feature, resolution) {
-                    return new ol.style.Style({                        
-                        stroke: new ol.style.Stroke({
-                            color: [255, 255, 255, 0]
-                        }),
-                        fill: new ol.style.Fill({
-                            color: getColor(feature)
-                        })
-                    });
-                }});
-            this.modelLayer.setZIndex(4);
-            this.map.addLayer(this.modelLayer);
+            this.modelSource.refresh();
         },
 
         /**
@@ -575,9 +577,9 @@ function MapInterface() {
         clearMap: function() {
             this.boundsSource.clear();
             this.gridSource.clear();
-            //this.modelSource.clear();
+            this.modelSource.clear();
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
-            if (this.modelLayer) {this.map.removeLayer(this.modelLayer);}
+            //if (this.modelLayer) {this.map.removeLayer(this.modelLayer);}
             this.box = null;
             this.polyGrid = [];
             this.cemGrid = [];

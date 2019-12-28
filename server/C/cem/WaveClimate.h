@@ -8,15 +8,18 @@ extern "C" {
 #include "consts.h"
 
 	struct WaveClimate {
-		double* wave_periods;
-		double* wave_angles;
-		double* wave_heights;
-		double (*GetWaveHeight)(struct WaveClimate *this, int timestep);
-		double (*GetWavePeriod)(struct WaveClimate* this, int timestep);
-		double (*GetWaveAngle)(struct WaveClimate* this, int timestep);
+		float t_resolution;
+		float asymmetry, stability;
+		float* wave_periods;
+		float* wave_angles;
+		float* wave_heights;
+		float (*GetWaveHeight)(struct WaveClimate *this, int timestep);
+		float (*GetWavePeriod)(struct WaveClimate* this, int timestep);
+		float (*GetWaveAngle)(struct WaveClimate* this, int timestep);
 	};
 	extern const struct WaveClimateClass {
-		struct WaveClimate(*new)(double* wave_periods, double* wave_angles, double* wave_heights);
+		struct WaveClimate(*new)(float* wave_periods, float* wave_angles, float* wave_heights, 
+			float asymmetry, float stability, int num_timesteps);
 	} WaveClimate;
 
 #endif

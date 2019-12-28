@@ -8,7 +8,7 @@ extern "C" {
 #include "consts.h"
 	
 struct BeachNode {
-    double frac_full, transport_potential, net_volume_change, cell_width, cell_length;
+    float frac_full, transport_potential, net_volume_change, cell_width, cell_length;
 		int is_beach, is_boundary, row, col;
 		int (*GetRow)(struct BeachNode* this);
 		int (*GetCol)(struct BeachNode* this);
@@ -16,14 +16,14 @@ struct BeachNode {
     struct BeachNode* next;
     struct BeachNode* prev;
     FLOW_DIR (*GetFlowDirection)(struct BeachNode *this);
-		double (*GetTransportPotential)(struct BeachNode* this);
+		float (*GetTransportPotential)(struct BeachNode* this);
 };
 extern const struct BeachNodeClass {
-    struct BeachNode (*new)(double frac_full, int row, int col, double cell_width, double cell_length);
+    struct BeachNode (*new)(float frac_full, int row, int col, float cell_width, float cell_length);
     struct BeachNode (*empty)();
 		struct BeachNode* (*boundary)(int r, int c);
     int (*isEmpty)(struct BeachNode *node);
-		double (*GetAngle)(struct BeachNode* node1, struct BeachNode* node2);
+		float (*GetAngle)(struct BeachNode* node1, struct BeachNode* node2);
 } BeachNode;
 
 #if defined(__cplusplus)

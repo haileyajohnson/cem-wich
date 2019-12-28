@@ -15,7 +15,7 @@ static int GetCol(struct BeachNode* this)
 	return this->col;
 }
 
-static double GetTransportPotential(struct BeachNode* this)
+static float GetTransportPotential(struct BeachNode* this)
 {
 	return this->transport_potential;
 }
@@ -25,7 +25,7 @@ static int GetBoundaryRow(struct BeachNode* this)
 	if (this->row != EMPTY_INT) { return this->row; }
 
 	struct BeachNode* otherNode;
-	double angle, cdist;
+	float angle, cdist;
 	if (!BeachNode.isEmpty(this->next))
 	{
 		otherNode = this->next;
@@ -38,7 +38,7 @@ static int GetBoundaryRow(struct BeachNode* this)
 		angle = BeachNode.GetAngle(otherNode->prev, otherNode);
 		cdist = this->col - otherNode->GetCol(otherNode);
 	}
-	double rdist = cdist * tan(angle);
+	float rdist = cdist * tan(angle);
 	return (int) trunc(otherNode->GetRow(otherNode) + rdist);
 }
 
@@ -47,7 +47,7 @@ static int GetBoundaryCol(struct BeachNode* this)
 	if (this->col != EMPTY_INT) { return this->col; }
 
 	struct BeachNode* otherNode;
-	double angle, rdist;
+	float angle, rdist;
 	if (!BeachNode.isEmpty(this->next))
 	{
 		otherNode = this->next;
@@ -61,11 +61,11 @@ static int GetBoundaryCol(struct BeachNode* this)
 		rdist = this->row - otherNode->GetRow(otherNode);
 	}
 
-	double cdist = rdist / tan(angle);
+	float cdist = rdist / tan(angle);
 	return (int)trunc(otherNode->GetCol(otherNode) + cdist);
 }
 
-static double GetBoundaryTransportPotential(struct BeachNode* this)
+static float GetBoundaryTransportPotential(struct BeachNode* this)
 {
 	if (this->next)
 	{
@@ -111,7 +111,7 @@ static FLOW_DIR GetFlowDirection(struct BeachNode* this)
 	}
 }
 
-static struct BeachNode new(double frac_full, int r, int c, double cell_width, double cell_length){
+static struct BeachNode new(float frac_full, int r, int c, float cell_width, float cell_length){
 		return (struct BeachNode) {
 				.frac_full = frac_full,
 				.transport_dir = NONE,
@@ -134,16 +134,16 @@ static struct BeachNode new(double frac_full, int r, int c, double cell_width, d
 
 static struct BeachNode empty() {
 	return (struct BeachNode) {
-		.frac_full = EMPTY_DOUBLE,
+		.frac_full = EMPTY_float,
 			.transport_dir = EMPTY_INT,
-			.transport_potential = EMPTY_DOUBLE,
-			.net_volume_change = EMPTY_DOUBLE,
+			.transport_potential = EMPTY_float,
+			.net_volume_change = EMPTY_float,
 			.is_beach = EMPTY_INT,
 			.is_boundary = EMPTY_INT,
 			.row = EMPTY_INT,
 			.col = EMPTY_INT,
-			.cell_width = EMPTY_DOUBLE,
-			.cell_length = EMPTY_DOUBLE,
+			.cell_width = EMPTY_float,
+			.cell_length = EMPTY_float,
 			.next = NULL,
 			.prev = NULL,
 			.GetRow = NULL,
@@ -156,16 +156,16 @@ static struct BeachNode empty() {
 static struct BeachNode* boundary(int r, int j) {
 	struct BeachNode* ptr = malloc(sizeof(struct BeachNode));
 	*ptr = (struct BeachNode) {
-		.frac_full = EMPTY_DOUBLE,
+		.frac_full = EMPTY_float,
 			.transport_dir = EMPTY_INT,
-			.transport_potential = EMPTY_DOUBLE,
-			.net_volume_change = EMPTY_DOUBLE,
+			.transport_potential = EMPTY_float,
+			.net_volume_change = EMPTY_float,
 			.is_beach = TRUE,
 			.is_boundary = TRUE,
 			.row = r,
 			.col = j,
-			.cell_width = EMPTY_DOUBLE,
-			.cell_length = EMPTY_DOUBLE,
+			.cell_width = EMPTY_float,
+			.cell_length = EMPTY_float,
 			.next = NULL,
 			.prev = NULL,
 			.GetRow = &GetBoundaryRow,
@@ -179,20 +179,20 @@ static struct BeachNode* boundary(int r, int j) {
 
 static int isEmpty(struct BeachNode* node)
 {
-	if (node == NULL)
+	if (!node)
 	{
 		return TRUE;
 	}
 
-	if (node->frac_full != EMPTY_DOUBLE
+	if (node->frac_full != EMPTY_float
 		|| node->transport_dir != EMPTY_INT
-		|| node->transport_potential != EMPTY_DOUBLE
-		|| node->net_volume_change != EMPTY_DOUBLE
+		|| node->transport_potential != EMPTY_float
+		|| node->net_volume_change != EMPTY_float
 		|| node->is_beach != EMPTY_INT
 		|| node->row != EMPTY_INT
 		|| node->col != EMPTY_INT
-		|| node->cell_width != EMPTY_DOUBLE
-		|| node->cell_length != EMPTY_DOUBLE
+		|| node->cell_width != EMPTY_float
+		|| node->cell_length != EMPTY_float
 		|| node->next != NULL
 		|| node->prev != NULL
 		|| node->GetRow != NULL
@@ -212,11 +212,11 @@ static int isEmpty(struct BeachNode* node)
 * 0: up (seaward) -> col1 < col2 && r1 == r2
 * -90: right -> col1 == col2 && r1 < r2
 */
-static double GetAngle(struct BeachNode* node1, struct BeachNode* node2)
+static float GetAngle(struct BeachNode* node1, struct BeachNode* node2)
 {
-	double dR = node1->GetRow(node1) - node2->GetRow(node2);
-	double dC = node2->GetCol(node2) - node1->GetCol(node1);
-	double dF = node2->frac_full - node1->frac_full;
+	float dR = node1->GetRow(node1) - node2->GetRow(node2);
+	float dC = node2->GetCol(node2) - node1->GetCol(node1);
+	float dF = node2->frac_full - node1->frac_full;
 
 	// vertical orientation
 	if (dC == 0)
@@ -230,7 +230,7 @@ static double GetAngle(struct BeachNode* node1, struct BeachNode* node2)
 		// subtract if bottom edge (dC < 0), add if top edge (dC > 0) 
 		dR += (dC / fabs(dC)) * dF;
 	}
-	double angle = atan2(dR * node1->cell_length, dC * node1->cell_width);
+	float angle = atan2(dR * node1->cell_length, dC * node1->cell_width);
 
 	while (angle > PI)
 	{

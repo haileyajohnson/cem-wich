@@ -24,8 +24,8 @@ typedef enum {
 #ifndef EMPTY_INT
 # define EMPTY_INT -9999
 #endif
-#ifndef EMPTY_DOUBLE
-# define EMPTY_DOUBLE -9999.9
+#ifndef EMPTY_float
+# define EMPTY_float -9999.9
 #endif
 
 /* Universal Constants */

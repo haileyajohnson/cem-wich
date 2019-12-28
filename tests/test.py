@@ -8,20 +8,20 @@ from datetime import datetime
 
 class Config(Structure):
     _fields_ = [
-        ("grid", POINTER(POINTER(c_double))),
-        ("waveHeights", POINTER(c_double)),
-        ("waveAngles", POINTER(c_double)),
-        ('wavePeriods', POINTER(c_double)),
+        ("grid", POINTER(POINTER(c_float))),
+        ("waveHeights", POINTER(c_float)),
+        ("waveAngles", POINTER(c_float)),
+        ('wavePeriods', POINTER(c_float)),
         ("nRows", c_int),
         ("nCols", c_int),
-        ("cellWidth", c_double),
-        ("cellLength", c_double),
-        ("shelfSlope", c_double),
-        ("shorefaceSlope", c_double),
+        ("cellWidth", c_float),
+        ("cellLength", c_float),
+        ("shelfSlope", c_float),
+        ("shorefaceSlope", c_float),
 		("crossShoreReferencePos", c_int),
-		("shelfDepthAtReferencePos", c_double),
-		("minimumShelfDepthAtClosure", c_double),
-        ("lengthTimestep", c_double),
+		("shelfDepthAtReferencePos", c_float),
+		("minimumShelfDepthAtClosure", c_float),
+        ("lengthTimestep", c_float),
         ("saveInterval", c_int)]
         
 if __name__ == "__main__": 
@@ -48,9 +48,9 @@ if __name__ == "__main__":
     # create wave inputs
     # random.seed(datetime.now())
     random.seed(5)
-    waveHeights = (c_double * numTimesteps)()
-    waveAngles = (c_double * numTimesteps)()
-    wavePeriods = (c_double * numTimesteps)()
+    waveHeights = (c_float * numTimesteps)()
+    waveAngles = (c_float * numTimesteps)()
+    wavePeriods = (c_float * numTimesteps)()
     for i in range(numTimesteps):
         waveHeights[i] = random.random() + 1 # random wave height 1 to 2 meters
         angle = random.random() * (math.pi/4)
@@ -64,14 +64,27 @@ if __name__ == "__main__":
     # create grid input
     import_grid = pd.read_excel("test/input/shoreline_config.xlsx")
     import_grid = import_grid.values
-    grid = ((POINTER(c_double)) * nRows)()
+    grid_orig = ((POINTER(c_float)) * nRows)()
     for r in range(nRows):
-        grid[r] = (c_double * nCols)()
+        grid[r] = (c_float * nCols)()
         for c in range(nCols):
             grid[r][c] = import_grid[r][c]
+            
+    grid_new = ((POINTER(c_float)) * nRows)()
+    for r in range(nRows):
+        grid[r] = (c_float * nCols)()
+        for c in range(nCols):
+            grid[r][c] = import_grid[nRows - r - 1][c]
 
+    # create config objects
+    input_orig = Config(grid = grid_orig, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+            nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
+            shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
+            shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
+            lengthTimestep = lengthTimestep, saveInterval = saveInterval)
+            
     # create config object
-    input = Config(grid = grid, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+    input_new = Config(grid = grid_new, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
             nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
             shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
             shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
@@ -93,5 +106,5 @@ if __name__ == "__main__":
     lib_new.run_test.restype = c_int
 
     # initialize both models
-    print(lib_orig.run_test(input, numTimesteps, saveInterval))
-    print(lib_new.run_test(input, numTimesteps, saveInterval))
+    print(lib_orig.run_test(input_orig, numTimesteps, saveInterval))
+    print(lib_new.run_test(input_new, numTimesteps, saveInterval))

@@ -9,9 +9,7 @@ extern "C" {
 
 void **malloc2d(size_t n_rows, size_t n_cols, size_t itemsize);
 void free2d(void **mem);
-double RandZeroToOne(void);
-int *reverse(int *array, size_t n_cols);
-int *rotate(int *array, size_t offset, size_t n_cols);
+float RandZeroToOne(void);
 
 #if defined(__cplusplus)
 }

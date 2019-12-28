@@ -16,7 +16,7 @@
 /* Globals */
 struct BeachGrid g_beachGrid;
 int current_time_step;
-double current_time;
+float current_time;
 
 /* Wave climate object */
 struct WaveClimate g_wave_climate;
@@ -34,12 +34,12 @@ int IsLandCell(int row, int col);
 
 // Main steps
 int cem_initialize(Config config);
-int cem_update(int saveInterval);
+double* cem_update(int saveInterval);
 int cem_finalize(void);
 
 /* Logging and Debugging */
 void Process();
-double* results = NULL;
+float* results = NULL;
 void test_LogShoreline();
 void test_OutputGrid();
 
@@ -51,7 +51,8 @@ int cem_initialize(Config config)
 	current_time = 0.0;
 
 	myConfig = config;
-	g_wave_climate = WaveClimate.new(myConfig.wavePeriods, myConfig.waveAngles, myConfig.waveHeights);
+	g_wave_climate = WaveClimate.new(myConfig.wavePeriods, myConfig.waveAngles, myConfig.waveHeights,
+		myConfig.asymmetry, myConfig.stability, myConfig.numTimesteps);
 
 	InitializeBeachGrid();
 
@@ -59,12 +60,12 @@ int cem_initialize(Config config)
 	{
 		return -1;
 	}
-	test_LogShoreline();
+
 	return 0;
 }
 
 // Update the CEM by a single time step.
-int cem_update(int saveInterval) {
+double* cem_update(int saveInterval) {
 	int i;
 	for (i = 0; i < saveInterval; i++)
 	{
@@ -75,7 +76,7 @@ int cem_update(int saveInterval) {
 	}
 
 	Process();
-	return 0;
+	return results;
 }
 
 int cem_finalize() {
@@ -98,7 +99,7 @@ void InitializeBeachGrid()
 	{
 		for (c = 0; c < myConfig.nCols; c++)
 		{
-			double val = myConfig.grid[myConfig.nRows-1-r][c];
+			float val = myConfig.grid[r][c];
 			nodes[r][c] = BeachNode.new(val, r, c, myConfig.cellWidth, myConfig.cellLength);
 		}
 	}
@@ -204,7 +205,7 @@ int FindBeach()
 					do
 					{
 						// turn 45 degrees clockwise/counterclockwise to next neighbor
-						double angle = atan2(temp[0] - curr->GetRow(curr), temp[1] - curr->GetCol(curr));
+						float angle = atan2(temp[0] - curr->GetRow(curr), temp[1] - curr->GetCol(curr));
 						angle += (search_dir) * (PI / 4);
 						int next[2] = { curr->GetRow(curr) + round(sin(angle)), curr->GetCol(curr) + round(cos(angle)) };
 
@@ -404,7 +405,7 @@ void Process()
 	if (results) {
 		free(results);
 	}
-	results = malloc(g_beachGrid.rows * g_beachGrid.cols * sizeof(double));
+	results = malloc(g_beachGrid.rows * g_beachGrid.cols * sizeof(float));
 	int r, c;
 	for (r = 0; r < myConfig.nRows; r++)
 	{
@@ -422,7 +423,7 @@ void Process()
 }
 
 void test_LogShoreline() {
-	char savefile_name[40] = "test/new_shoreline.txt";
+	char savefile_name[40] = "test/output/new_shoreline.txt";
 
 	FILE* savefile = fopen(savefile_name, "w");
 

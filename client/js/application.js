@@ -39,6 +39,7 @@ function initialize() {
 
     // start up the SocketIO connection to the server
     socket = io.connect('http://' + document.domain + ':' + location.port + '/request');
+
     // this is a callback that triggers when the results event is emitted by the server.
     socket.on('results_ready', (msg) => {
         onUpdate(msg);
@@ -112,14 +113,24 @@ function onRun() {
     // create payload
     var input_data = {
         grid: mapInterface.cemGrid,
+        nRows: mapInterface.numRows,
+        nCols: mapInterface.numCols,
+        polyGrid: mapInterface.polyGrid,
+        source: mapInterface.source.name,
+        year: mapInterface.source.year,
+        geometry: mapInterface.box.getCoordinates(),
         cellWidth: mapInterface.getCellWidth(),
         cellLength: mapInterface.getCellLength(),
         asymmetry: parseFloat(this.waveTab.a_val),
         stability: parseFloat(this.waveTab.u_val),
-        waveHeight: parseFloat(this.waveTab.wave_height),
-        wavePeriod: parseFloat(this.waveTab.wave_period),
+        waveHeights: this.waveTab.wave_heights,
+        wavePeriods: this.waveTab.wave_periods,
+        waveAngles: this.waveTab.wave_angles,
         shelfSlope: parseFloat(this.controlTab.shelf_slope),
         shorefaceSlope: parseFloat(this.controlTab.shoreface_slope),
+        crossShoreRef: parseFloat(this.controlTab.cross_shore_ref),
+        refDepth: parseFloat(this.controlTab.ref_depth),
+        minClosureDepth: parseFloat(this.controlTab.min_closure_depth),
         numTimesteps: controlTab.num_timesteps,
         lengthTimestep: parseFloat(this.controlTab.length_timestep),
         saveInterval: parseInt(this.controlTab.save_interval)
@@ -228,16 +239,33 @@ function updateJSON() {
         rotation: mapInterface.rotation,
         numRows: mapInterface.numRows,
         numCols: mapInterface.numCols,
-        grid: mapInterface.cemGrid
+        source: mapInterface.source.id
     };
     if (coords) {
         gridConfig.points = [coords[0], coords[2]];
     }
     configJSON.gridConfig = gridConfig;
 
-    // TODO save wave inputs
+    // save wave inputs
+    configJSON.waveConfig = {
+        asymmetry: waveTab.a_val,
+        stability: waveTab.u_val,
+        waveHeights: waveTab.wave_heights,
+        wavePeriods: waveTab.wave_periods,
+        waveAngles: waveTab.wave_angles
+    };
 
-    // TODO save config inputs
+    // save config inputs
+    configJSON.controlConfig = {
+        shelfSlope: controlTab.shelf_slope,
+        shorefaceSlope: controlTab.shoreface_slope,
+        crossShoreRef: controlTab.cross_shore_ref,
+        refDepth: controlTab.ref_depth,
+        minClosureDepth: controlTab.min_closure_depth,
+        endYear: controlTab.end_year,
+        lengthTimestep: controlTab.length_timestep,
+        saveInterval: controlTab.save_interval
+    };
 }
 
 function importJSON(newContent) {
@@ -255,16 +283,37 @@ function importJSON(newContent) {
     mapInterface.setNumRows(gridConfig.numRows);
     mapInterface.setNumCols(gridConfig.numCols);
     mapInterface.map.getView().setRotation(gridConfig.rotation);  
-    mapInterface.cemGrid = gridConfig.grid;
+    mapInterface.source = sources[gridConfig.source];
     if (gridConfig.points) {
         var points = gridConfig.points;
         mapInterface.updateBox(points[0][0], points[0][1], points[1][0], points[1][1]);
     }
     gridTab.setAllValues();
 
-    // TODO: load wave inpts
+    // load wave inpts
+    if (configJSON.waveConfig) {
+        var waveConfig = configJSON.waveConfig;
+        waveTab.a_val = waveConfig.asymmetry;
+        waveTab.u_val = waveConfig.stability;
+        waveTab.wave_heights = waveConfig.waveHeights;
+        waveTab.wave_periods = waveConfig.wavePeriods;
+        waveTab.wave_angles = waveConfig.waveAngles;
+        waveTab.setAllValues();
+    }
 
-    // TODO: load config inputs
+    // load config inputs
+    if (configJSON.controlConfig) {
+        var controlConfig = configJSON.controlConfig;
+        controlTab.shelf_slope = controlConfig.shelfSlope;
+        controlTab.shoreface_slope = controlConfig.shorefaceSlope;
+        controlTab.cross_shore_ref = controlConfig.crossShoreRef;
+        controlTab.ref_depth = controlConfig.refDepth;
+        controlTab.min_closure_depth = controlConfig.minClosureDepth;
+        controlTab.end_year = controlConfig.endYear;
+        controlTab.length_timestep = controlConfig.lengthTimestep;
+        controlTab.save_interval = controlConfig.saveInterval;
+        controlTab.setAllValues();
+    }
 }
 
 function saveConfig() {    
@@ -275,11 +324,11 @@ function saveConfig() {
     a.click();
 }
 
- function loadConfig() {
+function loadConfig() {
     // getting a hold of the file reference
     var file = this.event.target.files[0];
     if (!file) { return; }
-    
+
     // setting up the reader
     var reader = new FileReader();
     reader.readAsText(file,'UTF-8');
@@ -289,7 +338,23 @@ function saveConfig() {
         importJSON(content)
     };
     this.event.target.value = '';
- }
+}
+
+function uploadWaveFile() {    
+    // getting a hold of the file reference
+    var file = event.target.files[0];
+    if (!file) { return; }
+
+    // setting up the reader
+    var reader = new FileReader();
+    reader.readAsText(file,'UTF-8');
+
+    reader.onload = (readerEvent) => {
+        var content = readerEvent.target.result;
+        waveTab.readWaveFile(content);
+    };
+    this.event.target.value = '';
+}
 
 /**
  * Grid tab view
@@ -314,6 +379,7 @@ function GridTab() {
         $submitButton: $(".submit-button"),
         $clearButton: $(".clear-button"),
         $editButton: $(".edit-button"),
+        $exportButton: $(".export-button"),
 
         init: function() {
             // add input listeners
@@ -328,7 +394,7 @@ function GridTab() {
             this.$submitButton.click(() => { this.onSubmitClicked(); });
             this.$clearButton.click(() => { this.onClearClicked(); });
             this.$editButton.click(() => { this.toggleEdit(); });
-
+            this.$exportButton.click(() => { this.exportGrid(); });
 
             $('input[type=radio]').click(function(){
                     mapInterface.source = sources[this.value];
@@ -339,6 +405,7 @@ function GridTab() {
             this.$submitButton.disable();
             this.$clearButton.disable();
             this.$editButton.disable();
+            this.$exportButton.disable();
 
             // initialize
             this.setAllValues();
@@ -357,20 +424,9 @@ function GridTab() {
             this.$numCols.disable();
             this.$submitButton.disable();
 
-            mapInterface.mapTransform([mapInterface.source.startFilter, mapInterface.source.endFilter], true);
-            
-            // send to server
-            var grid_data = {
-                nRows: mapInterface.numRows,
-                nCols: mapInterface.numCols,
-                polyGrid: mapInterface.polyGrid,
-                source: mapInterface.source.name,
-                year: mapInterface.source.year,
-                geometry: mapInterface.box.getCoordinates()
-            }
-            socket.emit('submit', grid_data);
-            
+            mapInterface.mapTransform([mapInterface.source.startFilter, mapInterface.source.endFilter], true);            
             this.$editButton.enable();
+            this.$exportButton.enable();
             runTab.$runButton.enable();
         },
 
@@ -389,8 +445,7 @@ function GridTab() {
             this.$submitButton.disable();
             this.$editButton.disable();
             this.$clearButton.disable();
-
-
+            this.$exportButton.disable();
             
             $loadButton.enable();
             runTab.$runButton.disable();
@@ -405,6 +460,20 @@ function GridTab() {
         toggleEdit: function() {
             this.$editButton.attr("selected") ? this.$editButton.removeAttr("selected") : this.$editButton.attr("selected", "selected");
             mapInterface.toggleEditMode();
+        },        
+
+        exportGrid: function() {
+            var a = document.createElement("a");
+            var content = "data:text/csv;charset=utf-8,";
+            // write nRows and nCols
+            content += mapInterface.numCols + ", " + mapInterface.numCols + "\n";
+            // write row size and col size
+            content += mapInterface.getCellLength() + ", " + mapInterface.getCellWidth() + "\n";
+            // write grid
+            content += mapInterface.cemGrid.map(e => e.join(",")).join("\n");
+            a.href = encodeURI(content);
+            a.download = "grid.txt";
+            a.click();
         },
 
         /*****************
@@ -450,7 +519,8 @@ function GridTab() {
             this.setRotation();
             this.$numRows.val(mapInterface.numRows);
             this.$numCols.val(mapInterface.numCols);
-            this.setCoords();
+            this.setCoords();            
+            $("input[type=radio]:eq(" + mapInterface.source.id + ")").attr("checked", true);
         },        
 
         setRotation: function() {    
@@ -491,24 +561,49 @@ function WaveTab() {
         $stability: $("input[name=u-input]"),
         $wave_height: $("input[name=wave-height]"),       
         $wave_period: $("input[name=wave-period]"),
+        $upload_button: $(".upload-button"),
 
-        a_val: null,
-        u_val: null,
-        wave_height: null,
-        wave_period: null,
+        a_val: 50,
+        u_val: 50,
+        wave_heights: [1.5],
+        wave_periods: [10],
+        wave_angles: [-1],
 
         init: function() {
             this.$tab.click(() => { onTabChange(this); });
             // init values
-            this.a_val = this.$asymmetry.val();
-            this.u_val = this.$stability.val();
-            this.wave_height = this.$wave_height.val();
-            this.wave_period = this.$wave_period.val();
+            this.setAllValues();
             // attach listeners
             this.$asymmetry.change(() => { this.onAsymmetryChange(); });
             this.$stability.change(() => { this.onStabilityChange(); });
             this.$wave_height.change(() => { this.onWaveHeightChange(); });
             this.$wave_period.change(() => { this.onWavePeriodChange(); });
+            this.$upload_button.click(() => { $('#wave-file-input').trigger('click'); });
+        },
+
+        readWaveFile: function(csv) {
+            try {
+                var H = [];
+                var T = [];
+                var theta = [];
+                var rows = csv.split('\n');
+                for (var i = 0; i < rows.length; i++) {
+                    var cols = rows[i].split(',');
+                    H.push(cols[0]);
+                    T.push(cols[1]);
+                    theta.push(cols[2]);
+                }
+                this.wave_heights = H;
+                this.wave_periods = T;
+                this.wave_angles = theta;
+
+                this.disableWaveInput();
+                this.a_val = null;
+                this.u_val = null;
+            } catch (e)
+            {
+                return 1;
+            }
         },
 
         /***********
@@ -523,13 +618,34 @@ function WaveTab() {
         },
 
         onWaveHeightChange: function() {
-            this.wave_height = this.$wave_height.val();
+            this.wave_heights[0] = parseFloat(this.$wave_height.val());
         },
 
         onWavePeriodChange: function() {
-            this.wave_period = this.$wave_period.val();
-        }
+            this.wave_periods[0] = parseFloat(this.$wave_period.val());
+        },
 
+        /*********
+         * setters
+         *********/
+        setAllValues: function() {
+            if (this.a_val && this.u_val) {
+                this.$asymmetry.val(this.a_val);
+                this.$stability.val(this.u_val);
+                this.$wave_height.val(this.wave_heights[0]);
+                this.$wave_period.val(this.wave_periods[0]);
+            }
+            else {
+                this.disableWaveInput();
+            }
+        },
+
+        disableWaveInput: function() {
+            this.$asymmetry.disable();
+            this.$stability.disable();
+            this.$wave_height.disable();
+            this.$wave_period.disable();
+        }
     }
 }
 
@@ -543,28 +659,33 @@ function ControlsTab() {
 
         $shelf_slope: $("input[name=shelf-slope]"),
         $shoreface_slope: $("input[name=shoreface-slope]"),
+        $cross_shore_ref: $("input[name=cross-shore-reference]"),
+        $ref_depth: $("input[name=shelf-depth-at-ref]"),
+        $min_closure_depth: $("input[name=min-shelf-depth]"),
         $end_year: $("input[name=end-date]"),
         $length_timestep: $("input[name=timestep]"),
         $save_interval: $("input[name=save-interval]"),
 
-        shelf_slope: null,
-        shoreface_slope: null,
-        end_year: null,
-        length_timestep: null,
-        save_interval: null,
+        shelf_slope: .001,
+        shoreface_slope: .01,
+        cross_shore_ref: 10.0,
+        ref_depth: 10.0,
+        min_closure_depth: 10.0,
+        end_year: 2019,
+        length_timestep: 1,
+        save_interval: 365,
         num_timesteps: null,
 
         init: function() {
             this.$tab.click(() => { onTabChange(this); });
             // init values
-            this.shelf_slope = this.$shelf_slope.val();
-            this.shoreface_slope = this.$shoreface_slope.val();
-            this.end_year = this.$end_year.val();
-            this.length_timestep = this.$length_timestep.val();
-            this.save_interval = this.$save_interval.val();
+            this.setAllValues();
             // attach listeners
             this.$shelf_slope.change(() => { this.onShelfSlopeChange(); });
             this.$shoreface_slope.change(() => { this.onShorefaceSlopeChange(); });
+            this.$cross_shore_ref.change(() => { this.onCrossShoreRefChange(); });
+            this.$ref_depth.change(() => { this.onRefDepthChange(); });
+            this.$min_closure_depth.change(() => { this.onMinClosureDepthChange(); });
             this.$end_year.change(() => { this.onEndYearChange(); });
             this.$length_timestep.change(() => { this.onTimestepLengthChange(); });
             this.$save_interval.change(() => { this.onSaveIntervalChange(); });
@@ -585,6 +706,18 @@ function ControlsTab() {
         onShorefaceSlopeChange: function() {
             this.shoreface_slope = this.$shoreface_slope.val();
         },
+        
+        onCrossShoreRefChange: function() {
+            this.cross_shore_ref = this.$cross_shore_ref.val();
+        },
+        
+        onRefDepthChange: function() {
+            this.ref_depth = this.$ref_depth.val();
+        },
+        
+        onMinClosureDepthChange: function() {
+            this.min_closure_depth = this.$min_closure_depth.val();
+        },
 
         onEndYearChange: function() {
             this.end_year = this.$end_year.val();
@@ -598,6 +731,20 @@ function ControlsTab() {
 
         onSaveIntervalChange: function() {
             this.save_interval = this.$save_interval.val();
+        },
+
+        /*********
+         * setters
+         *********/
+        setAllValues: function() {
+            this.$shelf_slope.val(this.shelf_slope);
+            this.$shoreface_slope.val(this.shoreface_slope);
+            this.$cross_shore_ref.val(this.cross_shore_ref);
+            this.$ref_depth.val(this.ref_depth);
+            this.$min_closure_depth.val(this.min_closure_depth);
+            this.$end_year.val(this.end_year);
+            this.$length_timestep.val(this.length_timestep);
+            this.$save_interval.val(this.save_interval);       
         }
     }
 }

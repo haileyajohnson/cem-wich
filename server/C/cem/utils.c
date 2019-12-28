@@ -25,42 +25,9 @@ void free2d(void **mem)
 /**
  * Generates a random number equally distributed between zero and one
  * PARAMETERS: none
- * RETURN: random double between zero and one
+ * RETURN: random float between zero and one
  */
-double RandZeroToOne(void)
+float RandZeroToOne(void)
 {
-	return (double)rand() / RAND_MAX;
-}
-
-/**
- * Reverses a 1D array of ints
- */
-int *reverse(int *array, size_t n_cols)
-{
-  int *rev = malloc(sizeof(int) * n_cols);
-  size_t i;
-  for (i = 0; i < n_cols; i++)
-  {
-    rev[i] = array[n_cols-i-1];
-  }
-
-  return rev;
-}
-
-/**
- * Shifts a 1D array ofints by offset
- */
-int *rotate(int *array, size_t offset, size_t n_cols)
-{
-  int *rot = malloc(sizeof(int) * n_cols);
-  size_t i;
-  for (i = 0; i < n_cols-offset; i++)
-  {
-    rot[i] = array[i+offset];
-  }
-  for (i = n_cols-offset; i < n_cols; i++)
-  {
-      rot[i] = array[i-(n_cols-offset)];
-  }
-  return rot;
+	return (float)rand() / RAND_MAX;
 }
