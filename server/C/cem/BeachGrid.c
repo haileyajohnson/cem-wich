@@ -217,6 +217,11 @@ static struct BeachNode** Get4Neighbors(struct BeachGrid* this, struct BeachNode
 	for (i = 0; i < 4; i++)
 	{
 		neighbors[i] = TryGetNode(this, rows[i], cols[i]);
+		if (BeachNode.isEmpty(neighbors[i])) {
+			struct BeachNode* neighbor = BeachNode.boundary(EMPTY_INT, EMPTY_INT);
+			neighbor->frac_full = node->frac_full > 1.0 ? 0.0 : 1.0;
+			neighbors[i] = neighbor;
+		}
 	}
 
 	return neighbors;

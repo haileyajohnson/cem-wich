@@ -14,7 +14,7 @@ static float GetWavePeriod(struct WaveClimate* this, int timestep)
 
 static float GetWaveAngle(struct WaveClimate* this, int timestep)
 {
-	if (this->asymmetry && this->stability)
+	if (this->asymmetry >= 0 && this->stability >= 0)
 	{
 		float angle = RandZeroToOne() * (PI / 4);   // random angle 0 - pi/4
 		if (RandZeroToOne() >= this->stability)        // random variable determining above or below 45 degrees
@@ -32,16 +32,8 @@ static float GetWaveAngle(struct WaveClimate* this, int timestep)
 }
 
 static struct WaveClimate new(float* wave_periods, float* wave_angles, float* wave_heights,
-	float asymmetry, float stability, int num_timesteps){
-	int len_wave_periods = sizeof(*wave_periods) / sizeof(float);
-	int len_wave_angles = sizeof(*wave_angles) / sizeof(float);
-	int len_wave_heights = sizeof(*wave_heights) / sizeof(float);
-	if (len_wave_periods != len_wave_angles || len_wave_angles != len_wave_heights)
-	{
-		// TODO error reporting
-		exit(1);
-	}
-	float t_resolution = ((float)num_timesteps) / len_wave_periods;
+	float asymmetry, float stability, int num_timesteps, int num_wave_inputs){
+	float t_resolution = ((float)num_timesteps) / num_wave_inputs;
 	return (struct WaveClimate) {
 		.t_resolution = t_resolution,
 		.wave_periods = wave_periods,

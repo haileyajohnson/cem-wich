@@ -466,7 +466,7 @@ function GridTab() {
             var a = document.createElement("a");
             var content = "data:text/csv;charset=utf-8,";
             // write nRows and nCols
-            content += mapInterface.numCols + ", " + mapInterface.numCols + "\n";
+            content += mapInterface.numRows + ", " + mapInterface.numCols + "\n";
             // write row size and col size
             content += mapInterface.getCellLength() + ", " + mapInterface.getCellWidth() + "\n";
             // write grid

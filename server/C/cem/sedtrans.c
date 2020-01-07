@@ -64,7 +64,7 @@ void WaveTransformation(struct BeachGrid* grid, float wave_angle, float wave_per
 				local_alpha = asin(local_c / c_deep * sin(alpha_deep));
 
 				// Determine wave height from refract calcs, from Komar 5.49
-				local_wave_height = wave_height * sqrt(fabs((c_deep * cos(alpha_deep)) / (local_c * 2.0 * n * cos(local_alpha))));
+				local_wave_height = wave_height * sqrtf(fabs((c_deep * cos(alpha_deep)) / (local_c * 2.0 * n * cos(local_alpha))));
 
 			} while (local_wave_height <= k_break * local_depth && local_depth >= refract_step);
 			
@@ -80,7 +80,7 @@ void WaveTransformation(struct BeachGrid* grid, float wave_angle, float wave_per
 float GetTransportVolumePotential(float alpha, float wave_height, float timestep_length)
 {
 	int rho = 1020;         // (kg/m^3) density of salt water
-	return fabs(1.1 * rho * powf(GRAVITY, 3.0 / 2.0) * powf(wave_height, 5.0 / 2.0) * cos(alpha) * sin(alpha) * timestep_length);
+	return fabs(.67 * rho * powf(GRAVITY, 3.0 / 2.0) * powf(wave_height, 5.0 / 2.0) * cos(alpha) * sin(alpha) * timestep_length);
 }
 
 void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, float ref_depth, float shelf_slope, float shoreface_slope, float min_depth)
@@ -211,12 +211,12 @@ int TransportSediment(struct BeachGrid* grid, int ref_pos, float ref_depth, floa
 				OopsImEmpty(grid, curr);
 				FIND_BEACH_FLAG = TRUE;
 			}
-			else if (curr->frac_full > 1)
+			else if (curr->frac_full > 1.0)
 			{
 				OopsImFull(grid, curr);
 				FIND_BEACH_FLAG = TRUE;
 			}
-			else if (curr->frac_full == 0)
+			else if (curr->frac_full <= 0.0)
 			{
 				FIND_BEACH_FLAG = TRUE;
 			}
@@ -236,7 +236,7 @@ void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 	int i;
 	for (i = 0; i < 4; i++)
 	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full >= 1)
+		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full >= 1.0)
 		{
 			num_cells++;
 		}
@@ -247,7 +247,7 @@ void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 		none_full = TRUE;
 		for (i = 0; i < 4; i++)
 		{
-			if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 0)
+			if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 0.0)
 			{
 				num_cells++;
 			}
@@ -257,7 +257,7 @@ void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 	float delta_fill = node->frac_full / num_cells;
 	for (i = 0; i < 4; i++)
 	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 0 && (none_full || neighbors[i]->frac_full >= 1))
+		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 0.0 && (none_full || neighbors[i]->frac_full >= 1.0))
 		{
 			neighbors[i]->frac_full += delta_fill;
 		}
@@ -271,7 +271,7 @@ void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 	// recurse through neighbors
 	for (i = 0; i < 4; i++)
 	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full < -0.000001)
+		if (!BeachNode.isEmpty(neighbors[i]) && !neighbors[i]->is_boundary && neighbors[i]->frac_full < -0.000001)
 		{
 			OopsImEmpty(grid, neighbors[i]);
 		}
@@ -290,7 +290,7 @@ void OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 	int i;
 	for (i = 0; i < 4; i++)
 	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full <= 0)
+		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full <= 0.0)
 		{
 			num_cells++;
 		}
@@ -301,7 +301,7 @@ void OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 		none_empty = TRUE;
 		for (i = 0; i < 4; i++)
 		{
-			if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full < 1)
+			if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full < 1.0)
 			{
 				num_cells++;
 			}
@@ -311,7 +311,7 @@ void OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 	float delta_fill = (node->frac_full - 1) / num_cells;
 	for (i = 0; i < 4; i++)
 	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full < 1 && (none_empty || neighbors[i]->frac_full <= 0))
+		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full < 1.0 && (none_empty || neighbors[i]->frac_full <= 0.0))
 		{
 			neighbors[i]->frac_full += delta_fill;
 		}
@@ -325,7 +325,7 @@ void OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 	// recurse through neighbors
 	for (i = 0; i < 4; i++)
 	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 1)
+		if (!BeachNode.isEmpty(neighbors[i]) && !neighbors[i]->is_boundary && neighbors[i]->frac_full > 1)
 		{
 			OopsImFull(grid, neighbors[i]);
 		}
@@ -359,7 +359,7 @@ int FixBeach(struct BeachGrid* grid)
 				{
 					needs_fix = FALSE;
 				}
-				else if (neighbors[j]->frac_full > 0)
+				else if (neighbors[j]->frac_full > 0.0)
 				{
 					num_cells++;
 				}
@@ -375,7 +375,7 @@ int FixBeach(struct BeachGrid* grid)
 					for (j = 0; j < 4; j++)
 					{
 						if (BeachNode.isEmpty(neighbors[j])) { continue; }
-						if (neighbors[j]->frac_full < 1.0 && neighbors[j]->frac_full > 0)
+						if (neighbors[j]->frac_full < 1.0 && neighbors[j]->frac_full > 0.0)
 						{
 							neighbors[j]->frac_full += delta_fill;
 							if (neighbors[j]->frac_full > 1.0)
@@ -392,7 +392,7 @@ int FixBeach(struct BeachGrid* grid)
 					int c = curr->GetCol(curr);
 					struct BeachNode* temp = (*grid).TryGetNode(grid, r, c);
 
-					while (!BeachNode.isEmpty(temp) && !(temp->frac_full > 0))
+					while (!BeachNode.isEmpty(temp) && !(temp->frac_full > 0.0))
 					{
 						r--;
 						temp = (*grid).TryGetNode(grid, r, c);

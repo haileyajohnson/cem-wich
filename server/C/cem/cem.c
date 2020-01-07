@@ -52,7 +52,7 @@ int cem_initialize(Config config)
 
 	myConfig = config;
 	g_wave_climate = WaveClimate.new(myConfig.wavePeriods, myConfig.waveAngles, myConfig.waveHeights,
-		myConfig.asymmetry, myConfig.stability, myConfig.numTimesteps);
+		myConfig.asymmetry, myConfig.stability, myConfig.numTimesteps, myConfig.numWaveInputs);
 
 	InitializeBeachGrid();
 
@@ -198,27 +198,41 @@ int FindBeach()
 					// backtrack
 					dir_r = -dir_r;
 					dir_c = -dir_c;
-					int backtrack[2] = { curr->GetRow(curr) + dir_r, curr->GetCol(curr) + dir_c };
+					int currRow = curr->GetRow(curr);
+					int currCol = curr->GetCol(curr);
+					int backtrack[2] = { currRow + dir_r, currCol + dir_c };
 					int temp[2] = { backtrack[0], backtrack[1] };
 
 					int foundNextBeach = FALSE;
 					do
 					{
 						// turn 45 degrees clockwise/counterclockwise to next neighbor
-						float angle = atan2(temp[0] - curr->GetRow(curr), temp[1] - curr->GetCol(curr));
+						float angle = atan2(temp[0] - currRow, temp[1] - currCol);
 						angle += (search_dir) * (PI / 4);
-						int next[2] = { curr->GetRow(curr) + round(sin(angle)), curr->GetCol(curr) + round(cos(angle)) };
+						int next[2] = { currRow + round(sin(angle)), currCol + round(cos(angle)) };
 
 						// break if running off edge of grid
 						if (next[0] < 0 || next[0] >= myConfig.nRows || next[1] < 0 || next[1] >= myConfig.nCols) { break; }
 
 						// track dir relative to previous neighbor for backtracking
 						dir_r = next[0] - temp[0];
+
 						dir_c = next[1] - temp[1];
 						temp[0] = next[0];
 						temp[1] = next[1];
 						if (IsLandCell(temp[0], temp[1])) {
 							foundNextBeach = TRUE;
+							// special case for inset corners
+							//if (abs(currRow - temp[0]) - abs(currCol - temp[1]) == 0) { // diagonal
+							//	angle += (search_dir) * (PI / 4);
+							//	int corner[2] = { currRow + round(sin(angle)), currCol + round(cos(angle)) };
+							//	if (IsLandCell(corner[0], corner[1], TRUE)) {
+							//		temp[0] = corner[0];
+							//		temp[1] = corner[1];
+							//		dir_r = temp[0] - currRow;
+							//		dir_c = temp[1] - currCol;
+							//	}
+							//}
 							break;
 						}
 					} while (temp[0] != backtrack[0] || temp[1] != backtrack[1]);
@@ -248,8 +262,9 @@ int FindBeach()
 						// end if undercutting
 						if (tempNode->GetCol(tempNode) < curr->GetCol(curr) && tempNode->GetRow(tempNode) >= curr->GetRow(curr))
 						{
-							tempNode->is_beach = FALSE;
+							tempNode->is_beach = TRUE;
 							tempNode->is_boundary = TRUE;
+							// TODO set get flow to boundary get flow
 							search_dir = -1;
 							dir_r = 1;
 							dir_c = 0;
@@ -271,6 +286,7 @@ int FindBeach()
 						{
 							tempNode->is_beach = TRUE;
 							tempNode->is_boundary = TRUE;
+							// TODO set get flow to boundary get flow
 							break;
 						}
 						startNode = tempNode;
@@ -288,6 +304,7 @@ int FindBeach()
 					else if (startNode->GetRow(startNode) == myConfig.nRows - 1) { startBoundary = BeachNode.boundary(myConfig.nRows, EMPTY_INT); }
 					else {
 						startNode->is_boundary = TRUE;
+						// TODO set boundary flow
 						startBoundary = startNode;
 						startNode = startNode->next;
 
@@ -305,6 +322,7 @@ int FindBeach()
 					else if (endNode->GetRow(endNode) == myConfig.nRows - 1) { endBoundary = BeachNode.boundary(myConfig.nRows, EMPTY_INT); }
 					else {
 						endNode->is_boundary = TRUE;
+						// TODO set boundary flow
 						endBoundary = endNode;
 						endNode = endNode->prev;
 					}
@@ -396,7 +414,7 @@ int IsLandCell(int row, int col)
 		return FALSE;
 	}
 
-	return (temp->frac_full > 0);
+	return (temp->frac_full > 0.0);
 }
 
 /* ----- CONFIGURATION AND OUTPUT FUNCTIONS -----*/

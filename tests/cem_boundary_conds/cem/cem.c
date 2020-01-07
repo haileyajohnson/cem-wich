@@ -11,29 +11,29 @@
 
 // replace consts with config vars
 Config myConfig;
-double cell_width;
-double cell_length;
-double SHELF_SLOPE;
-double SHOREFACE_SLOPE;
+float cell_width;
+float cell_length;
+float SHELF_SLOPE;
+float SHOREFACE_SLOPE;
 
 // minimum depth of shoreface due to wave action (meters)
-double DEPTH_SHOREFACE;
+float DEPTH_SHOREFACE;
 // cell where intial conditions changes from beach to ocean
-double INIT_BEACH;
+float INIT_BEACH;
 // theoretical depth in meters of continental shelf at x = INIT_BEACH
-double INITIAL_DEPTH;
+float INITIAL_DEPTH;
 
 // Global variables to be share with other files.
 int current_time_step = 0;  // Time step of current calculation
-double current_time = 0.;  // Current model time
+float current_time = 0.;  // Current model time
 
 
 // Global variables to be used only within this file.
-static const double kAngleFactor = 1.;
+static const float kAngleFactor = 1.;
 
 // Overall Shoreface Configuration Arrays - Data file information
 // Fractional amount of cell full of sediment LMV
-double** PercentFullSand = NULL;
+float** PercentFullSand = NULL;
 
 static FILE* SaveSandFile;
 static FILE* ReadSandFile;
@@ -47,21 +47,21 @@ static int Y[MaxBeachLength]; // Y Position of ith beach element
 static int XBehind[MaxBeachLength]; // Cell that is "behind" X[i] LMV
 static int YBehind[MaxBeachLength]; // Cell that is "behind" Y[i] LMV
 static char InShadow[MaxBeachLength]; // Is ith beach element in shadow?
-static double ShorelineAngle[MaxBeachLength]; // Angle between cell and right (z+1) neighbor
-static double SurroundingAngle[MaxBeachLength]; // Angle between left and right neighbors
+static float ShorelineAngle[MaxBeachLength]; // Angle between cell and right (z+1) neighbor
+static float SurroundingAngle[MaxBeachLength]; // Angle between left and right neighbors
 static char UpWind[MaxBeachLength]; // Upwind or downwind condition used to calculate sediment transport
-static double VolumeIn[MaxBeachLength]; // Sediment volume into ith beach element
-static double VolumeOut[MaxBeachLength]; // Sediment volume out of ith beach element
-static double VolumeAcrossBorder[MaxBeachLength]; // Sediment volume across border of ith beach element in m^3/day LMV
+static float VolumeIn[MaxBeachLength]; // Sediment volume into ith beach element
+static float VolumeOut[MaxBeachLength]; // Sediment volume out of ith beach element
+static float VolumeAcrossBorder[MaxBeachLength]; // Sediment volume across border of ith beach element in m^3/day LMV
 /* amount sediment needed, not necessarily amount a cell gets */
-static double ActualVolumeAcross[MaxBeachLength]; // Sediment volume that actually gets passed across border LMV
+static float ActualVolumeAcross[MaxBeachLength]; // Sediment volume that actually gets passed across border LMV
 /* amount sed is limited by volumes across border upstream and downstream */
 static char DirectionAcrossBorder[MaxBeachLength]; // Flag to indicate if transport across border is L or R LMV
 static char FlowThroughCell[MaxBeachLength]; // Is flow through ith cell Left, Right, Convergent, or Divergent LMV
 
-static double WvHeight;
-static double Angle;
-static double WvPeriod;
+static float WvHeight;
+static float Angle;
+static float WvPeriod;
 
 // Miscellaneous Global Variables
 
@@ -71,31 +71,31 @@ static int BehindX;
 static int BehindY;
 static int TotalBeachCells; // Number of cells describing beach at particular iteration
 static int ShadowXMax; // used to determine maximum extent of beach cells
-static double WaveAngle; // wave angle for current time step
+static float WaveAngle; // wave angle for current time step
 static int FindStart; // Used to tell FindBeach at what Y value to start looking
 static char FellOffArray; // Flag used to determine if accidentally went off array
 static int NumWaveBins; // For Input Wave - number of bins
-static double WaveMax[36]; // Max Angle for specific bin
-static double WaveProb[36]; // Probability of Certain Bin
-static double WaveAngleIn;
-static double WaveHeightIn;
-static double WavePeriodIn;
+static float WaveMax[36]; // Max Angle for specific bin
+static float WaveProb[36]; // Probability of Certain Bin
+static float WaveAngleIn;
+static float WaveHeightIn;
+static float WavePeriodIn;
 
-static double Period = 10.0; // seconds
-static double OffShoreWvHt = 2.0; // meters
+static float Period = 10.0; // seconds
+static float OffShoreWvHt = 2.0; // meters
 
 // Fractional portion of waves coming from positive (left) direction
-static double Asym = 0.70;
+static float Asym = 0.70;
 // .5 = even dist, < .5 high angle domination. NOTE Highness actually
 // determines lowness!
-static double Highness = 0.35;
+static float Highness = 0.35;
 
 // Factor applied to the input wave height; 1 = no change, 0.5 = half
-// wave height, and 2 = double wave height
-static double waveheightchange = 1.;
+// wave height, and 2 = float wave height
+static float waveheightchange = 1.;
 // Factor applied to the input wave period; 1 = no change, 0.5 = half
-// wave period, and 2 = double wave period
-static double waveperiodchange = 1.;
+// wave period, and 2 = float wave period
+static float waveperiodchange = 1.;
 
 void AdjustShore(int i);
 void DetermineAngles(void);
@@ -103,19 +103,19 @@ void DetermineSedTransport(void);
 void FindBeachCells(int ystart);
 char FindIfInShadow(int xin, int yin, int ShadMax);
 void FindNextCell(int x, int y, int z);
-double FindWaveAngle(void);
+float FindWaveAngle(void);
 void FixBeach(void);
 void FixFlow(void);
 void FlowInCell(void);
 void OopsImEmpty(int x, int y);
 void OopsImFull(int x, int y);
-double Raise(double b, double e);
-double RandZeroToOne(void);
+float Raise(float b, float e);
+float RandZeroToOne(void);
 void ReadSandFromFile(void);
 void RealWaveIn(void);
 void SaveSandToFile(void);
 void SaveLineToFile(void);
-void SedTrans(int From, int To, double ShoreAngle, char MaxT, int Last);
+void SedTrans(int From, int To, float ShoreAngle, char MaxT, int Last);
 void ShadowSweep(void);
 void TransportSedimentSweep(void);
 void ZeroVars(void);
@@ -158,7 +158,7 @@ int initialize(Config config) {
 	{ // Allocate memory for arrays.
 		const int n_rows = X_MAX;
 		const int n_cols = Y_MAX;
-		PercentFullSand = (double**)malloc2d(n_rows, n_cols, sizeof(double));
+		PercentFullSand = (float**)malloc2d(n_rows, n_cols, sizeof(float));
 	}
 
 	ReadSandFromFile();
@@ -231,14 +231,14 @@ int finalize() {
 
 /* -----FUNCTIONS ARE BELOW----- */
 
-double FindWaveAngle(void)
+float FindWaveAngle(void)
 /* calculates wave angle for given time step */
 {
-	double Angle;
+	float Angle;
 	
 	RealWaveIn(); /*Read real data (angle/period/height) */
 
-	Angle = ((double)(WaveAngleIn));
+	Angle = ((float)(WaveAngleIn));
 	if (Angle >= PI)
 		Angle -= (2*PI); /* conversion to CEM angles (-180 -- 0 -- +180) */
 	//Angle *= -1; /*-1 is there as wave angle is from 90 in the west to -90 	the east*/
@@ -305,7 +305,7 @@ void FindBeachCells(int ystart)
 		 * direction     */
 		 /* Jump off and start again closer to middle */
 
-		if ((NextY < 1) || ((NextY == Y[0]) && (NextX == X[0])) ||
+		if ((NextY < 0) || ((NextY == Y[0]) && (NextX == X[0])) ||
 			(z > MaxBeachLength - 2)) {
 			FellOffArray = 'y';
 			ZeroVars();
@@ -817,7 +817,7 @@ char FindIfInShadow(int xin, int yin, int ShadMax)
 	int ymin = 0;
 	int ymax = Y_MAX;
 
-	double xdistance, ydistance;
+	float xdistance, ydistance;
 
 	int xcheck = xin;
 	int ycheck = yin;
@@ -903,8 +903,8 @@ void DetermineAngles(void)
 		{
 			/* math revised 6-03 */
 
-			ShorelineAngle[i] = atan2(((X[i + 1] - (PercentFullSand[X[i + 1]][Y[i + 1]])) -
-				(X[i] - (PercentFullSand[X[i]][Y[i]]))) * cell_length, (Y[i + 1] - Y[i]) * cell_width);
+			ShorelineAngle[i] = atan2((X[i + 1] - X[i] - (PercentFullSand[X[i + 1]][Y[i + 1]] + PercentFullSand[X[i]][Y[i]]))* cell_length, 
+				(Y[i + 1] - Y[i]) * cell_width);
 
 			if (ShorelineAngle[i] > PI) {
 				ShorelineAngle[i] -= 2.0 * PI;
@@ -915,25 +915,22 @@ void DetermineAngles(void)
 			/* function revised 1-04 - asusme if goin right, on regular shore */
 			/*  'regular' beach */
 		{
-			ShorelineAngle[i] = atan2(
-				((X[i + 1] + (PercentFullSand[X[i + 1]][Y[i + 1]])) -
-				(X[i] + (PercentFullSand[X[i]][Y[i]]))) * cell_length, (Y[i + 1] - Y[i]) * cell_width);
+			ShorelineAngle[i] = atan2((X[i + 1] - X[i] + (PercentFullSand[X[i + 1]][Y[i + 1]] - PercentFullSand[X[i]][Y[i]])) * cell_length, 
+					(Y[i + 1] - Y[i]) * cell_width);
 		}
 
 		else if (Y[i] == Y[i + 1] && X[i] > X[i + 1])
 			/*  Shore up and down, on right side */
 		{
 			ShorelineAngle[i] = atan2((X[i + 1] - X[i]) * cell_length,
-				((Y[i + 1] + (PercentFullSand[X[i + 1]][Y[i + 1]])) -
-				(Y[i] + (PercentFullSand[X[i]][Y[i]]))) * cell_width);
+				(Y[i + 1] - Y[i] + (PercentFullSand[X[i + 1]][Y[i + 1]] - PercentFullSand[X[i]][Y[i]])) * cell_width);
 		}
 
 		else if (Y[i] == Y[i + 1] && X[i] < X[i + 1])
 			/* Shore up and down, on left side */
 		{
 			ShorelineAngle[i] = atan2((X[i + 1] - X[i]) * cell_length,
-				((Y[i + 1] - (PercentFullSand[X[i + 1]][Y[i + 1]])) -
-				(Y[i] - (PercentFullSand[X[i]][Y[i]]))) * cell_width);
+				(Y[i + 1] - Y[i] - (PercentFullSand[X[i + 1]][Y[i + 1]] + PercentFullSand[X[i]][Y[i]])) * cell_width);
 		}
 
 		else {
@@ -995,7 +992,7 @@ void DetermineSedTransport(void)
 {
 	int i; /* Loop variable LMV also sent to SedTrans to determine VolAcrossBorder
 						*/
-	double ShoreAngleUsed; /* Temporary holder for shoreline angle */
+	float ShoreAngleUsed; /* Temporary holder for shoreline angle */
 	int CalcCell; /* Cell sediment coming from to go across boundary i */
 	int Next, Last; /* Indicators so test can go both left/right */
 	int Correction; /* Term needed for shoreline angle and i+1 case, angle stored
@@ -1093,7 +1090,7 @@ void DetermineSedTransport(void)
 	}
 }
 
-void SedTrans(int i, int From, double ShoreAngle, char MaxT, int Last)
+void SedTrans(int i, int From, float ShoreAngle, char MaxT, int Last)
 
 /*  This central function will calcualte the sediment transported from the cell
 	 i-1 to          */
@@ -1107,24 +1104,24 @@ void SedTrans(int i, int From, double ShoreAngle, char MaxT, int Last)
 {
 	/* Coefficients - some of these are important */
 
-	double StartDepth = 3 * OffShoreWvHt; /* m, depth to begin refraction calcs
+	float StartDepth = 3 * OffShoreWvHt; /* m, depth to begin refraction calcs
 																					(needs to be beyond breakers) */
-	double RefractStep =
+	float RefractStep =
 		.2; /* m, step size to iterate depth for refraction calcs */
-	double KBreak = 0.5; /* coefficient for wave breaking threshold */
-	double rho = 1020; /* kg/m3 - density of water and dissolved matter */
+	float KBreak = 0.5; /* coefficient for wave breaking threshold */
+	float rho = 1020; /* kg/m3 - density of water and dissolved matter */
 
 	/* Variables */
 
-	double AngleDeep;          /* rad, Angle of waves to shore at inner shelf  */
-	double Depth = StartDepth; /* m, water depth for current iteration         */
-	double Angle;              /* rad, calculation angle                       */
-	double CDeep;              /* m/s, phase velocity in deep water            */
-	double LDeep;              /* m, offhsore wavelength                       */
-	double C;                  /* m/s, current step phase velocity             */
-	double kh;                 /* wavenumber times depth                       */
-	double n;                  /* n                                            */
-	double WaveLength;         /* m, current wavelength                        */
+	float AngleDeep;          /* rad, Angle of waves to shore at inner shelf  */
+	float Depth = StartDepth; /* m, water depth for current iteration         */
+	float Angle;              /* rad, calculation angle                       */
+	float CDeep;              /* m/s, phase velocity in deep water            */
+	float LDeep;              /* m, offhsore wavelength                       */
+	float C;                  /* m/s, current step phase velocity             */
+	float kh;                 /* wavenumber times depth                       */
+	float n;                  /* n                                            */
+	float WaveLength;         /* m, current wavelength                        */
 
 	/* Primary assumption is that waves refract over shore-parallel contours */
 	/* New algorithm 6/02 iteratively takes wiave onshore until they break, then
@@ -1187,7 +1184,7 @@ void SedTrans(int i, int From, double ShoreAngle, char MaxT, int Last)
 	 /* so no attempt made to make this a more perfect imperfection */
 
 	VolumeAcrossBorder[i] =
-		fabs(1.1 * rho * Raise(GRAVITY, 3.0 / 2.0) * Raise(WvHeight, 2.5) *
+		fabs(.67 * rho * Raise(GRAVITY, 3.0 / 2.0) * Raise(WvHeight, 2.5) *
 			cos(Angle) * sin(Angle) * myConfig.lengthTimestep); /*LMV - now global array*/
 
 /*LMV VolumeIn/Out is now calculated below in AdjustShore */
@@ -1210,7 +1207,7 @@ void FlowInCell(void)
 	int i;
 
 	/* float AverageFull; */
-	double TotalPercentInBeaches = 0.;
+	float TotalPercentInBeaches = 0.;
 
 	for (i = 1; i < TotalBeachCells-1; i++) {
 		if ((DirectionAcrossBorder[i - 1] == 'r') &&
@@ -1246,16 +1243,16 @@ void FixFlow(void)
 						/* revised 5/04 LMV */
 {
 	int i;
-	double AmountSand; /* amount of sand availible for transport (includes amount
+	float AmountSand; /* amount of sand availible for transport (includes amount
 											 in cell behind) LMV */
 
-	double Depth; /* Depth of current cell */
+	float Depth; /* Depth of current cell */
 	/* float        DeltaArea;       Holds change in area for cell (m^2) */
-	double Distance;   /* distance from shore to intercept of equilib. profile and
+	float Distance;   /* distance from shore to intercept of equilib. profile and
 											 overall slope (m) */
-	double Xintercept; /* X position of intercept of equilib. profile and overall
+	float Xintercept; /* X position of intercept of equilib. profile and overall
 											 slope */
-	double DepthEffective; /* depth at x intercept, Brad: where slope becomes <
+	float DepthEffective; /* depth at x intercept, Brad: where slope becomes <
 													 equilib slope, */
 													 /*                             so sand stays piled against shoreface */
 
@@ -1436,13 +1433,13 @@ void AdjustShore(int i)
 /*  Uses global variables: SHELF_SLOPE, CELL_WIDTH, SHOREFACE_SLOPE, INITIAL_DEPTH
 	 */
 {
-	double Depth;      /* Depth of current cell */
-	double DeltaArea;  /* Holds change in area for cell (m^2) */
-	double Distance;   /* distance from shore to intercept of equilib. profile and
+	float Depth;      /* Depth of current cell */
+	float DeltaArea;  /* Holds change in area for cell (m^2) */
+	float Distance;   /* distance from shore to intercept of equilib. profile and
 											 overall slope (m) */
-	double Xintercept; /* X position of intercept of equilib. profile and overall
+	float Xintercept; /* X position of intercept of equilib. profile and overall
 											 slope */
-	double DepthEffective; /* depth at x intercept, Brad: where slope becomes <
+	float DepthEffective; /* depth at x intercept, Brad: where slope becomes <
 													 equilib slope, */
 													 /*                             so sand stays piled against shoreface */
 
@@ -1806,7 +1803,7 @@ void FixBeach(void)
 	}
 }
 
-double Raise(double b, double e)
+float Raise(float b, float e)
 /**
  * function calulates b to the e power. pow has problems if b <= 0
  * 	note you can't use this at all when b is negative--it'll be

@@ -12,6 +12,9 @@ class Config(Structure):
         ("waveHeights", POINTER(c_float)),
         ("waveAngles", POINTER(c_float)),
         ('wavePeriods', POINTER(c_float)),
+        ('asymmetry', c_float),
+        ('stability', c_float),
+        ('numWaveInputs', c_int),
         ("nRows", c_int),
         ("nCols", c_int),
         ("cellWidth", c_float),
@@ -22,6 +25,7 @@ class Config(Structure):
 		("shelfDepthAtReferencePos", c_float),
 		("minimumShelfDepthAtClosure", c_float),
         ("lengthTimestep", c_float),
+        ("numTimesteps", c_int),
         ("saveInterval", c_int)]
         
 if __name__ == "__main__": 
@@ -39,11 +43,11 @@ if __name__ == "__main__":
     shelfDepthAtReferencePos = 10.0
     minimumShelfDepthAtClosure = 10.0
     lengthTimestep = 1
-    saveInterval = 1
-    numTimesteps = 365
+    saveInterval = 100
+    numTimesteps = 10400#3650 * 4
 
     asymmetry = .7
-    stability = .4
+    stability = .3
 
     # create wave inputs
     # random.seed(datetime.now())
@@ -66,29 +70,31 @@ if __name__ == "__main__":
     import_grid = import_grid.values
     grid_orig = ((POINTER(c_float)) * nRows)()
     for r in range(nRows):
-        grid[r] = (c_float * nCols)()
+        grid_orig[r] = (c_float * nCols)()
         for c in range(nCols):
-            grid[r][c] = import_grid[r][c]
+            grid_orig[r][c] = import_grid[r][c]
             
     grid_new = ((POINTER(c_float)) * nRows)()
     for r in range(nRows):
-        grid[r] = (c_float * nCols)()
+        grid_new[r] = (c_float * nCols)()
         for c in range(nCols):
-            grid[r][c] = import_grid[nRows - r - 1][c]
+            grid_new[r][c] = import_grid[nRows - r - 1][c]
 
     # create config objects
-    input_orig = Config(grid = grid_orig, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+    input_orig = Config(grid = grid_orig, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods, 
+            asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
             nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
             shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
             shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
-            lengthTimestep = lengthTimestep, saveInterval = saveInterval)
+            lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
             
     # create config object
     input_new = Config(grid = grid_new, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+            asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
             nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
             shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
             shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
-            lengthTimestep = lengthTimestep, saveInterval = saveInterval)
+            lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
 
     # set library paths
     #lib_path_orig = "cem_orig/_build/test_cem"

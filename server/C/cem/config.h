@@ -12,6 +12,7 @@ extern "C" {
 		float* wavePeriods;
 		float asymmetry;
 		float stability;
+		int numWaveInputs;
 		int nRows;
 		int nCols;
 		float cellWidth;

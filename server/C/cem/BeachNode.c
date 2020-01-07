@@ -234,11 +234,11 @@ static float GetAngle(struct BeachNode* node1, struct BeachNode* node2)
 
 	while (angle > PI)
 	{
-		angle -= 2 * PI;
+		angle -= 2.0 * PI;
 	}
 	while (angle < -PI)
 	{
-		angle += 2 * PI;
+		angle += 2.0 * PI;
 	}
 	return angle;
 }

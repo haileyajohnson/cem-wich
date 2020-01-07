@@ -25,6 +25,7 @@ class Config(Structure):
         ('wavePeriods', POINTER(c_float)),
         ('asymmetry', c_float),
         ('stability', c_float),
+        ('numWaveInputs', c_int),
         ("nRows", c_int),
         ("nCols", c_int),
         ("cellWidth", c_float),
@@ -141,7 +142,7 @@ def get_input_data(input_data):
 
     # config object
     input = Config(grid = grid, nRows = nRows,  nCols = nCols, cellWidth = input_data['cellWidth'], cellLength = input_data['cellLength'],
-        asymmetry = input_data['asymmetry'], stability = input_data['stability'], 
+        asymmetry = input_data['asymmetry'], stability = input_data['stability'], numWaveInputs = len(H),
         waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
         shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
         crossShoreReferencePos = input_data['crossShoreRef'], shelfDepthAtReferencePos = input_data['refDepth'],

@@ -19,7 +19,7 @@ extern "C" {
 	};
 	extern const struct WaveClimateClass {
 		struct WaveClimate(*new)(float* wave_periods, float* wave_angles, float* wave_heights, 
-			float asymmetry, float stability, int num_timesteps);
+			float asymmetry, float stability, int num_timesteps, int numWaveInputs);
 	} WaveClimate;
 
 #endif
