@@ -14,7 +14,7 @@ extern "C" {
 
 cem_EXPORT int run_test(Config config, int numTimesteps, int saveInterval);
 cem_EXPORT int initialize(Config config);
-cem_EXPORT double** update(int saveInterval);
+cem_EXPORT float* update(int saveInterval);
 cem_EXPORT int finalize();
 
 #if defined(__cplusplus)

@@ -117,7 +117,7 @@ function onRun() {
         nCols: mapInterface.numCols,
         polyGrid: mapInterface.polyGrid,
         source: mapInterface.source.name,
-        year: mapInterface.source.year,
+        date: mapInterface.source.date,
         geometry: mapInterface.box.getCoordinates(),
         cellWidth: mapInterface.getCellWidth(),
         cellLength: mapInterface.getCellLength(),
@@ -671,7 +671,7 @@ function ControlsTab() {
         cross_shore_ref: 10.0,
         ref_depth: 10.0,
         min_closure_depth: 10.0,
-        end_year: 2019,
+        end_year: new Date().getFullYear() - 1,
         length_timestep: 1,
         save_interval: 365,
         num_timesteps: null,
@@ -693,7 +693,11 @@ function ControlsTab() {
         },
 
         getNumTimesteps: function() {
-            this.num_timesteps = parseInt(Math.round((this.end_year - mapInterface.source.year) * (365/this.length_timestep)))
+            var startDate = new Date(mapInterface.source.date);
+            var endDate = new Date(end_year + "-12-31");
+            var millis = endDate.getTime() - startDate.getTime();
+            var days = millis / (1000 * 60 * 60 * 24);
+            this.num_timesteps = Math.floor(days / this.length_timestep);
         },
 
         /***********

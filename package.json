@@ -17,9 +17,9 @@
   },
   "homepage": "https://github.com/haileyajohnson/cem-utility#readme",
   "devDependencies": {
-    "autoprefixer": "^9.6.1",
+    "autoprefixer": "^9.7.3",
     "cssnano": "^4.1.10",
-    "del": "^5.0.0",
+    "del": "^5.1.0",
     "gulp": "^4.0.2",
     "gulp-clean": "^0.4.0",
     "gulp-concat": "^2.6.1",
@@ -28,5 +28,9 @@
     "gulp-sass": "^4.0.2",
     "gulp-sourcemaps": "^2.6.5",
     "gulp-uglify-es": "^1.0.4"
+  },
+  "dependencies": {
+    "browserslist": "^4.8.3",
+    "caniuse-lite": "^1.0.30001019"
   }
 }

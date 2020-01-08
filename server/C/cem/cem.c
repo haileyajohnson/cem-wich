@@ -32,14 +32,14 @@ void SedimentTransport();
 /* Helpers */
 int IsLandCell(int row, int col);
 
-// Main steps
+/* Main steps */
 int cem_initialize(Config config);
-double* cem_update(int saveInterval);
+float* cem_update(int saveInterval);
 int cem_finalize(void);
 
 /* Logging and Debugging */
-void Process();
-float* results = NULL;
+void SaveOutputGrid();
+float* outputGrid = NULL;
 void test_LogShoreline();
 void test_OutputGrid();
 
@@ -64,24 +64,23 @@ int cem_initialize(Config config)
 	return 0;
 }
 
-// Update the CEM by a single time step.
-double* cem_update(int saveInterval) {
+// Update the CEM by given steps
+float* cem_update(int saveInterval) {
 	int i;
 	for (i = 0; i < saveInterval; i++)
 	{
 		SedimentTransport();
-
 		current_time_step++;
 		current_time += myConfig.lengthTimestep;
 	}
 
-	Process();
-	return results;
+	SaveOutputGrid();
+	return outputGrid;
 }
 
 int cem_finalize() {
 	// free everything
-	free(results);
+	free(outputGrid);
 	free(g_beachGrid.shoreline);
 	free(g_beachGrid.cells);
 	return 0;
@@ -418,12 +417,12 @@ int IsLandCell(int row, int col)
 }
 
 /* ----- CONFIGURATION AND OUTPUT FUNCTIONS -----*/
-void Process()
+void SaveOutputGrid()
 {
-	if (results) {
-		free(results);
+	if (outputGrid) {
+		free(outputGrid);
 	}
-	results = malloc(g_beachGrid.rows * g_beachGrid.cols * sizeof(float));
+	outputGrid = malloc(myConfig.nRows * myConfig.nCols * sizeof(float));
 	int r, c;
 	for (r = 0; r < myConfig.nRows; r++)
 	{
@@ -435,7 +434,7 @@ void Process()
 				continue;
 			}
 			int i = r * myConfig.nCols + c;
-			results[i] = node->frac_full;
+			outputGrid[i] = node->frac_full;
 		}
 	}
 }

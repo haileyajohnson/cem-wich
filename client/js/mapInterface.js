@@ -28,9 +28,9 @@ sources = [
 {
     id: 0,
     name: "LS5",
-    year: 1985,
-    startFilter: "1985-01-01",
-    endFilter: "1985-12-31",
+    date: "1984-09-01",
+    startFilter: "1984-03-01",
+    endFilter: "1985-02-28",
     bands: ['B2', 'B4'],
     url:"LANDSAT/LT05/C01/T1"
 },
@@ -39,7 +39,7 @@ sources = [
 {
     id: 1,
     name: "LS7",
-    year: 1999,
+    date: "1999-06-01",
     startFilter: "1999-01-01",
     endFilter: "1999-12-31",
     bands: ['B2', 'B4'],
@@ -50,9 +50,9 @@ sources = [
 {
     id: 2,
     name: "LS8",
-    year: 2014,
-    startFilter: "2014-01-01",
-    endFilter: "2014-12-31",
+    date: "2013-10-01",
+    startFilter: "2013-04-01",
+    endFilter: "2014-03-31",
     bands: ['B3', 'B5'],
     url:"LANDSAT/LC08/C01/T1"
 }];
@@ -210,17 +210,21 @@ function MapInterface() {
                 bestEffort: true
             });
 
+            // returns water mask: water = 1, land = 0
             var water = ndwi.gt(this.otsu(values.get('nd')));
+            // remove small features
             var minConnectivity = 50;
             var connectCount = water.connectedPixelCount(minConnectivity, true);
-            // create mask
-            var land_pix = water.eq(0).and(connectCount.lt(minConnectivity));
-            var water_pix = water.eq(1).and(connectCount.lt(minConnectivity)).multiply(-1);
-            var mask = water.add(land_pix).add(water_pix).not();
+            var unconnect_land_pix = water.eq(0).and(connectCount.lt(minConnectivity));
+            var unconnect_water_pix = water.eq(1).and(connectCount.lt(minConnectivity)).multiply(-1); // mask = negative ones on low connectivity water pixels
+            // 1. add mask of ones for low connectivity land pixels
+            // 2. add mask of -1 for low connectivity water pixels
+            // 3. invert: land = 1, water = 0
+            var mask = water.add(unconnect_land_pix).add(unconnect_water_pix).not();
 
             // smooth
             var gaussian = ee.Kernel.gaussian({
-                radius: 1
+                radius: 3
             });            
             var smooth = mask.convolve(gaussian).clip(poly);
 
