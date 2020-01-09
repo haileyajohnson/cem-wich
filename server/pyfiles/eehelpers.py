@@ -1,6 +1,7 @@
 import ee
 import numpy as np
 from skimage import filters
+import datetime
 
 from server.pyfiles import globals
 
@@ -13,30 +14,41 @@ def make_cem_grid(im):
             features.append(ee.Feature(ee.Geometry.Polygon(globals.polyGrid[r][c].tolist())))
 
     fc = ee.FeatureCollection(features)
+
+    eeGrid = np.empty((globals.nRows, globals.nCols), float)
             
-    # Reduce the region. The region parameter is the Feature geometry.
-    dict = im.reduceRegions(reducer = ee.Reducer.mean(), collection = fc, scale = 30)
+    # Reduce features to mean value
+    maxTries = 8
+    numTries = 0
+    while numTries < maxTries:
+        try:
+            dict = im.reduceRegions(reducer = ee.Reducer.mean(), collection = fc, scale = 30)
+            info = dict.getInfo().get('features')
+            break
+        except:
+            numTries = numTries + 1
+            print("Could not get info from EE server. Trying again...")
+            if numTries == maxTries:
+                print("Max tries exceeded: could not get info from EE server")
+                return eeGrid
 
-    info = dict.getInfo().get('features')
-
-    globals.eeGrid = np.empty((globals.nRows, globals.nCols), float)
     i = 0
     for r in range(globals.nRows):
         for c in range(globals.nCols):
             feature = info[i]
             fill = feature['properties']['mean']
-            globals.eeGrid[r][c] = fill
+            eeGrid[r][c] = fill
             i += 1
-    return globals.eeGrid
+    return eeGrid
 
 ###
 # create water mask from 365 day TOA composite 
-def get_image_composite():
+def get_image_composite(date):
     # build request
     poly = ee.Geometry.Polygon(globals.geometry[0])
-    start_date = (globals.date + datetime.timedelta(6*365/12)).strftime('%Y-%m-%d')
-    end_date = (globals.date - datetime.timedelta(6*365/12)).strftime('%Y-%m-%d')
-    url = _get_source_url()
+    start_date = (date - datetime.timedelta(6*365/12)).strftime('%Y-%m-%d')
+    end_date = (date + datetime.timedelta(6*365/12)).strftime('%Y-%m-%d')
+    url = _get_source_url(date)
 
     # get composite
     collection = ee.ImageCollection(url).filterBounds(poly).filterDate(start_date, end_date) 
@@ -63,16 +75,15 @@ def get_image_composite():
     
 ###
 # build URL to request image
-def _get_source_url():
-    if globals.source == "LS5" and globals.date.year >= 2012:
-        globals.source = "LS7"
-    
+def _get_source_url(date):
+    # update source if necessary        
+    if globals.source == "LS5" and date.year >= 2012:
+        return "LANDSAT/LE07/C01/T1"
     if (globals.source == "LS5"):
         return "LANDSAT/LT05/C01/T1"
-    elif (source == "LS7"):
+    if (globals.source == "LS7"):
         return "LANDSAT/LE07/C01/T1"
-    else:
-        return "LANDSAT/LC08/C01/T1"
+    return "LANDSAT/LC08/C01/T1"
 
 ###
 # return NWDI source bands for current source

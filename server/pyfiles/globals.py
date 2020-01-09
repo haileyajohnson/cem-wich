@@ -1,11 +1,16 @@
-# initialize global values
+# reference variables
 source = None
 polyGrid = None
 geometry = None
 nRows = None
 nCols = None
-date = None
-eeGrid = None
+rowSize = None
+colSize = None
 ref_shoreline = None
+
+# exported variables
 model = None
 observed = None
+S = None
+r = None
+var_ratio = None

@@ -50,12 +50,12 @@ function initialize() {
     
     // create tabs
     gridTab = GridTab();
-    gridTab.init();
     waveTab = WaveTab();
-    waveTab.init();
-    controlTab = ControlsTab()
-    controlTab.init();
+    controlTab = ControlsTab();
     runTab = RunTab();
+    gridTab.init();
+    waveTab.init();
+    controlTab.init();
     runTab.init();
     
     // create modal dialog window
@@ -216,8 +216,8 @@ function onModelComplete(msg) {
         mapInterface.source = sources[1];
     }
     
-    var start_date = endYear + "-01-01";
-    var end_date = endYear + "-12-01";
+    var start_date = endYear + "-06-01";
+    var end_date = (endYear+1) + "-06-01";
     return [start_date, end_date];
  }
 
@@ -689,15 +689,15 @@ function ControlsTab() {
             this.$end_year.change(() => { this.onEndYearChange(); });
             this.$length_timestep.change(() => { this.onTimestepLengthChange(); });
             this.$save_interval.change(() => { this.onSaveIntervalChange(); });
-            this.getNumTimesteps();
         },
 
         getNumTimesteps: function() {
             var startDate = new Date(mapInterface.source.date);
-            var endDate = new Date(end_year + "-12-31");
+            var endDate = new Date(this.end_year + "-12-31");
             var millis = endDate.getTime() - startDate.getTime();
             var days = millis / (1000 * 60 * 60 * 24);
             this.num_timesteps = Math.floor(days / this.length_timestep);
+            if (runTab) { runTab.displayNumTimesteps(); }
         },
 
         /***********
@@ -741,6 +741,7 @@ function ControlsTab() {
          * setters
          *********/
         setAllValues: function() {
+            this.getNumTimesteps();     
             this.$shelf_slope.val(this.shelf_slope);
             this.$shoreface_slope.val(this.shoreface_slope);
             this.$cross_shore_ref.val(this.cross_shore_ref);
@@ -748,7 +749,7 @@ function ControlsTab() {
             this.$min_closure_depth.val(this.min_closure_depth);
             this.$end_year.val(this.end_year);
             this.$length_timestep.val(this.length_timestep);
-            this.$save_interval.val(this.save_interval);       
+            this.$save_interval.val(this.save_interval);  
         }
     }
 }
@@ -761,7 +762,7 @@ function RunTab() {
         $elem: $(".run-tab"),
         $tab: $("#run-tab"),
         
-        $output: $(".output-pane"),
+        $output: $(".output-table > tbody"),
         $timestep: $(".timestep"),
         $runButton: $(".run-button"),
         $outputButton: $(".output-button"),
@@ -774,31 +775,46 @@ function RunTab() {
             this.$outputButton.disable();
 
             this.displayTimestep(0);
-            this.$output.text('t \tdif  \t\tPCA\n');
+            this.displayNumTimesteps();
         },
 
         /***********
          * callbacks
          ***********/
         updateOutput: function(msg) {
-            var text = this.$output.text();
-            var pca = msg.sp_pca;
-            var pca_str = "";
-            for (var i = 0; i < 2; i++) {
-                num = pca[i]*100;
-                num = num.toPrecision(4);
-                pca_str += num + ", "
+            var text = this.$output.html();
+            var rotation = msg.sp_pca.rotation;
+            var scale = msg.sp_pca.scale;
+            var S = msg.t_pca;
+
+            var $trow = $("<tr></tr>");
+            $trow.append($("<td></td>").text(msg.time));
+            $trow.append($("<td></td>").text(rotation.toFixed(3)));
+            $trow.append($("<td></td>").text(scale.toFixed(3)));
+
+            if (S.length >= 3) {
+                $trow.append($("<td></td>").text(S[0].toFixed(3)))
+                .append($("<td></td>").text(S[1].toFixed(3)))
+                .append($("<td></td>").text(S[2].toFixed(3)));
+            } else {
+                $trow.append($("<td></td>").text("---"))
+                .append($("<td></td>").text("---"))
+                .append($("<td></td>").text("---"));
             }
-            text += msg.time + ":\t" + (100*msg.dif).toFixed(4) + '\t' + pca_str + "\n";
-            this.$output.text(text);
+
+            $trow.appendTo(this.$output);
         },
 
         clearOutput: function() {
-            this.$output.text("");
+            this.$output.empty();
         },
 
         displayTimestep: function(t) {
-            this.$timestep.text("T = " + t + " out of " + controlTab.num_timesteps);
+            $(this.$timestep.find(".current-step")[0]).text("t = " + t);
+        },
+
+        displayNumTimesteps: function() {
+            $(this.$timestep.find(".num-timesteps")[0]).text(controlTab.num_timesteps);
         }
     }
 }

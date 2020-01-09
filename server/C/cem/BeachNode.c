@@ -85,7 +85,7 @@ static FLOW_DIR GetBoundaryFlowDirection(struct BeachNode* this)
 static FLOW_DIR GetFlowDirection(struct BeachNode* this)
 {
 	FLOW_DIR next_dir = this->transport_dir;
-	FLOW_DIR prev_dir = this->prev->is_boundary ? this->prev->GetFlowDirection(this->prev) : this->prev->transport_dir;
+	FLOW_DIR prev_dir = this->prev->transport_dir == EMPTY_INT ? this->prev->GetFlowDirection(this->prev) : this->prev->transport_dir;
 
 	if (prev_dir == RIGHT)
 	{
@@ -98,7 +98,7 @@ static FLOW_DIR GetFlowDirection(struct BeachNode* this)
 			return CONVERGENT;
 		}
 	}
-	else
+	else if (prev_dir == LEFT)
 	{
 		if (next_dir == RIGHT)
 		{
@@ -108,6 +108,10 @@ static FLOW_DIR GetFlowDirection(struct BeachNode* this)
 		{
 			return LEFT;
 		}
+	}
+	else
+	{
+		return next_dir;
 	}
 }
 

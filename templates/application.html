@@ -180,12 +180,28 @@
                 <div class="run-tab tab-view">
                     <div class="run-content content-pane">                        
                         <input type="button" class="button run-button" value="Run">
-                        <div class="section timestep"></div>
+                        <div class="section timestep"><span class="current-step"></span>&nbsp;out of&nbsp;<span class="num-timesteps"></span></div>
                         <div class="section">  
                             <div class="section-title">Output</div>
-                            <div class="output-pane"></div>
+                            <div class="output-pane">
+                                <table class="output-table">
+                                    <thead><tr>
+                                        <th>t</th>
+                                        <th>d&theta;</th>
+                                        <th>&sigma;<sub>1</sub><sup>2</sup>/&sigma;<sub>2</sub><sup>2</sup></th>
+                                        <th>S<sub>1</sub></th>
+                                        <th>S<sub>2</sub></th>
+                                        <th>S<sub>3</sub></th>
+                                    </tr></thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
                         </div>
-                        <input type="button" class="button output-button" value="Save output">
+                        <div class="container">
+                             <a href="/download-zip" target="blank">
+                                <input type="button" class="button output-button" value="Save output">
+                            </a>
+                        </div>
                     </div>
                 </div>
 

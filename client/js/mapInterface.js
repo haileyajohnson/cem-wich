@@ -255,15 +255,28 @@ function MapInterface() {
             }
 
             var fc = new ee.FeatureCollection(features);
-                    
-            // Reduce the region. The region parameter is the Feature geometry.
-            var dict = image.reduceRegions({
-                reducer: ee.Reducer.mean(),
-                collection: fc,
-                scale: 30
-            });
-
-            var infoGrid = dict.getInfo();
+            // Reduce features to mean value
+            var maxTries = 8;
+            var numTries = 0;
+            while (numTries < maxTries) {
+                try {
+                    var dict = image.reduceRegions({
+                        reducer: ee.Reducer.mean(),
+                        collection: fc,
+                        scale: 30
+                    });
+        
+                    var infoGrid = dict.getInfo();
+                    break;
+                } catch (e) {
+                    numTries++;
+                    if (numTries == maxTries) {
+                        console.log("Max tries exceeded: could not get info from EE server")
+                        // TODO error reporting
+                        return;
+                    }
+                }
+            }
             var numCells = infoGrid.features.length;
 
             // get fill of each cell feature

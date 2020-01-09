@@ -54,7 +54,7 @@ function validateData(data) {
     if (!data.nRows || data.nRows <= 0) { return -1; }
     if (!data.nCols || data.nCols <= 0) { return -1; }
     if (!data.source) { return -1; }
-    if (!data.year) { return -1; }
+    if (!data.date) { return -1; }
     if (!data.geometry || data.geometry == 0) { return -1; }
     if (!data.polyGrid || data.polyGrid.length == 0) { return -1; }
     if (!data.waveHeights) { return -1; }
