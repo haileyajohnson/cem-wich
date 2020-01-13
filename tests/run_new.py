@@ -27,11 +27,10 @@ class Config(Structure):
         ("lengthTimestep", c_double),
         ("numTimesteps", c_int),
         ("saveInterval", c_int)]
-        
+   
 if __name__ == "__main__": 
     # wait for vs debugger
     input("Press Enter to continue...")  
-        
     # create basic input variables
     nRows = 26
     nCols = 28
@@ -43,14 +42,14 @@ if __name__ == "__main__":
     shelfDepthAtReferencePos = 10.0
     minimumShelfDepthAtClosure = 10.0
     lengthTimestep = 1
-    saveInterval = 365
-    numTimesteps = 365 * 20
+    saveInterval = 1
+    numTimesteps = 365
 
-    asymmetry = 1
-    stability = .7
+    asymmetry = .7
+    #stability = .3
+    stability = .4
 
     # create wave inputs
-    # random.seed(datetime.now())
     random.seed(5)
     waveHeights = (c_double * numTimesteps)()
     waveAngles = (c_double * numTimesteps)()
@@ -68,50 +67,43 @@ if __name__ == "__main__":
     # create grid input
     import_grid = pd.read_excel("test/input/shoreline_config.xlsx")
     import_grid = import_grid.values
-    grid_orig = ((POINTER(c_double)) * nRows)()
+    grid = ((POINTER(c_double)) * nRows)()
     for r in range(nRows):
-        grid_orig[r] = (c_double * nCols)()
+        grid[r] = (c_double * nCols)()
         for c in range(nCols):
-            grid_orig[r][c] = import_grid[r][c]
-            
-    grid_new = ((POINTER(c_double)) * nRows)()
-    for r in range(nRows):
-        grid_new[r] = (c_double * nCols)()
-        for c in range(nCols):
-            grid_new[r][c] = import_grid[nRows - r - 1][c]
-            
+            grid[r][c] = import_grid[r][c]
 
-    # create config objects
-    input_orig = Config(grid = grid_orig, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods, 
-            asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
-            nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
-            shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
-            shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
-            lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
-            
     # create config object
-    input_new = Config(grid = grid_new, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+    input = Config(grid = grid, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
             asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
             nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
             shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
             shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
             lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
 
-    # set library paths
-    lib_path_orig = "cem_orig/_build/test_cem"
-    #lib_path_orig = "cem_boundary_conds/_build/test_cem"
-    lib_path_new = "../server/C/_build/py_cem"
+    # set library path
+    lib_path = "cem_util/_build/py_cem"
 
-    # open libraries
-    lib_orig = CDLL(lib_path_orig)
-    lib_new = CDLL(lib_path_new)
+    # open library
+    lib = CDLL(lib_path)
 
     # set arg/return types
-    lib_orig.run_test.argtypes = [Config, c_int]
-    lib_orig.run_test.restype = c_int
-    lib_new.run_test.argtypes = [Config, c_int]
-    lib_new.run_test.restype = c_int
+    lib.initialize.argtypes = [Config]
+    lib.initialize.restype = c_int
 
-    # initialize both models
-    print(lib_orig.run_test(input_orig, numTimesteps, saveInterval))
-    print(lib_new.run_test(input_new, numTimesteps, saveInterval))
+    lib.update.argtypes = [c_int]
+    lib.update.restype = c_int
+
+    lib.finalize.restype = c_int
+
+    # initialize model
+    print(lib.initialize(input))
+
+    # run model
+    i = 0
+    while i < numTimesteps:
+        temp = lib.update(saveInterval)
+        i+=saveInterval
+
+    # finalize model
+    print(lib.finalize())

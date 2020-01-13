@@ -10,6 +10,9 @@ extern "C" {
 		double* waveHeights;
 		double* waveAngles;
 		double* wavePeriods;
+		double asymmetry;
+		double stability;
+		int numWaveInputs;
 		int nRows;
 		int nCols;
 		double cellWidth;
@@ -20,6 +23,7 @@ extern "C" {
 		double shelfDepthAtReferencePos;
 		double minimumShelfDepthAtClosure;
 		double lengthTimestep;
+		int numTimesteps;
 		int saveInterval;
 	} Config;
 

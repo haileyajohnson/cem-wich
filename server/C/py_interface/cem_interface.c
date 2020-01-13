@@ -7,7 +7,7 @@
 
 int run_test(Config config, int numTimesteps, int saveInterval);
 int cem_initialize(Config config);
-float* cem_update(int saveInterval);
+double* cem_update(int saveInterval);
 int cem_finalize(void);
 
 void test_LogShoreline();
@@ -21,7 +21,7 @@ int run_test(Config config, int numTimesteps, int saveInterval)
 	while (i < numTimesteps)
 	{
 		int steps = (i + saveInterval) < numTimesteps ? saveInterval: (numTimesteps - i);
-		float* out = cem_update(steps);
+		double* out = cem_update(steps);
 		test_OutputGrid();
 		i += saveInterval;
 	}
@@ -38,7 +38,7 @@ int initialize(Config config) {
 		return FAILURE;
 }
 
-float* update(int saveInterval) {
+double* update(int saveInterval) {
 	return cem_update(saveInterval);
 }
 

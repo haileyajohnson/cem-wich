@@ -2,8 +2,8 @@
 close all;
 formatSpec = '%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%9f%f%[^\n\r]';
 %% LOOP import + display
-dif = [];
-for t = (99:100:10399)%14599)
+difs = [];
+for t = (364:365:(365*20-1))%14599)
     % close
     close all
     
@@ -23,7 +23,20 @@ for t = (99:100:10399)%14599)
     new = getShoreline(grid_new);
     old = getShoreline(grid_orig);
     dif = abs(new-old);
-    dif(end+1) = mean(dif);
+    difs(end+1) =  length(find(dif >= 1));
+
+%     
+%     figure(1)
+%     pcolor(grid_orig);
+%     shading flat; axis equal;
+% 
+%     figure(2)
+%     pcolor(grid_new);
+%     shading flat; axis equal;
+% 
+%     figure(3)
+%     pcolor(grid_orig - grid_new);
+%     shading flat; axis equal;
 end
 
 figure(1)

@@ -9,7 +9,7 @@ extern "C" {
 
 void **malloc2d(size_t n_rows, size_t n_cols, size_t itemsize);
 void free2d(void **mem);
-float RandZeroToOne(void);
+double RandZeroToOne(void);
 
 #if defined(__cplusplus)
 }

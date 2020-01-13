@@ -6,21 +6,21 @@
 #include "BeachGrid.h"
 
 
-float GetTransportVolumePotential(float alpha, float wave_height, float timestep_length);
+double GetTransportVolumePotential(double alpha, double wave_height, double timestep_length);
 void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node);
 void OopsImFull(struct BeachGrid* grid, struct BeachNode* node);
-float GetDepthOfClosure(struct BeachNode* node, int ref_pos, float shelf_depth_at_ref_pos, float shelf_slope, float shoreface_slope, float shore_angle, float min_shelf_depth_at_closure, int cell_size);
-float ModTowardZero(float a, float m);
-float RoundRadians(float angle, float round_to, float bias);
-float GetDir(float shore_angle);
-struct BeachNode* GetNodeInDir(struct BeachGrid* grid, struct BeachNode* node, float dir);
+double GetDepthOfClosure(struct BeachNode* node, int ref_pos, double shelf_depth_at_ref_pos, double shelf_slope, double shoreface_slope, double shore_angle, double min_shelf_depth_at_closure, int cell_size);
+double ModTowardZero(double a, double m);
+double RoundRadians(double angle, double round_to, double bias);
+double GetDir(double shore_angle);
+struct BeachNode* GetNodeInDir(struct BeachGrid* grid, struct BeachNode* node, double dir);
 
 
-void WaveTransformation(struct BeachGrid* grid, float wave_angle, float wave_period, float wave_height, float timestep_length)
+void WaveTransformation(struct BeachGrid* grid, double wave_angle, double wave_period, double wave_height, double timestep_length)
 {
-	float start_depth = 3 * wave_height;       // (meters) depth to begin refraction calculations
-	float refract_step = 0.2;                  // (meters) step size to iterate through depth
-	float k_break = 0.5;                       // coefficient such that waves break at Hs > k_break*depth
+	double start_depth = 3 * wave_height;       // (meters) depth to begin refraction calculations
+	double refract_step = 0.2;                  // (meters) step size to iterate through depth
+	double k_break = 0.5;                       // coefficient such that waves break at Hs > k_break*depth
 
 	int i = 0;
 	while (i < grid->num_shorelines)
@@ -31,9 +31,9 @@ void WaveTransformation(struct BeachGrid* grid, float wave_angle, float wave_per
 		do {
 			curr->transport_potential = 0;
 
-			float alpha_deep;
-			float shore_angle = (*grid).GetAngleByDifferencingScheme(grid, curr, wave_angle);
-			alpha_deep = wave_angle - shore_angle;
+			double alpha_deep;
+			double shore_angle = (*grid).GetAngleByDifferencingScheme(grid, curr, wave_angle);
+			alpha_deep = abs(shore_angle - EMPTY_double) < 1 ? PI / 4 : wave_angle - shore_angle;
 
 			if (fabs(alpha_deep) > (0.995 * PI / 2))
 			{
@@ -41,24 +41,21 @@ void WaveTransformation(struct BeachGrid* grid, float wave_angle, float wave_per
 				continue;
 			}
 
-			float local_wave_height = wave_height;
-			float c_deep = (GRAVITY * wave_period) / (2 * PI);
-			float l_deep = c_deep * wave_period;
-			float local_depth = start_depth + refract_step;
-			float local_alpha;
+			double local_wave_height = wave_height;
+			double c_deep = (GRAVITY * wave_period) / (2 * PI);
+			double l_deep = c_deep * wave_period;
+			double local_depth = start_depth;
+			double local_alpha;
 
-			do {
-				// iterate
-				local_depth -= refract_step;
-
+			while (TRUE) {
 				// non-iterative eqn or L, from Fenton & McKee
-				float wave_length = l_deep * powf(tanh(powf(powf(2.0 * PI / wave_period, 2.0) * (local_depth / GRAVITY), .75)), 2.0 / 3.0);
-				float local_c = wave_length / wave_period;
+				double wave_length = l_deep * powf(tanh(powf(powf(2.0 * PI / wave_period, 2.0) * local_depth / GRAVITY, .75)), 2.0 / 3.0);
+				double local_c = wave_length / wave_period;
 
 				// n = 1/2(1+2kh/sinh(kh)) Komar 5.21
 				// kh = 2 pi depth/L  from k = 2 pi/L
-				float kh = 2 * PI * local_depth / wave_length;
-				float n = 0.5 * (1 + 2.0 * kh / sinh(2.0 * kh));
+				double kh = 2 * PI * local_depth / wave_length;
+				double n = 0.5 * (1 + 2.0 * kh / sinh(2.0 * kh));
 
 				// Calculate angle, assuming shore parallel contours and no conv/div of rays from Komar 5.47
 				local_alpha = asin(local_c / c_deep * sin(alpha_deep));
@@ -66,7 +63,14 @@ void WaveTransformation(struct BeachGrid* grid, float wave_angle, float wave_per
 				// Determine wave height from refract calcs, from Komar 5.49
 				local_wave_height = wave_height * sqrtf(fabs((c_deep * cos(alpha_deep)) / (local_c * 2.0 * n * cos(local_alpha))));
 
-			} while (local_wave_height <= k_break * local_depth && local_depth >= refract_step);
+				// wave break condition
+				if (local_wave_height > k_break * local_depth || local_depth <= refract_step)
+				{
+					break;
+				}
+				// iterate
+				local_depth -= refract_step;
+			}
 			
 			// sed transport_potential
 			curr->transport_potential = GetTransportVolumePotential(local_alpha, local_wave_height, timestep_length);
@@ -77,15 +81,15 @@ void WaveTransformation(struct BeachGrid* grid, float wave_angle, float wave_per
 	}
 }
 
-float GetTransportVolumePotential(float alpha, float wave_height, float timestep_length)
+double GetTransportVolumePotential(double alpha, double wave_height, double timestep_length)
 {
 	int rho = 1020;         // (kg/m^3) density of salt water
 	return fabs(.67 * rho * powf(GRAVITY, 3.0 / 2.0) * powf(wave_height, 5.0 / 2.0) * cos(alpha) * sin(alpha) * timestep_length);
 }
 
-void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, float ref_depth, float shelf_slope, float shoreface_slope, float min_depth)
+void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth)
 {
-	float cell_area = grid->cell_width * grid->cell_length;
+	double cell_area = grid->cell_width * grid->cell_length;
 
 	int i = 0;
 	while (i < grid->num_shorelines)
@@ -95,8 +99,8 @@ void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, float ref_depth, fl
 		struct BeachNode* curr = start;
 
 		do {
-			float volume_needed_left = 0.0;
-			float volume_needed_right = 0.0;
+			double volume_needed_left = 0.0;
+			double volume_needed_right = 0.0;
 
 			struct BeachNode* prev = curr->prev;
 
@@ -116,10 +120,10 @@ void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, float ref_depth, fl
 				break;
 			}
 
-			float total_volume_needed = volume_needed_left + volume_needed_right;
-			float shore_angle = (*grid).GetNextAngle(grid, curr);
-			float depth = GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
-			float volume_available = curr->frac_full * cell_area * depth;
+			double total_volume_needed = volume_needed_left + volume_needed_right;
+			double shore_angle = (*grid).GetNextAngle(grid, curr);
+			double depth = GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
+			double volume_available = curr->frac_full * cell_area * depth;
 			struct BeachNode* node_behind = GetNodeInDir(grid, curr, GetDir(shore_angle));
 			if (!BeachNode.isEmpty(node_behind) && node_behind->frac_full >= 1.0)
 			{
@@ -160,8 +164,8 @@ void NetVolumeChange(struct BeachGrid* grid)
 		struct BeachNode* curr = start;
 
 		do {
-			float volume_in = 0.0;
-			float volume_out = 0.0;
+			double volume_in = 0.0;
+			double volume_out = 0.0;
 
 			struct BeachNode* prev = curr->prev;
 
@@ -190,11 +194,11 @@ void NetVolumeChange(struct BeachGrid* grid)
 	}
 }
 
-int TransportSediment(struct BeachGrid* grid, int ref_pos, float ref_depth, float shelf_slope, float shoreface_slope, float min_depth)
+int TransportSediment(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth)
 {
 
 	int FIND_BEACH_FLAG = FALSE;
-	float cell_area = grid->cell_width * grid->cell_length;
+	double cell_area = grid->cell_width * grid->cell_length;
 	int i = 0;
 	while (i < grid->num_shorelines)
 	{
@@ -202,9 +206,9 @@ int TransportSediment(struct BeachGrid* grid, int ref_pos, float ref_depth, floa
 		struct BeachNode* curr = start;
 
 		do {
-			float shore_angle = (*grid).GetNextAngle(grid, curr);
-			float depth = GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
-			float net_area_change = curr->net_volume_change / depth;
+			double shore_angle = (*grid).GetNextAngle(grid, curr);
+			double depth = GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
+			double net_area_change = curr->net_volume_change / depth;
 			curr->frac_full = curr->frac_full + net_area_change / cell_area;
 			if (curr->frac_full < -0.000001)
 			{
@@ -254,7 +258,7 @@ void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 		}
 	}
 
-	float delta_fill = node->frac_full / num_cells;
+	double delta_fill = node->frac_full / num_cells;
 	for (i = 0; i < 4; i++)
 	{
 		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 0.0 && (none_full || neighbors[i]->frac_full >= 1.0))
@@ -308,7 +312,7 @@ void OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 		}
 	}
 
-	float delta_fill = (node->frac_full - 1) / num_cells;
+	double delta_fill = (node->frac_full - 1) / num_cells;
 	for (i = 0; i < 4; i++)
 	{
 		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full < 1.0 && (none_empty || neighbors[i]->frac_full <= 0.0))
@@ -370,7 +374,7 @@ int FixBeach(struct BeachGrid* grid)
 				// distribute to beach neighbors
 				if (num_cells > 0)
 				{
-					float delta_fill = curr->frac_full / num_cells;
+					double delta_fill = curr->frac_full / num_cells;
 					curr->frac_full = 0;
 					for (j = 0; j < 4; j++)
 					{
@@ -435,20 +439,20 @@ int FixBeach(struct BeachGrid* grid)
 
 
 /* ---- SEDIMENT TRANSPORT HELPERS ------- */
-float GetDepthOfClosure(struct BeachNode* node, int ref_pos, float shelf_depth_at_ref_pos, float shelf_slope, float shoreface_slope, float shore_angle, float min_shelf_depth_at_closure, int cell_length)
+double GetDepthOfClosure(struct BeachNode* node, int ref_pos, double shelf_depth_at_ref_pos, double shelf_slope, double shoreface_slope, double shore_angle, double min_shelf_depth_at_closure, int cell_length)
 {
 	int x = node->row;
 	// Eq 1
-	float local_shelf_depth = shelf_depth_at_ref_pos + ((ref_pos - x) * cell_length * shelf_slope);
+	double local_shelf_depth = shelf_depth_at_ref_pos + ((ref_pos - x) * cell_length * shelf_slope);
 
 	// Eq 2
-	float cross_shore_distance_to_closure = local_shelf_depth / (shoreface_slope - (cos(shore_angle) * shelf_slope));
+	double cross_shore_distance_to_closure = local_shelf_depth / (shoreface_slope - (cos(shore_angle) * shelf_slope));
 
 	// Eq 3
-	float cross_shore_pos_of_closure = x + cos(shore_angle) * cross_shore_distance_to_closure / cell_length;
+	double cross_shore_pos_of_closure = x + cos(shore_angle) * cross_shore_distance_to_closure / cell_length;
 
 	// Eq 4
-	float closure_depth = shelf_depth_at_ref_pos + (cross_shore_pos_of_closure - ref_pos) * cell_length * shelf_slope;
+	double closure_depth = shelf_depth_at_ref_pos + (cross_shore_pos_of_closure - ref_pos) * cell_length * shelf_slope;
 	if (closure_depth < min_shelf_depth_at_closure)
 	{
 		closure_depth = min_shelf_depth_at_closure;
@@ -457,7 +461,7 @@ float GetDepthOfClosure(struct BeachNode* node, int ref_pos, float shelf_depth_a
 	return closure_depth;
 }
 
-float ModTowardZero(float a, float m)
+double ModTowardZero(double a, double m)
 {
 	int sign = a / fabs(a);
 	a = fabs(a);
@@ -467,17 +471,17 @@ float ModTowardZero(float a, float m)
 	return a - m * c;
 }
 
-float RoundRadians(float angle, float round_to, float bias)
+double RoundRadians(double angle, double round_to, double bias)
 {
-	float m90 = ModTowardZero(angle, PI / 2);
-	float m180 = ModTowardZero(angle, PI);
+	double m90 = ModTowardZero(angle, PI / 2);
+	double m180 = ModTowardZero(angle, PI);
 
 	if (m90 != m180)
 	{
 		bias = (PI / 2) - bias;
 	}
 
-	float rounded_angle = angle - m90;
+	double rounded_angle = angle - m90;
 	if (fabs(m90) >= bias)
 	{
 		rounded_angle += (m90 / fabs(m90)) * (PI / 2);
@@ -485,13 +489,13 @@ float RoundRadians(float angle, float round_to, float bias)
 	return rounded_angle;
 }
 
-float GetDir(float shore_angle)
+double GetDir(double shore_angle)
 {
-	float shore_normal = shore_angle - PI / 2;
+	double shore_normal = shore_angle - PI / 2;
 	return RoundRadians(shore_normal, PI / 2, PI / 6);
 }
 
-struct BeachNode* GetNodeInDir(struct BeachGrid* grid, struct BeachNode* node, float dir)
+struct BeachNode* GetNodeInDir(struct BeachGrid* grid, struct BeachNode* node, double dir)
 {
 	int r = node->row;
 	int c = node->col;

@@ -891,15 +891,15 @@ void DetermineAngles(void)
 	/*      not equal to TotalBeachCells because angle between cell and rt
 	 * neighbor */
 
-	for (i = 0; i < TotalBeachCells; i++) {
+	for (i = 1; i < TotalBeachCells - 2; i++) {
 		/* function revised 1-04 */
 		if (Y[i] > Y[i + 1])
 			/* On bottom side of Spit (assuming we must be if going right)  */
 		{
 			/* math revised 6-03 */
 
-			ShorelineAngle[i] = atan2(((X[i + 1] - (PercentFullSand[X[i + 1]][Y[i + 1]])) -
-				(X[i] - (PercentFullSand[X[i]][Y[i]]))) * cell_length, (Y[i + 1] - Y[i]) * cell_width);
+			ShorelineAngle[i] = atan2((X[i + 1] - X[i] - (PercentFullSand[X[i + 1]][Y[i + 1]] + PercentFullSand[X[i]][Y[i]])) * cell_length,
+				(Y[i + 1] - Y[i]) * cell_width);
 
 			if (ShorelineAngle[i] > PI) {
 				ShorelineAngle[i] -= 2.0 * PI;
@@ -910,33 +910,34 @@ void DetermineAngles(void)
 			/* function revised 1-04 - asusme if goin right, on regular shore */
 			/*  'regular' beach */
 		{
-			ShorelineAngle[i] = atan2(
-				((X[i + 1] + (PercentFullSand[X[i + 1]][Y[i + 1]])) -
-				(X[i] + (PercentFullSand[X[i]][Y[i]]))) * cell_length, (Y[i + 1] - Y[i]) * cell_width);
+			ShorelineAngle[i] = atan2((X[i + 1] - X[i] + (PercentFullSand[X[i + 1]][Y[i + 1]] - PercentFullSand[X[i]][Y[i]])) * cell_length,
+				(Y[i + 1] - Y[i]) * cell_width);
 		}
 
 		else if (Y[i] == Y[i + 1] && X[i] > X[i + 1])
 			/*  Shore up and down, on right side */
 		{
 			ShorelineAngle[i] = atan2((X[i + 1] - X[i]) * cell_length,
-				((Y[i + 1] + (PercentFullSand[X[i + 1]][Y[i + 1]])) -
-				(Y[i] + (PercentFullSand[X[i]][Y[i]]))) * cell_width);
+				(Y[i + 1] - Y[i] + (PercentFullSand[X[i + 1]][Y[i + 1]] - PercentFullSand[X[i]][Y[i]])) * cell_width);
 		}
 
 		else if (Y[i] == Y[i + 1] && X[i] < X[i + 1])
 			/* Shore up and down, on left side */
 		{
 			ShorelineAngle[i] = atan2((X[i + 1] - X[i]) * cell_length,
-				((Y[i + 1] - (PercentFullSand[X[i + 1]][Y[i + 1]])) -
-				(Y[i] - (PercentFullSand[X[i]][Y[i]]))) * cell_width);
+				(Y[i + 1] - Y[i] - (PercentFullSand[X[i + 1]][Y[i + 1]] + PercentFullSand[X[i]][Y[i]])) * cell_width);
 		}
 
 		else {
 			printf("Should've found ShorelineAngle): %d, %d \n", X[i], Y[i]);
 		}
 	}
-	
-	for (k = 1; k < TotalBeachCells; k++) {
+
+	ShorelineAngle[0] = ShorelineAngle[1];
+	ShorelineAngle[TotalBeachCells - 2] = ShorelineAngle[TotalBeachCells - 3];
+	ShorelineAngle[TotalBeachCells - 1] = ShorelineAngle[TotalBeachCells - 3];
+
+	for (k = 1; k < TotalBeachCells - 1; k++) {
 		/* compute SurroundingAngle array */
 		/* 02/04 AA averaging doesn't work on bottom of spits */
 		/* Use trick that x is less if on bottom of spit - angles must be different
@@ -960,7 +961,7 @@ void DetermineAngles(void)
 	/* Note - Surrounding angle is based upon left and right cell neighbors, */
 	/* and is centered on cell, not on right boundary */
 
-	for (j = 1; j < TotalBeachCells; j++) {
+	for (j = 1; j < TotalBeachCells - 1; j++) {
 		if (fabs(WaveAngle - SurroundingAngle[j]) >= 42.0 / RAD_TO_DEG) {
 			UpWind[j] = 'u';
 		}
@@ -968,6 +969,8 @@ void DetermineAngles(void)
 			UpWind[j] = 'd';
 		}
 	}
+	UpWind[0] = UpWind[1];
+	UpWind[TotalBeachCells - 1] = UpWind[TotalBeachCells - 2];
 }
 
 void DetermineSedTransport(void)
@@ -1174,7 +1177,7 @@ void SedTrans(int i, int From, double ShoreAngle, char MaxT, int Last)
 	 /* so no attempt made to make this a more perfect imperfection */
 
 	VolumeAcrossBorder[i] =
-		fabs(1.1 * rho * Raise(GRAVITY, 3.0 / 2.0) * Raise(WvHeight, 2.5) *
+		fabs(0.67 * rho * Raise(GRAVITY, 3.0 / 2.0) * Raise(WvHeight, 2.5) *
 			cos(Angle) * sin(Angle) * myConfig.lengthTimestep); /*LMV - now global array*/
 
 /*LMV VolumeIn/Out is now calculated below in AdjustShore */
@@ -1569,35 +1572,35 @@ void OopsImFull(int x, int y)
 
 	/* find out how many cells will be filled up    */
 
-	if ((PercentFullSand[x - 1][y]) <= 0.0)
+	if ((PercentFullSand[x - 1][y]) <= 0.000001)
 		fillcells += 1;
-	if ((PercentFullSand[x + 1][y]) <= 0.0)
+	if ((PercentFullSand[x + 1][y]) <= 0.000001)
 		fillcells += 1;
-	if ((PercentFullSand[x][y - 1]) <= 0.0)
+	if ((PercentFullSand[x][y - 1]) <= 0.000001)
 		fillcells += 1;
-	if ((PercentFullSand[x][y + 1]) <= 0.0)
+	if ((PercentFullSand[x][y + 1]) <= 0.000001)
 		fillcells += 1;
 
 	if (fillcells != 0) {
 		/* Now Move Sediment */
 
-		if ((PercentFullSand[x - 1][y]) <= 0.0)
+		if ((PercentFullSand[x - 1][y]) <= 0.000001)
 			/*LMV*/ {
 			PercentFullSand[x - 1][y] +=
 				((PercentFullSand[x][y]) - 1.0) / fillcells;
 		}
 
-		if ((PercentFullSand[x + 1][y]) <= 0.0) {
+		if ((PercentFullSand[x + 1][y]) <= 0.000001) {
 			PercentFullSand[x + 1][y] +=
 				((PercentFullSand[x][y]) - 1.0) / fillcells;
 		}
 
-		if ((PercentFullSand[x][y - 1]) <= 0.0) {
+		if ((PercentFullSand[x][y - 1]) <= 0.000001) {
 			PercentFullSand[x][y - 1] +=
 				((PercentFullSand[x][y]) - 1.0) / fillcells;
 		}
 
-		if ((PercentFullSand[x][y + 1]) <= 0.0) {
+		if ((PercentFullSand[x][y + 1]) <= 0.000001) {
 			PercentFullSand[x][y + 1] +=
 				((PercentFullSand[x][y]) - 1.0) / fillcells;
 		}

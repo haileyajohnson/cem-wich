@@ -16,7 +16,7 @@
 /* Globals */
 struct BeachGrid g_beachGrid;
 int current_time_step;
-float current_time;
+double current_time;
 
 /* Wave climate object */
 struct WaveClimate g_wave_climate;
@@ -34,12 +34,12 @@ int IsLandCell(int row, int col);
 
 /* Main steps */
 int cem_initialize(Config config);
-float* cem_update(int saveInterval);
+double* cem_update(int saveInterval);
 int cem_finalize(void);
 
 /* Logging and Debugging */
 void SaveOutputGrid();
-float* outputGrid = NULL;
+double* outputGrid = NULL;
 void test_LogShoreline();
 void test_OutputGrid();
 
@@ -65,10 +65,11 @@ int cem_initialize(Config config)
 }
 
 // Update the CEM by given steps
-float* cem_update(int saveInterval) {
+double* cem_update(int saveInterval) {
 	int i;
 	for (i = 0; i < saveInterval; i++)
 	{
+		g_beachGrid.current_time = current_time_step;
 		SedimentTransport();
 		current_time_step++;
 		current_time += myConfig.lengthTimestep;
@@ -98,7 +99,7 @@ void InitializeBeachGrid()
 	{
 		for (c = 0; c < myConfig.nCols; c++)
 		{
-			float val = myConfig.grid[r][c];
+			double val = myConfig.grid[r][c];
 			nodes[r][c] = BeachNode.new(val, r, c, myConfig.cellWidth, myConfig.cellLength);
 		}
 	}
@@ -206,7 +207,7 @@ int FindBeach()
 					do
 					{
 						// turn 45 degrees clockwise/counterclockwise to next neighbor
-						float angle = atan2(temp[0] - currRow, temp[1] - currCol);
+						double angle = atan2(temp[0] - currRow, temp[1] - currCol);
 						angle += (search_dir) * (PI / 4);
 						int next[2] = { currRow + round(sin(angle)), currCol + round(cos(angle)) };
 
@@ -221,17 +222,6 @@ int FindBeach()
 						temp[1] = next[1];
 						if (IsLandCell(temp[0], temp[1])) {
 							foundNextBeach = TRUE;
-							// special case for inset corners
-							//if (abs(currRow - temp[0]) - abs(currCol - temp[1]) == 0) { // diagonal
-							//	angle += (search_dir) * (PI / 4);
-							//	int corner[2] = { currRow + round(sin(angle)), currCol + round(cos(angle)) };
-							//	if (IsLandCell(corner[0], corner[1], TRUE)) {
-							//		temp[0] = corner[0];
-							//		temp[1] = corner[1];
-							//		dir_r = temp[0] - currRow;
-							//		dir_c = temp[1] - currCol;
-							//	}
-							//}
 							break;
 						}
 					} while (temp[0] != backtrack[0] || temp[1] != backtrack[1]);
@@ -258,18 +248,18 @@ int FindBeach()
 						curr->next = tempNode;
 						tempNode->prev = curr;
 
-						// end if undercutting
-						if (tempNode->GetCol(tempNode) < curr->GetCol(curr) && tempNode->GetRow(tempNode) >= curr->GetRow(curr))
-						{
-							tempNode->is_beach = TRUE;
-							tempNode->is_boundary = TRUE;
-							// TODO set get flow to boundary get flow
-							search_dir = -1;
-							dir_r = 1;
-							dir_c = 0;
-							curr = startNode;
-							continue;
-						}
+						//// end if undercutting
+						//if (tempNode->GetCol(tempNode) < curr->GetCol(curr) && tempNode->GetRow(tempNode) >= curr->GetRow(curr))
+						//{
+						//	tempNode->is_beach = TRUE;
+						//	tempNode->is_boundary = TRUE;
+						//	// TODO set get flow to boundary get flow
+						//	search_dir = -1;
+						//	dir_r = 1;
+						//	dir_c = 0;
+						//	curr = startNode;
+						//	continue;
+						//}
 						endNode = tempNode;
 					}
 					else { // backtracking
@@ -280,14 +270,14 @@ int FindBeach()
 						}
 						curr->prev = tempNode;
 						tempNode->next = curr;
-						// end if undercutting
-						if (tempNode->GetCol(tempNode) > curr->GetCol(curr) && tempNode->GetRow(tempNode) >= curr->GetRow(curr))
-						{
-							tempNode->is_beach = TRUE;
-							tempNode->is_boundary = TRUE;
-							// TODO set get flow to boundary get flow
-							break;
-						}
+						//// end if undercutting
+						//if (tempNode->GetCol(tempNode) > curr->GetCol(curr) && tempNode->GetRow(tempNode) >= curr->GetRow(curr))
+						//{
+						//	tempNode->is_beach = TRUE;
+						//	tempNode->is_boundary = TRUE;
+						//	// TODO set get flow to boundary get flow
+						//	break;
+						//}
 						startNode = tempNode;
 					}
 					curr = tempNode;
@@ -422,7 +412,7 @@ void SaveOutputGrid()
 	if (outputGrid) {
 		free(outputGrid);
 	}
-	outputGrid = malloc(myConfig.nRows * myConfig.nCols * sizeof(float));
+	outputGrid = malloc(myConfig.nRows * myConfig.nCols * sizeof(double));
 	int r, c;
 	for (r = 0; r < myConfig.nRows; r++)
 	{

@@ -33,85 +33,124 @@ static struct BeachNode* TryGetNode(struct BeachGrid* this, int row, int col)
 	return &(this->cells[row][col]);
 }
 
-static float GetPrevAngle(struct BeachGrid* this, struct BeachNode* node)
+static double GetPrevAngle(struct BeachGrid* this, struct BeachNode* node)
 {
 	// error: node is null
 	if (BeachNode.isEmpty(node))
 	{
-		return EMPTY_float;
+		return EMPTY_double;
 	}
+	
+	if (node->prev_timestamp == this->current_time)
+	{
+		return node->prev_angle;
+	}
+
+	double angle;
 	if (node->is_boundary)
 	{
 		// start boundary node: prev is same as next->next
 		if (BeachNode.isEmpty(node->prev) && !BeachNode.isEmpty(node->next))
 		{
-			return (*this).GetNextAngle(this, node->next);
+			angle = (*this).GetNextAngle(this, node->next);
 		}
 		// end boundary node: prev is same as prev->prev
-		if (BeachNode.isEmpty(node->next) && !BeachNode.isEmpty(node->prev))
+		else if (BeachNode.isEmpty(node->next) && !BeachNode.isEmpty(node->prev))
 		{
-			return (*this).GetPrevAngle(this, node->prev);
+			angle = (*this).GetPrevAngle(this, node->prev);
 		}
-				// error: no valid neighbors
-		return EMPTY_float;
+		// error: no valid neighbors
+		else
+		{
+			return EMPTY_double;
+		}
 	}
-	if (node->prev->is_boundary)
+	else if (node->prev->is_boundary)
 	{
 		// error: no valid neighbors
 		if (BeachNode.isEmpty(node->next) || node->next->is_boundary)
 		{
-			return EMPTY_float;
+			return EMPTY_double;
 		}
 		// start node: prev is same as next
-		return BeachNode.GetAngle(node, node->next);
+		angle = BeachNode.GetAngle(node, node->next);
 	}
-	// main case
-	return BeachNode.GetAngle(node->prev, node);
+	else
+	{
+		// main case
+		angle = BeachNode.GetAngle(node->prev, node);
+	}
+	node->prev_angle = angle;
+	node->prev_timestamp = this->current_time;
+	return angle;
 }
 
-static float GetNextAngle(struct BeachGrid* this, struct BeachNode* node)
+static double GetNextAngle(struct BeachGrid* this, struct BeachNode* node)
 {
 	// error: node is null
 	if (BeachNode.isEmpty(node))
 	{
-		return EMPTY_float;
+		return EMPTY_double;
 	}
+
+	if (node->next_timestamp == this->current_time)
+	{
+		return node->next_angle;
+	}
+
+	double angle;
 	if (node->is_boundary)
 	{
 		// start boundary node: next is same as next->next
 		if (BeachNode.isEmpty(node->prev) && !BeachNode.isEmpty(node->next))
 		{
-			return (*this).GetNextAngle(this, node->next);
+			angle = (*this).GetNextAngle(this, node->next);
 		}
 		// end boundary node: next is same as prev->prev
-		if (BeachNode.isEmpty(node->next) && !BeachNode.isEmpty(node->prev))
+		else if (BeachNode.isEmpty(node->next) && !BeachNode.isEmpty(node->prev))
 		{
-			return (*this).GetPrevAngle(this, node->prev);
+			angle = (*this).GetPrevAngle(this, node->prev);
 		}
-		// error: no valid neighbors
-		return EMPTY_float;
+		else
+		{
+			// error: no valid neighbors
+			return EMPTY_double;
+		}
 	}
-	if (node->next->is_boundary)
+	else if (node->next->is_boundary)
 	{
 		// error: no valid neighbors
 		if (BeachNode.isEmpty(node->prev) || node->prev->is_boundary)
 		{
-			return EMPTY_float;
+			return EMPTY_double;
 		}
 		// end node: next is same as prev
-		return BeachNode.GetAngle(node->prev, node);
+		angle = BeachNode.GetAngle(node->prev, node);
 	}
-	// main case
-	return BeachNode.GetAngle(node, node->next);
+	else
+	{
+		// main case
+		angle = BeachNode.GetAngle(node, node->next);
+	}
+	node->next_angle = angle;
+	node->next_timestamp = this->current_time;
+	return angle;
 }
 
-static float GetSurroundingAngle(struct BeachGrid* this, struct BeachNode* node)
+static double GetSurroundingAngle(struct BeachGrid* this, struct BeachNode* node)
 {
 	// error: node is null
 	if (BeachNode.isEmpty(node))
 	{
-		return EMPTY_float;
+		return EMPTY_double;
 	}
+
+	if (node->surrounding_timestamp == this->current_time)
+	{
+		return node->surrounding_angle;
+	}
+
+	double angle;
 	if (node->is_boundary)
 	{
 		if (BeachNode.isEmpty(node->prev))
@@ -119,38 +158,44 @@ static float GetSurroundingAngle(struct BeachGrid* this, struct BeachNode* node)
 			// error: next node is null
 			if (BeachNode.isEmpty(node->next) || node->next->is_boundary)
 			{
-				return EMPTY_float;
+				return EMPTY_double;
 			}
 			// start boundary: surrounding is same as next
-			return (*this).GetNextAngle(this, node->next);
+			angle = (*this).GetNextAngle(this, node->next);
 		}
-		if (BeachNode.isEmpty(node->next))
+		else if (BeachNode.isEmpty(node->next))
 		{
 			// error: prev node is null
 			if (BeachNode.isEmpty(node->prev) || node->prev->is_boundary)
 			{
-				return EMPTY_float;
+				return EMPTY_double;
 			}
 			// end boundary: surrounding is same as prev
-			return (*this).GetPrevAngle(this, node->prev);
+			angle = (*this).GetPrevAngle(this, node->prev);
 		}
 	}
 	// error: next or prev is null
-	if (BeachNode.isEmpty(node->prev) || BeachNode.isEmpty(node->next))
+	else if (BeachNode.isEmpty(node->prev) || BeachNode.isEmpty(node->next))
 	{
-		return EMPTY_float;
+		return EMPTY_double;
 	}
-	// main case
-	return ((*this).GetPrevAngle(this, node) + (*this).GetNextAngle(this, node)) / 2;
+	else
+	{
+		// main case
+		angle = ((*this).GetPrevAngle(this, node) + (*this).GetNextAngle(this, node)) / 2;
+	}
+	node->surrounding_angle = angle;
+	node->surrounding_timestamp = this->current_time;
+	return angle;
 }
 
-static float GetAngleByDifferencingScheme(struct BeachGrid* this, struct BeachNode* node, float wave_angle)
+static double GetAngleByDifferencingScheme(struct BeachGrid* this, struct BeachNode* node, double wave_angle)
 {
-	float alpha = wave_angle - (*this).GetNextAngle(this, node);
+	double alpha = wave_angle - (*this).GetNextAngle(this, node);
 	struct BeachNode* downwind_node;
 	struct BeachNode* upwind_node;
 	struct BeachNode* calc_node;
-	float upwind_angle, downwind_angle;
+	double upwind_angle, downwind_angle;
 	if (alpha > 0) // transport going right
 	{
 		calc_node = node;
@@ -178,14 +223,14 @@ static float GetAngleByDifferencingScheme(struct BeachGrid* this, struct BeachNo
 	int downwindInShadow = (*this).CheckIfInShadow(this, downwind_node, wave_angle);
 	int upwindInShadow = (*this).CheckIfInShadow(this, upwind_node, wave_angle);
 
-	float instability_threshold = 42 * DEG_TO_RAD;
+	double instability_threshold = 42 * DEG_TO_RAD;
 	int U = fabs(wave_angle - (*this).GetSurroundingAngle(this, calc_node)) >= instability_threshold;
 	int U_downwind = !downwind_node->is_boundary ? (fabs(wave_angle - (*this).GetSurroundingAngle(this, downwind_node)) >= instability_threshold) : U;
 	int U_upwind = !upwind_node->is_boundary ? (fabs(wave_angle - (*this).GetSurroundingAngle(this, upwind_node)) >= instability_threshold) : U;
 
 	if (!U && ((U_downwind && !downwindInShadow) || (U_upwind && ! upwindInShadow)))
 	{
-		return wave_angle - (45 * DEG_TO_RAD);
+		return EMPTY_double;
 	}
 
 	if (downwindInShadow)
@@ -227,7 +272,7 @@ static struct BeachNode** Get4Neighbors(struct BeachGrid* this, struct BeachNode
 	return neighbors;
 }
 
-static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, float wave_angle)
+static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, double wave_angle)
 {
 	if (node->is_boundary)
 	{
@@ -237,7 +282,7 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, float
 	int col = node->GetCol(node);
 	int i = 1;
 
-	float shadow_step = 0.2;
+	double shadow_step = 0.2;
 	
 	while (TRUE)
 	{
@@ -265,12 +310,13 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, float
 	return FALSE;
 }
 
-static struct BeachGrid new(int rows, int cols, float cell_width, float cell_length){
+static struct BeachGrid new(int rows, int cols, double cell_width, double cell_length){
 		return (struct BeachGrid) {
 				.cell_width = cell_width,
 				.cell_length = cell_length,
 				.rows = rows,
 				.cols = cols,
+				.current_time = 0,
 				.cells = NULL,
 				.shoreline = NULL,
 				.num_shorelines = 0,

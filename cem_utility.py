@@ -10,7 +10,7 @@ import multiprocessing as mp
 import ee
 import os
 import datetime
-from io import StringIO
+from io import StringIO, BytesIO
 import zipfile
 
 from server.pyfiles import *
@@ -18,23 +18,23 @@ from server.pyfiles import *
 # configuration information passed to CEM lib
 class Config(Structure):
     _fields_ = [
-        ("grid", POINTER(POINTER(c_float))),
-        ("waveHeights", POINTER(c_float)),
-        ("waveAngles", POINTER(c_float)),
-        ('wavePeriods', POINTER(c_float)),
-        ('asymmetry', c_float),
-        ('stability', c_float),
+        ("grid", POINTER(POINTER(c_double))),
+        ("waveHeights", POINTER(c_double)),
+        ("waveAngles", POINTER(c_double)),
+        ('wavePeriods', POINTER(c_double)),
+        ('asymmetry', c_double),
+        ('stability', c_double),
         ('numWaveInputs', c_int),
         ("nRows", c_int),
         ("nCols", c_int),
-        ("cellWidth", c_float),
-        ("cellLength", c_float),
-        ("shelfSlope", c_float),
-        ("shorefaceSlope", c_float),
+        ("cellWidth", c_double),
+        ("cellLength", c_double),
+        ("shelfSlope", c_double),
+        ("shorefaceSlope", c_double),
 		("crossShoreReferencePos", c_int),
-		("shelfDepthAtReferencePos", c_float),
-		("minimumShelfDepthAtClosure", c_float),
-        ("lengthTimestep", c_float),
+		("shelfDepthAtReferencePos", c_double),
+		("minimumShelfDepthAtClosure", c_double),
+        ("lengthTimestep", c_double),
         ("numTimesteps", c_int),
         ("saveInterval", c_int)]
 
@@ -77,9 +77,9 @@ def run(input_data):
 
     # build cell grid
     input_grid = input_data['grid']
-    grid = ((POINTER(c_float)) * globals.nRows)()
+    grid = ((POINTER(c_double)) * globals.nRows)()
     for r in range(globals.nRows):
-        grid[r] = (c_float * globals.nCols)()
+        grid[r] = (c_double * globals.nCols)()
         for c in range(globals.nCols):
             grid[r][c] = input_grid[r][c]
 
@@ -97,9 +97,9 @@ def run(input_data):
     H = input_data['waveHeights']
     T = input_data['wavePeriods']
     theta = input_data['waveAngles']
-    waveHeights = (c_float * len(H))()
-    wavePeriods = (c_float * len(T))()
-    waveAngles = (c_float * len(theta))()
+    waveHeights = (c_double * len(H))()
+    wavePeriods = (c_double * len(T))()
+    waveAngles = (c_double * len(theta))()
     for i in range(len(H)):
         waveHeights[i] = H[i]
     for i in range(len(T)):
@@ -128,7 +128,7 @@ def run(input_data):
 
     # update
     lib.update.argtypes = [c_int]
-    lib.update.restype = POINTER(c_float)
+    lib.update.restype = POINTER(c_double)
     i = 0
     # multiprocessing
     # pool = mp.Pool()
@@ -205,6 +205,9 @@ def finalize():
 # export zip file of data
 @app.route('/download-zip')
 def export_zip():
+    # test = StringIO()
+    # test.write('this is a test!')
+
     # cem_shorelines.txt
     cem_shorelines = StringIO()    
     np.savetxt(cem_shorelines, globals.model, delimiter=',')
@@ -226,11 +229,12 @@ def export_zip():
     np.savetxt(results, PCs, delimiter=',')
 
     # create zip file in memory
-    buff = StringIO()
+    buff = BytesIO()
     with zipfile.ZipFile(buff, mode='w') as z:
         z.writestr('cem_shorelines.txt', cem_shorelines.getvalue())
         z.writestr('gee_shorelines.txt', gee_shorelines.getvalue())
         z.writestr('results.txt', results.getvalue())
+        # z.writestr('test.txt', test.getvalue())
 
     buff.seek(0)
     return send_file(
