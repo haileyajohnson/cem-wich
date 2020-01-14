@@ -174,6 +174,8 @@ int initialize(Config config) {
 	FindBeachCells(0);
 	SaveLineToFile();
 
+	current_time_step = 0;
+
 	return 0;
 }
 

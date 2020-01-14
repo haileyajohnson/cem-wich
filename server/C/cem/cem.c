@@ -39,7 +39,7 @@ int cem_finalize(void);
 
 /* Logging and Debugging */
 void SaveOutputGrid();
-double* outputGrid = NULL;
+double* outputGrid;
 void test_LogShoreline();
 void test_OutputGrid();
 
@@ -49,6 +49,7 @@ int cem_initialize(Config config)
 	srand(time(NULL));
 	current_time_step = 0;
 	current_time = 0.0;
+
 
 	myConfig = config;
 	g_wave_climate = WaveClimate.new(myConfig.wavePeriods, myConfig.waveAngles, myConfig.waveHeights,
@@ -60,6 +61,7 @@ int cem_initialize(Config config)
 	{
 		return -1;
 	}
+	outputGrid = malloc(myConfig.nRows * myConfig.nCols * sizeof(double));
 
 	return 0;
 }
@@ -81,9 +83,11 @@ double* cem_update(int saveInterval) {
 
 int cem_finalize() {
 	// free everything
+	struct BeachNode** shoreline = g_beachGrid.shoreline;
+	free(shoreline);
+	struct BeachNode** cells = g_beachGrid.cells;
+	free(cells);
 	free(outputGrid);
-	free(g_beachGrid.shoreline);
-	free(g_beachGrid.cells);
 	return 0;
 }
 
@@ -354,7 +358,7 @@ int FindBeach()
 	}
 
 	g_beachGrid.SetShorelines(&g_beachGrid, shorelines, num_landmasses);
-	return 1;
+	return 0;
 }
 
 void SedimentTransport()
@@ -409,10 +413,6 @@ int IsLandCell(int row, int col)
 /* ----- CONFIGURATION AND OUTPUT FUNCTIONS -----*/
 void SaveOutputGrid()
 {
-	if (outputGrid) {
-		free(outputGrid);
-	}
-	outputGrid = malloc(myConfig.nRows * myConfig.nCols * sizeof(double));
 	int r, c;
 	for (r = 0; r < myConfig.nRows; r++)
 	{
