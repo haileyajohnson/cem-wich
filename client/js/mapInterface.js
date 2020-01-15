@@ -28,9 +28,9 @@ sources = [
 {
     id: 0,
     name: "LS5",
-    date: "1984-09-01",
-    startFilter: "1984-03-01",
-    endFilter: "1985-02-28",
+    date: "1985-01-01",
+    startFilter: "1985-01-01",
+    endFilter: "1985-12-31",
     bands: ['B2', 'B4'],
     url:"LANDSAT/LT05/C01/T1"
 },
