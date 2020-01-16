@@ -288,6 +288,19 @@ function MapInterface() {
                 this.cemGrid[rc[0]][rc[1]] = polyFill[i];
             }
 
+            for (var c = 0; c < this.numCols; c++) {
+                var fill = false;
+                for (var r = 0; r < this.numRows; r++) {
+                    if (fill) {
+                        this.cemGrid[r][c] = 1
+                        continue;
+                    }
+                    if (this.cemGrid[r][c] >= 0.1) {
+                        fill = true;
+                    }
+                }
+            }
+
             this.updateDisplay(this.cemGrid);
         },
 

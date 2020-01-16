@@ -108,7 +108,7 @@ def run(input_data):
         waveAngles[i] = theta[i]
     
     # run variables
-    numTimesteps = 10 #input_data['numTimesteps']
+    numTimesteps = input_data['numTimesteps']
     saveInterval = input_data['saveInterval']
     lengthTimestep = input_data['lengthTimestep']
 

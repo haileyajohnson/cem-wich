@@ -376,6 +376,7 @@ int FixBeach(struct BeachGrid* grid)
 				{
 					double delta_fill = curr->frac_full / num_cells;
 					curr->frac_full = 0;
+					FIND_BEACH_FLAG = TRUE;
 					for (j = 0; j < 4; j++)
 					{
 						if (BeachNode.isEmpty(neighbors[j])) { continue; }
@@ -384,8 +385,10 @@ int FixBeach(struct BeachGrid* grid)
 							neighbors[j]->frac_full += delta_fill;
 							if (neighbors[j]->frac_full > 1.0)
 							{
-								OopsImFull(grid, neighbors[j]);
-								FIND_BEACH_FLAG = TRUE;
+								delta_fill = 1.0 - neighbors[j]->frac_full;
+								neighbors[j]->frac_full == 1.0;
+								curr->frac_full += delta_fill;
+								FIND_BEACH_FLAG = FALSE;
 							}
 						}
 					}

@@ -180,7 +180,7 @@ function onModelComplete(msg) {
 
     // run tab
     runTab.$runButton.enable();
-    runTab.$outputButton.disable();
+    runTab.$outputButton.enable();
 
  }
 
@@ -589,17 +589,19 @@ function WaveTab() {
                 var rows = csv.split('\n');
                 for (var i = 0; i < rows.length; i++) {
                     var cols = rows[i].split(',');
-                    H.push(cols[0]);
-                    T.push(cols[1]);
-                    theta.push(cols[2]);
+                    if (cols[0]) {
+                        H.push(parseFloat(cols[0]));
+                        T.push(parseFloat(cols[1]));
+                        theta.push(parseFloat(cols[2]));
+                    }
                 }
                 this.wave_heights = H;
                 this.wave_periods = T;
                 this.wave_angles = theta;
 
                 this.disableWaveInput();
-                this.a_val = null;
-                this.u_val = null;
+                this.a_val = -1;
+                this.u_val = -1;
             } catch (e)
             {
                 return 1;
@@ -731,6 +733,8 @@ function ControlsTab() {
 
         onTimestepLengthChange: function() {
             this.length_timestep = this.$length_timestep.val();
+            this.getNumTimesteps();
+            runTab.displayTimestep(0);
         },
 
         onSaveIntervalChange: function() {

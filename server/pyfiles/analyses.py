@@ -10,7 +10,7 @@ def getShoreline(grid):
     shoreline = np.empty(globals.nCols)   
     for c in range(globals.nCols): 
         for r in range(globals.nRows):
-            if grid[r][c] > 0:
+            if grid[r][c] > 0.1:
                 shoreline[c] = r + (1-grid[r][c])
                 break
     return shoreline
