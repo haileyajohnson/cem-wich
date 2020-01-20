@@ -1,19 +1,24 @@
-from flask import Flask, render_template, send_file
-from flask_socketio import SocketIO, emit
+from flask import Flask, render_template, send_file, request, jsonify
+import json
 app = Flask(__name__, static_folder="_dist")
-app.config["SECRET_KEY"] = "secret!"
-socketio = SocketIO(app)
 from ctypes import *
 import math
 import numpy as np
 import multiprocessing as mp
 import ee
 import os
-import datetime
 from io import StringIO, BytesIO
+from enum import Enum
 import zipfile
 
 from server.pyfiles import *
+
+# mode application is running in
+mode = None
+class Mode(Enum):
+    BOTH = 1
+    CEM = 2
+    GEE = 3
 
 # configuration information passed to CEM lib
 class Config(Structure):
@@ -45,6 +50,9 @@ if platform.system() == "Windows":
     lib_path = "server/C/_build/py_cem"
 lib = CDLL(lib_path)
 
+numTimesteps = None
+saveInterval = None
+
 ###
 # start application
 @app.route("/")
@@ -62,8 +70,10 @@ def startup():
     
 ###
 # run CEM
-@socketio.on('run', namespace='/request')
-def run(input_data):    
+@app.route('/initialize', methods = ['POST'])
+def initialize():    
+    jsdata = request.form['input_data']
+    input_data = json.loads(jsdata)
     print("run cem")
     # initialize global variables
     globals.nRows = input_data['nRows']
@@ -73,7 +83,8 @@ def run(input_data):
     globals.polyGrid = np.asarray(input_data['polyGrid'])
     globals.geometry = input_data['geometry']
     globals.source = input_data['source']
-    date = datetime.datetime.strptime(input_data['date'], '%Y-%m-%d')
+    year = input_data['start']
+    mode = input_data['mode']
 
     # build cell grid
     input_grid = input_data['grid']
@@ -129,46 +140,50 @@ def run(input_data):
     # update
     lib.update.argtypes = [c_int]
     lib.update.restype = POINTER(c_double)
-    i = 0
-    # multiprocessing
+
+    # multiprocess satellite-based shoreline detections
     # pool = mp.Pool()
-    while i < numTimesteps:
-        steps = min(saveInterval, numTimesteps-i)
-        i+=saveInterval
-        # run cem synchronously    
-        mod_results = run_cem(steps)
-        # get remote-sense shoreline ansynchronously
-        date += datetime.timedelta(days=lengthTimestep*steps)
-        # sat_results = pool.apply_async(get_sat_data, args=(date))
-        print("get sat results")
-        sat_results = get_sat_data(date)
-        process(mod_results, sat_results, i)
+    
+    # sat_results = pool.apply_async(get_sat_data, args=(year))
     # end pool
     # pool.close()
     # pool.join()
+    resp = jsonify({'message': 'CEM initialized'})
+    resp.status_code = 200
+    return resp
 
+###
+# update
+@app.route('/update/<int:timestep>', methods = ['GET'])
+def update(timestep):
+    steps = min(saveInterval, numTimesteps-timestep)
+    out = lib.update(steps)    
+    grid = np.ctypeslib.as_array(out, shape=[globals.nRows, globals.nCols])
+    resp = jsonify({'message': 'CEM updated', 'grid': grid, 'timestep': timestep+steps})
+    resp.status_code = 200
+    return resp
+
+### 
+# finalize
+def finalize():
     # finalize
     lib.finalize()
     finalize()
+    resp = jsonify({'message': 'CEM finalized'})
+    resp.status_code = 200
+    return resp
 
-###
-# return results
-@socketio.on('export', namespace='/request')
-def export_results():
-    PC_theoretical = analyses.get_wave_PCs()
 
 ###
 # run cem for specified timesteps and format output
 def run_cem(interval):        
-    out = lib.update(interval)    
-    return np.ctypeslib.as_array(out, shape=[globals.nRows, globals.nCols])
     
 ###
 # get remote-sensed shoreline for supplied date
-def get_sat_data(date):
+def get_sat_data(year):
     # get moving window composite
     print("get im")
-    im = eehelpers.get_image_composite(date)
+    im = eehelpers.get_image_composite(year)
     # convert to grid
     print("convert im")
     return eehelpers.make_cem_grid(im)
@@ -178,63 +193,63 @@ def get_sat_data(date):
 def process(mod_grid, eeGrid, timestep):
     print("processing results: " + str(timestep))
     # grid to shoreline
+    shoreline = analyses.getShoreline(mod_grid)
     shoreline = analyses.getShorelineChange(analyses.getShoreline(mod_grid))
     globals.model = np.vstack((globals.model, shoreline))
-    shoreline = analyses.getShorelineChange(analyses.getShoreline(eeGrid))
+    shoreline = globals.ref_shoreline #analyses.getShorelineChange(analyses.getShoreline(eeGrid))
     globals.observed = np.vstack((globals.observed, shoreline))
 
     # spatial PCA
     # np.savetxt('tests/test.out', ret, delimiter=',')
-    sp_pca = analyses.get_spatial_pca()
+    sp_pca = analyses.get_spatial_pca() if mode == 1 else []
     # temporal PCA
     t_pca = []
-    if np.shape(globals.model)[0] > 2:
+    if mode == 1 and np.shape(globals.model)[0] > 2:
         analyses.get_similarity_index()
         t_pca = globals.S[-1].tolist()
-    emit('results_ready',
-    {'grid':mod_grid.tolist(), 'time':timestep, 'sp_pca': sp_pca, 't_pca': t_pca },
-    namespace='/request')
-    print('emitted event')
-
-###
-# notify client when model completes
-def finalize():
-    emit('model_complete', {}, namespace='/request')
+    return {'grid':mod_grid.tolist(), 'time':timestep, 'sp_pca': sp_pca, 't_pca': t_pca }
 
 ###
 # export zip file of data
 @app.route('/download-zip')
 def export_zip():
-    # test = StringIO()
-    # test.write('this is a test!')
+    # reference shoreline
+    ref_shoreline = StringIO()
+    np.savetxt(ref_shoreline, globals.ref_shoreline, delimiter=',')
 
     # cem_shorelines.txt
-    cem_shorelines = StringIO()    
-    np.savetxt(cem_shorelines, globals.model, delimiter=',')
+    if not mode == 3:
+        cem_shorelines = StringIO()    
+        np.savetxt(cem_shorelines, globals.model, delimiter=',')
 
     # gee_shorelines.txt
-    gee_shorelines = StringIO()
-    np.savetxt(gee_shorelines, globals.observed, delimiter=',')
+    if not mode == 2:
+        gee_shorelines = StringIO()
+        np.savetxt(gee_shorelines, globals.observed, delimiter=',')
     
     # results.txt
-    PCs = analyses.get_wave_PCs()
     results = StringIO()
-    results.write("Corrcoeffs:\n")
-    np.savetxt(results, globals.r, delimiter=',')
-    results.write("\n\n\nVariance ratios:\n")
-    np.savetxt(results, globals.var_ratio, delimiter=',')
-    results.write("\n\n\nSimlarity scores:\n")
-    np.savetxt(results, globals.S, delimiter=',')
-    results.write("Wave-drive modes:\n")
-    np.savetxt(results, PCs, delimiter=',')
+    if not mode == 3:
+        PCs = analyses.get_wave_PCs()
+        results.write("Wave-drive modes:\n")
+        np.savetxt(results, PCs, delimiter=',')
+    if mode == 1:
+        results.write("Corrcoeffs:\n")
+        np.savetxt(results, globals.r, delimiter=',')
+        results.write("\n\n\nVariance ratios:\n")
+        np.savetxt(results, globals.var_ratio, delimiter=',')
+        results.write("\n\n\nSimlarity scores:\n")
+        np.savetxt(results, globals.S, delimiter=',')
 
     # create zip file in memory
     buff = BytesIO()
     with zipfile.ZipFile(buff, mode='w') as z:
-        z.writestr('cem_shorelines.txt', cem_shorelines.getvalue())
-        z.writestr('gee_shorelines.txt', gee_shorelines.getvalue())
+        z.writestr('ref_shoreline.txt', ref_shoreline.getvalue())
+        if not mode == 3:
+            z.writestr('cem_shorelines.txt', cem_shorelines.getvalue())
+        if not mode == 2:
+            z.writestr('gee_shorelines.txt', gee_shorelines.getvalue())
         z.writestr('results.txt', results.getvalue())
-        # z.writestr('test.txt', test.getvalue())
 
     buff.seek(0)
     return send_file(
@@ -246,4 +261,4 @@ def export_zip():
 
 
 if __name__ == "__main__":
-    socketio.run(app, host="localhost", port=8080)
+    app.run(host="localhost", port=8080)

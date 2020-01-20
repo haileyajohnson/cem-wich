@@ -28,20 +28,17 @@ sources = [
 {
     id: 0,
     name: "LS5",
-    date: "1985-01-01",
-    startFilter: "1985-01-01",
-    endFilter: "1985-12-31",
+    start: 1985,
+    end: 2011,
     bands: ['B2', 'B4'],
     url:"LANDSAT/LT05/C01/T1"
 },
-
 // Landsat 7 access info
 {
     id: 1,
     name: "LS7",
-    date: "1999-06-01",
-    startFilter: "1999-01-01",
-    endFilter: "1999-12-31",
+    start: 1999,
+    end: 9999,
     bands: ['B2', 'B4'],
     url:"LANDSAT/LE07/C01/T1"
 },
@@ -50,9 +47,8 @@ sources = [
 {
     id: 2,
     name: "LS8",
-    date: "2013-10-01",
-    startFilter: "2013-04-01",
-    endFilter: "2014-03-31",
+    start: 2014,
+    end: 9999,
     bands: ['B3', 'B5'],
     url:"LANDSAT/LC08/C01/T1"
 }];
@@ -76,7 +72,6 @@ function MapInterface() {
         numCols: 100,
         numRows:  50,
         rotation: 0,
-        source: sources[0],
 
         initMap: function() {
             // initialize earth engine
@@ -189,18 +184,18 @@ function MapInterface() {
         mapTransform: function(filterDates, makeGrid){
             // clear
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
-
+            var source = this.getSource(controlTab.start_year);
             var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
             // get image
             try {
-                var dataset = ee.ImageCollection(this.source.url).filterBounds(poly).filterDate(filterDates[0], filterDates[1]);
+                var dataset = ee.ImageCollection(source.url).filterBounds(poly).filterDate(filterDates[0], filterDates[1]);
                 var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
             } catch(error) {
                 return error;
             }
             
             // Otsu thresholding to classify as land/water
-            var water_bands = this.source.bands;
+            var water_bands = source.bands;
             var ndwi = composite.normalizedDifference(water_bands);
 
             var values = ndwi.reduceRegion({
@@ -297,7 +292,9 @@ function MapInterface() {
                     }
                     if (this.cemGrid[r][c] >= 0.1) {
                         fill = true;
+                        continue;
                     }
+                    this.cemGrid[r][c] = 0;
                 }
             }
 
@@ -599,6 +596,24 @@ function MapInterface() {
             var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             var d = R * c;
             return d * 1000; // meters
+        },
+
+        /**
+         * Get appropriate satellite mission
+         */
+        getSource: function(year) {
+            source = controlTab.source;
+            if (source < 0) {
+                for (var i = sources.length - 1; i >= 0 ; i--){
+                    if (year >= sources[i].start) {
+                        return sources[i];
+                    }
+                }
+            }
+            else if (source < sources.length) {
+                return sources[source];
+            }
+            // TODO throw error
         },
 
         /**

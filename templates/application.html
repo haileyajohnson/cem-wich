@@ -53,6 +53,15 @@
                 </div>
             
             </div>
+            <!-- mode input-->
+            <div class="mode-section">
+                <div class="section-title">Mode:</div>
+                <div class="mode-input">
+                <input type="radio" name="mode" value="1"> Normal
+                <input type="radio" name="mode" value="2"> CEM only
+                <input type="radio" name="mode" value="3"> GEE only
+                </div>
+            </div>
         </div>
 
         <!-- application -->
@@ -104,10 +113,12 @@
                             <input class="input" type="number" name="numRows" min="0" max="1000">                     
                             <div class="section-title">Num cols:</div>
                             <input class="input" type="number" name="numCols" min="0" max="1000">
+                            <div class="cell-dimensions">Cell size: </div>
                         </div>
 
                         <div class="section">
-                            <div class="section-title">Source:</div><br>                            
+                            <div class="section-title">Source:</div><br>
+                            <input type="radio" name="source" value="-1">Best available                          
                             <input type="radio" name="source" value="0">Landsat 5
                             <input type="radio" name="source" value="1">Landsat 7
                             <input type="radio" name="source" value="2">Landsat 8
@@ -164,8 +175,11 @@
                             <input class="input" type="number" name="min-shelf-depth" min="0" value="10.0">
                         </div>
                         <div class="section">  
+                            <div class="section-title">Start year</div>
+                            <input class="input" type="number" name="start-date" min="1985" max="2019" value="1985">
+                            <br>
                             <div class="section-title">End year</div>
-                            <input class="input" type="number" name="end-date" min="1995" value="2000">
+                            <input class="input" type="number" name="end-date" min="1995" max="2019" value="2000">
                             <br>
                             <div class="section-title">Timestep length</div>
                             <input class="input" type="number" name="timestep" value="1">

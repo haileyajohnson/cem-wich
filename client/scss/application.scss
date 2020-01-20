@@ -71,6 +71,20 @@ html, body {
         background-color: #ff9800;
         border-color: #ff9800;
     }
+
+    .mode-section {
+        margin-left: 1%;
+        font-size: 14px;
+
+        .section-title {
+            float:left;
+            margin-top: 3px;
+        }
+        .mode-input {
+            float: left;
+            margin-top: 3px;
+        }
+    }
 }
 
 /* map and input panes*/
