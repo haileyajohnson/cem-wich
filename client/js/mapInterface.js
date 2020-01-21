@@ -184,14 +184,15 @@ function MapInterface() {
         mapTransform: function(filterDates, makeGrid){
             // clear
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
-            var source = this.getSource(controlTab.start_year);
+            var source = this.getSource(gridTab.start_year);
             var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
             // get image
             try {
                 var dataset = ee.ImageCollection(source.url).filterBounds(poly).filterDate(filterDates[0], filterDates[1]);
                 var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
             } catch(error) {
-                return error;
+                showErrorMessage("Error generating composite image.");
+                return -1;
             }
             
             // Otsu thresholding to classify as land/water
@@ -232,6 +233,7 @@ function MapInterface() {
             if (makeGrid) {
                 this.createGrid(smooth);
             }
+            return 0;
         },
 
         /**
@@ -266,8 +268,7 @@ function MapInterface() {
                 } catch (e) {
                     numTries++;
                     if (numTries == maxTries) {
-                        console.log("Max tries exceeded: could not get info from EE server")
-                        // TODO error reporting
+                        showErrorMessage("Max tries exceeded: could not get info from EE server")
                         return;
                     }
                 }
@@ -602,7 +603,7 @@ function MapInterface() {
          * Get appropriate satellite mission
          */
         getSource: function(year) {
-            source = controlTab.source;
+            source = gridTab.source;
             if (source < 0) {
                 for (var i = sources.length - 1; i >= 0 ; i--){
                     if (year >= sources[i].start) {
@@ -611,9 +612,12 @@ function MapInterface() {
                 }
             }
             else if (source < sources.length) {
+                if (year < sources[source].start) {
+                    showErrorMessage("Time range out of bounds for the provided source.")
+                }
                 return sources[source];
             }
-            // TODO throw error
+            showErrorMessage("Invalid source input")
         },
 
         /**
@@ -624,7 +628,6 @@ function MapInterface() {
             this.gridSource.clear();
             this.modelSource.clear();
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
-            //if (this.modelLayer) {this.map.removeLayer(this.modelLayer);}
             this.box = null;
             this.polyGrid = [];
             this.cemGrid = [];

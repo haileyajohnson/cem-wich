@@ -22,7 +22,7 @@ function tryParseInt(input, fallback) {
         return parseInt(input);
     }
     catch (err) {
-        displayInputErrors();
+        showErrorMessage("Could not parse " + input + " as type: float");
         return fallback;
     }
 }
@@ -35,13 +35,9 @@ function tryParseFloat(input, fallback) {
         return parseFloat(input);
     }
     catch (err) {
-        displayInputErrors();
+        showErrorMessage("Could not parse " + input + " as type: float");
         return fallback;
     }
-}
-
-function displayInputErrors(errorMessage) {
-    console.log(errorMessage);
 }
 
 /**
@@ -54,7 +50,7 @@ function validateData(data) {
     if (!data.nRows || data.nRows <= 0) { return -1; }
     if (!data.nCols || data.nCols <= 0) { return -1; }
     if (!data.source) { return -1; }
-    if (!data.date) { return -1; }
+    if (!data.start) { return -1; }
     if (!data.geometry || data.geometry == 0) { return -1; }
     if (!data.polyGrid || data.polyGrid.length == 0) { return -1; }
     if (!data.waveHeights) { return -1; }

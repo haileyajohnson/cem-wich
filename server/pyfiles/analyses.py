@@ -23,15 +23,6 @@ def getShorelineChange(shoreline):
 ###
 # get difference in shoreline orientation and cross-shore variability using 2D spatial PCA
 def get_spatial_pca():
-    # mod_shoreline = globals.model[-1]
-    # obs_shoreline = globals.observed[-1]
-    # print(mod_shoreline)
-    # print(obs_shoreline)
-    # print(np.any(np.isnan(mod_shoreline)))
-    # print(np.all(np.isfinite(mod_shoreline)))
-    # print(np.any(np.isnan(obs_shoreline)))
-    # print(np.all(np.isfinite(obs_shoreline)))
-
     # columnwise positions
     cols = np.multiply(range(globals.nCols), globals.colSize).reshape([globals.nCols, 1])
     # row-wise positions
@@ -62,10 +53,11 @@ def get_spatial_pca():
 # 2. ratio of explained variance of first three modes: describes similarity of scale of shoreline change
 # 3. similarity score, an overal descriptive index: correlation coefficient * ratio
 def get_similarity_index():
-    print(np.any(np.isnan(globals.model)))
-    print(not np.all(np.isfinite(globals.model)))
-    print(np.any(np.isnan(globals.observed)))
-    print(not np.all(np.isfinite(globals.observed)))
+    # print(np.any(np.isnan(globals.model)))
+    # print(not np.all(np.isfinite(globals.model)))
+    # print(np.any(np.isnan(globals.observed)))
+    # print(not np.all(np.isfinite(globals.observed)))
+
     # modelled pca
     pca_mod = PCA(n_components=3)
     pca_mod.fit(globals.model)

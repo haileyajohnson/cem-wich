@@ -94,6 +94,30 @@ html, body {
     padding: 1%;
     overflow: auto;
 
+    #error-container {        
+        padding: 1px 5px;
+        background-color: #F6B759;
+        margin-bottom: 4px;
+        height: 26px;
+        display: none;
+
+        #error-message {
+            display: inline-flex;
+            vertical-align: middle;
+        }
+
+        #close {
+            float:right;
+            display:inline-block;
+            padding:2px 5px;
+            background:#F6B759;
+        }
+        #close:hover{
+            color:#fff;
+            cursor: pointer;
+        }
+    }
+
     .section {
         margin-bottom: 8px;
     }

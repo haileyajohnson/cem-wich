@@ -52,6 +52,9 @@ lib = CDLL(lib_path)
 
 numTimesteps = None
 saveInterval = None
+lenTimestep = None
+start_year = None
+current_year = None
 
 ###
 # start application
@@ -75,6 +78,7 @@ def initialize():
     jsdata = request.form['input_data']
     input_data = json.loads(jsdata)
     print("run cem")
+    status = 0
     # initialize global variables
     globals.nRows = input_data['nRows']
     globals.nCols = input_data['nCols']
@@ -83,7 +87,8 @@ def initialize():
     globals.polyGrid = np.asarray(input_data['polyGrid'])
     globals.geometry = input_data['geometry']
     globals.source = input_data['source']
-    year = input_data['start']
+    start_year = input_data['start']
+    current_year = start_year
     mode = input_data['mode']
 
     # build cell grid
@@ -104,110 +109,137 @@ def initialize():
     globals.r = np.array([]).reshape(0, 3)
     globals.var_ratio = np.array([]).reshape(0, 3)
 
-    # build wave inputs
-    H = input_data['waveHeights']
-    T = input_data['wavePeriods']
-    theta = input_data['waveAngles']
-    waveHeights = (c_double * len(H))()
-    wavePeriods = (c_double * len(T))()
-    waveAngles = (c_double * len(theta))()
-    for i in range(len(H)):
-        waveHeights[i] = H[i]
-    for i in range(len(T)):
-        wavePeriods[i] = T[i]
-    for i in range(len(theta)):
-        waveAngles[i] = theta[i]
-    
-    # run variables
-    numTimesteps = input_data['numTimesteps']
-    saveInterval = input_data['saveInterval']
-    lengthTimestep = input_data['lengthTimestep']
+    if not mode == 3:
+        # build wave inputs
+        H = input_data['waveHeights']
+        T = input_data['wavePeriods']
+        theta = input_data['waveAngles']
+        waveHeights = (c_double * len(H))()
+        wavePeriods = (c_double * len(T))()
+        waveAngles = (c_double * len(theta))()
+        for i in range(len(H)):
+            waveHeights[i] = H[i]
+        for i in range(len(T)):
+            wavePeriods[i] = T[i]
+        for i in range(len(theta)):
+            waveAngles[i] = theta[i]
+        
+        # run variables
+        numTimesteps = input_data['numTimesteps']
+        saveInterval = input_data['saveInterval']
+        lengthTimestep = input_data['lengthTimestep']
 
-    # config object
-    input = Config(grid = grid, nRows = globals.nRows,  nCols = globals.nCols, cellWidth = globals.colSize, cellLength = globals.rowSize,
-        asymmetry = input_data['asymmetry'], stability = input_data['stability'], numWaveInputs = len(H),
-        waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
-        shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
-        crossShoreReferencePos = input_data['crossShoreRef'], shelfDepthAtReferencePos = input_data['refDepth'],
-        minimumShelfDepthAtClosure = input_data['minClosureDepth'], numTimesteps = numTimesteps,
-        lengthTimestep = lengthTimestep, saveInterval = saveInterval)
+        # config object
+        input = Config(grid = grid, nRows = globals.nRows,  nCols = globals.nCols, cellWidth = globals.colSize, cellLength = globals.rowSize,
+            asymmetry = input_data['asymmetry'], stability = input_data['stability'], numWaveInputs = len(H),
+            waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+            shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
+            crossShoreReferencePos = input_data['crossShoreRef'], shelfDepthAtReferencePos = input_data['refDepth'],
+            minimumShelfDepthAtClosure = input_data['minClosureDepth'], numTimesteps = numTimesteps,
+            lengthTimestep = lengthTimestep, saveInterval = saveInterval)
 
-    # init
-    lib.initialize.argtypes = [Config]
-    lib.initialize.restype = c_int
-    print(lib.initialize(input))
+        # init
+        lib.initialize.argtypes = [Config]
+        lib.initialize.restype = c_int
+        lib.update.argtypes = [c_int]
+        lib.update.restype = POINTER(c_double)
+        lib.finalize.restype = c_int
 
-    # update
-    lib.update.argtypes = [c_int]
-    lib.update.restype = POINTER(c_double)
+        status = lib.initialize(input)
 
-    # multiprocess satellite-based shoreline detections
-    # pool = mp.Pool()
-    
-    # sat_results = pool.apply_async(get_sat_data, args=(year))
-    # end pool
-    # pool.close()
-    # pool.join()
-    resp = jsonify({'message': 'CEM initialized'})
-    resp.status_code = 200
-    return resp
+    # return response
+    if status == 0:    
+        resp = jsonify({'message': 'Run initialized'})
+        resp.status_code = 200
+        return resp        
+    return throw_error("Run failed to initialize")
 
 ###
 # update
 @app.route('/update/<int:timestep>', methods = ['GET'])
 def update(timestep):
+    # update time counters
     steps = min(saveInterval, numTimesteps-timestep)
-    out = lib.update(steps)    
-    grid = np.ctypeslib.as_array(out, shape=[globals.nRows, globals.nCols])
-    resp = jsonify({'message': 'CEM updated', 'grid': grid, 'timestep': timestep+steps})
+    end_timestep = timestep + 365 if mode == 3 else timestep + steps
+    year = floor(end_timestep/365)
+    # init values
+    ee_grid = []
+    cem_grid = []
+    sp_pca = []
+    t_pca = []
+    # run CEM if not in GEE only mode
+    if not mode == 3:
+        try:
+            out = lib.update(steps)
+        except:
+            return throw_error("Error on run update")   
+
+        cem_grid = np.ctypeslib.as_array(out, shape=[globals.nRows, globals.nCols])
+    # update satellite shoreline
+    if year > current_year:
+        current_year = year
+        if not mode == 2:
+            ee_grid = get_sat_grid()
+        # process if running in standard mode
+        if mode == 1:
+            prc = process(cem_grid, ee_grid)
+            sp_pca = prc.sp_pca
+            t_pca = prc.t_pca
+    
+    data = {
+        'message': 'Run updated',
+        'grid': cem_grid.tolist(),
+        'timestep': timestep,
+        "results": {
+            'sp_pca': sp_pca,
+            't_pca': t_pca
+        }
+    }
+    resp = jsonify(data)
     resp.status_code = 200
     return resp
 
 ### 
 # finalize
+@app.route('/finalize', methods = ['GET'])
 def finalize():
-    # finalize
-    lib.finalize()
-    finalize()
-    resp = jsonify({'message': 'CEM finalized'})
-    resp.status_code = 200
-    return resp
-
-
-###
-# run cem for specified timesteps and format output
-def run_cem(interval):        
+    status = 0
+    if not mode == 3:
+        status = lib.finalize()
+    if status == 0:
+        resp = jsonify({'message': 'Run finalized'})
+        resp.status_code = 200
+        return resp
+    throw_error('Run failed to finalize')
     
 ###
 # get remote-sensed shoreline for supplied date
-def get_sat_data(year):
+def get_sat_grid():
     # get moving window composite
     print("get im")
-    im = eehelpers.get_image_composite(year)
+    im = eehelpers.get_image_composite(current_year)
     # convert to grid
     print("convert im")
     return eehelpers.make_cem_grid(im)
 
 ###
 # process results and return to client
-def process(mod_grid, eeGrid, timestep):
+def process(cem_grid, ee_grid):
     print("processing results: " + str(timestep))
-    # grid to shoreline
-    shoreline = analyses.getShoreline(mod_grid)
-    shoreline = analyses.getShorelineChange(analyses.getShoreline(mod_grid))
+    # grids to shorelines
+    shoreline = analyses.getShorelineChange(analyses.getShoreline(cem_grid))
     globals.model = np.vstack((globals.model, shoreline))
-    shoreline = globals.ref_shoreline #analyses.getShorelineChange(analyses.getShoreline(eeGrid))
-    globals.observed = np.vstack((globals.observed, shoreline))
+    shorline = analyses.getShorelineChange(analyses.getShoreline(ee_grid))
+    globals.observed = np.vstack((gloals.observed, shoreline))
 
     # spatial PCA
-    # np.savetxt('tests/test.out', ret, delimiter=',')
-    sp_pca = analyses.get_spatial_pca() if mode == 1 else []
+    sp_pca = analyses.get_spatial_pca()
     # temporal PCA
     t_pca = []
-    if mode == 1 and np.shape(globals.model)[0] > 2:
+    if np.shape(globals.model)[0] > 2:
         analyses.get_similarity_index()
         t_pca = globals.S[-1].tolist()
-    return {'grid':mod_grid.tolist(), 'time':timestep, 'sp_pca': sp_pca, 't_pca': t_pca }
+    return {'sp_pca': sp_pca, 't_pca': t_pca}
 
 ###
 # export zip file of data
@@ -258,6 +290,16 @@ def export_zip():
         as_attachment=True,
         attachment_filename='results.zip'
     )
+
+@app.errorhandler(500)
+def throw_error(message):
+    error = {
+        'message': message,
+        'status': 500
+    }
+    resp = jsonify(error)
+    resp.status_code = 500
+    return resp
 
 
 if __name__ == "__main__":

@@ -5,34 +5,23 @@ from skimage import filters
 from server.pyfiles import globals
 
 sources = [
-# Landsat 5
 {
-    id: 0,
-    name: "LS5",
-    start: 1985,
-    end: 2011,
-    bands: ['B2', 'B4'],
-    url:"LANDSAT/LT05/C01/T1"
+    'start': 1985,
+    'end': 2011,
+    'bands': ['B2', 'B4'],
+    'url':"LANDSAT/LT05/C01/T1"
 },
-
-# Landsat 7
 {
-    id: 1,
-    name: "LS7",
-    start: 1999,
-    end: 9999,
-    bands: ['B2', 'B4'],
-    url:"LANDSAT/LE07/C01/T1"
+    'start': 1999,
+    'end': 9999,
+    'bands': ['B2', 'B4'],
+    'url':"LANDSAT/LE07/C01/T1"
 },
-
-# Landsat 8
 {
-    id: 2,
-    name: "LS8",
-    start: 2014,
-    end: 9999,
-    bands: ['B3', 'B5'],
-    url:"LANDSAT/LC08/C01/T1"
+    'start': 2014,
+    'end': 9999,
+    'bands': ['B3', 'B5'],
+    'url':"LANDSAT/LC08/C01/T1"
 }]
 
 ###
@@ -107,7 +96,7 @@ def get_image_composite(year):
 # build URL to request image
 def _get_source(year):    
     if (globals.source < 0):
-        for (i in range(len(sources)-1, -1, -1)):
+        for i in range(len(sources)-1, -1, -1):
             if (year >= sources[i].start):
                 return sources[i]
 

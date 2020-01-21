@@ -67,6 +67,11 @@
         <!-- application -->
         <div class="app-container">
 
+            <div id="error-container">
+                <div id="error-message"></div>
+                <span id="close">x</span>
+            </div>
+
             <div class="map-container">
                 <div id="map" class="map"></div>
             </div>
@@ -122,6 +127,9 @@
                             <input type="radio" name="source" value="0">Landsat 5
                             <input type="radio" name="source" value="1">Landsat 7
                             <input type="radio" name="source" value="2">Landsat 8
+                            <br>
+                            <div class="section-title">Start year</div>
+                            <input class="input" type="number" name="start-date" min="1985" max="2019" value="1985">
                         </div>
                         
                         <div class="section">  
@@ -175,9 +183,6 @@
                             <input class="input" type="number" name="min-shelf-depth" min="0" value="10.0">
                         </div>
                         <div class="section">  
-                            <div class="section-title">Start year</div>
-                            <input class="input" type="number" name="start-date" min="1985" max="2019" value="1985">
-                            <br>
                             <div class="section-title">End year</div>
                             <input class="input" type="number" name="end-date" min="1995" max="2019" value="2000">
                             <br>
