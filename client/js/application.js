@@ -154,7 +154,7 @@ function onRun() {
         }).done((resp) => {
             onUpdate(0); 
         }).fail((err) => {
-            showErrorMessage(err.message);
+            showErrorMessage(JSON.parse(err.responseText).message);
         });
     } else {
         showErrorMessage("One or more inputs are invalid.");
@@ -163,6 +163,15 @@ function onRun() {
 
 function onUpdate(timestep) {
     $.get('/update/' + timestep).done((resp) => {
+        try {
+            resp = JSON.parse(resp);
+            if (resp.status != 200) {
+                throw(new Error(resp.message))
+            }
+        } catch (err){
+            showErrorMessage(err.message);
+            return;
+        }
         new_time = resp.timestep;
         runTab.displayTimestep(new_time);
         if (resp.grid.length > 0) {
@@ -174,14 +183,14 @@ function onUpdate(timestep) {
         } else {
             onModelComplete();
         }
-    }).fail((err) => { showErrorMessage(err.message); });
+    }).fail((err) => { showErrorMessage(JSON.parse(err.responseText).message); });
 }
 
 function onModelComplete() {
     $.get('/finalize').done(() => {
         mapInterface.mapTransform(FilterDates(controlTab.end_year), false);
         enableAll();
-    }).fail((err) => { showErrorMessage(err.message); });
+    }).fail((err) => { showErrorMessage(JSON.parse(err.responseText).message); });
 }
 
 /*********

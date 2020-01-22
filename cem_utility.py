@@ -74,7 +74,8 @@ def startup():
 ###
 # run CEM
 @app.route('/initialize', methods = ['POST'])
-def initialize():    
+def initialize():
+    global numTimesteps, saveInterval, lenTimestep, start_year, current_year
     jsdata = request.form['input_data']
     input_data = json.loads(jsdata)
     print("run cem")
@@ -108,6 +109,11 @@ def initialize():
     globals.S = np.array([]).reshape(0, 3)
     globals.r = np.array([]).reshape(0, 3)
     globals.var_ratio = np.array([]).reshape(0, 3)
+        
+    # run variables
+    numTimesteps = input_data['numTimesteps']
+    saveInterval = input_data['saveInterval']
+    lengthTimestep = input_data['lengthTimestep']
 
     if not mode == 3:
         # build wave inputs
@@ -123,11 +129,6 @@ def initialize():
             wavePeriods[i] = T[i]
         for i in range(len(theta)):
             waveAngles[i] = theta[i]
-        
-        # run variables
-        numTimesteps = input_data['numTimesteps']
-        saveInterval = input_data['saveInterval']
-        lengthTimestep = input_data['lengthTimestep']
 
         # config object
         input = Config(grid = grid, nRows = globals.nRows,  nCols = globals.nCols, cellWidth = globals.colSize, cellLength = globals.rowSize,
@@ -148,20 +149,19 @@ def initialize():
         status = lib.initialize(input)
 
     # return response
-    if status == 0:    
-        resp = jsonify({'message': 'Run initialized'})
-        resp.status_code = 200
-        return resp        
+    if status == 0:
+        return json.dumps({'message': 'Run initialized', 'status': 200})   
     return throw_error("Run failed to initialize")
 
 ###
 # update
 @app.route('/update/<int:timestep>', methods = ['GET'])
 def update(timestep):
+    global current_year
     # update time counters
     steps = min(saveInterval, numTimesteps-timestep)
     end_timestep = timestep + 365 if mode == 3 else timestep + steps
-    year = floor(end_timestep/365)
+    year = math.floor(end_timestep/365)
     # init values
     ee_grid = []
     cem_grid = []
@@ -172,9 +172,13 @@ def update(timestep):
         try:
             out = lib.update(steps)
         except:
+            print("Error on run update")
             return throw_error("Error on run update")   
 
         cem_grid = np.ctypeslib.as_array(out, shape=[globals.nRows, globals.nCols])
+        if np.any(np.isnan(cem_grid)) or not np.all(np.isfinite(cem_grid)):
+            return throw_error("CEM return NaN or Inf value")
+
     # update satellite shoreline
     if year > current_year:
         current_year = year
@@ -190,14 +194,13 @@ def update(timestep):
         'message': 'Run updated',
         'grid': cem_grid.tolist(),
         'timestep': timestep,
-        "results": {
+        'results': {
             'sp_pca': sp_pca,
             't_pca': t_pca
-        }
+        },
+        'status': 200
     }
-    resp = jsonify(data)
-    resp.status_code = 200
-    return resp
+    return json.dumps(data), 200
 
 ### 
 # finalize
@@ -207,10 +210,8 @@ def finalize():
     if not mode == 3:
         status = lib.finalize()
     if status == 0:
-        resp = jsonify({'message': 'Run finalized'})
-        resp.status_code = 200
-        return resp
-    throw_error('Run failed to finalize')
+        return json.dumps({'message': 'Run finalized', 'status': 200}), 200
+    return throw_error('Run failed to finalize')
     
 ###
 # get remote-sensed shoreline for supplied date
@@ -297,9 +298,7 @@ def throw_error(message):
         'message': message,
         'status': 500
     }
-    resp = jsonify(error)
-    resp.status_code = 500
-    return resp
+    return json.dumps(error), 500
 
 
 if __name__ == "__main__":
