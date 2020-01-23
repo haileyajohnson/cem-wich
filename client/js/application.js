@@ -850,12 +850,15 @@ function RunTab() {
             $trow.append($("<td></td>").text(timestep));
 
             var shape = msg.sp_pca;
-            if (shape.length > 0) {
+            if (shape.hasOwnProperty("rotation")) {
                 $trow.append($("<td></td>").text((shape.rotation).toFixed(3)));
+            } else {
+                $trow.append($("<td></td>").text("---"));
+            }
+            if (shape.hasOwnProperty("scale")) {
                 $trow.append($("<td></td>").text((shape.scale).toFixed(3)));
-            }else {
-                $trow.append($("<td></td>").text("---"))
-                .append($("<td></td>").text("---"))
+            } else {
+                $trow.append($("<td></td>").text("---"));
             }
 
             var S = msg.t_pca;

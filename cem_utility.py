@@ -75,7 +75,7 @@ def startup():
 # run CEM
 @app.route('/initialize', methods = ['POST'])
 def initialize():
-    global numTimesteps, saveInterval, lenTimestep, start_year, current_year
+    global numTimesteps, saveInterval, lenTimestep, start_year, current_year, mode
     jsdata = request.form['input_data']
     input_data = json.loads(jsdata)
     print("run cem")
@@ -120,19 +120,22 @@ def initialize():
         H = input_data['waveHeights']
         T = input_data['wavePeriods']
         theta = input_data['waveAngles']
-        waveHeights = (c_double * len(H))()
-        wavePeriods = (c_double * len(T))()
-        waveAngles = (c_double * len(theta))()
-        for i in range(len(H)):
+        num_wave_inputs = len(H)
+        if not len(T) == num_wave_inputs or not len(theta) == num_wave_inputs:
+            return throw_error("Length of wave inputs do not match") 
+        waveHeights = (c_double * num_wave_inputs)()
+        wavePeriods = (c_double * num_wave_inputs)()
+        waveAngles = (c_double * num_wave_inputs)()
+        for i in range(num_wave_inputs):
             waveHeights[i] = H[i]
-        for i in range(len(T)):
+        for i in range(num_wave_inputs):
             wavePeriods[i] = T[i]
-        for i in range(len(theta)):
+        for i in range(num_wave_inputs):
             waveAngles[i] = theta[i]
 
         # config object
         input = Config(grid = grid, nRows = globals.nRows,  nCols = globals.nCols, cellWidth = globals.colSize, cellLength = globals.rowSize,
-            asymmetry = input_data['asymmetry'], stability = input_data['stability'], numWaveInputs = len(H),
+            asymmetry = input_data['asymmetry'], stability = input_data['stability'], numWaveInputs = num_wave_inputs,
             waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
             shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
             crossShoreReferencePos = input_data['crossShoreRef'], shelfDepthAtReferencePos = input_data['refDepth'],
@@ -161,7 +164,7 @@ def update(timestep):
     # update time counters
     steps = min(saveInterval, numTimesteps-timestep)
     end_timestep = timestep + 365 if mode == 3 else timestep + steps
-    year = math.floor(end_timestep/365)
+    year = current_year + math.floor(end_timestep/365)
     # init values
     ee_grid = []
     cem_grid = []
@@ -177,23 +180,29 @@ def update(timestep):
 
         cem_grid = np.ctypeslib.as_array(out, shape=[globals.nRows, globals.nCols])
         if np.any(np.isnan(cem_grid)) or not np.all(np.isfinite(cem_grid)):
-            return throw_error("CEM return NaN or Inf value")
+            return throw_error("CEM returned NaN or Inf value")
 
     # update satellite shoreline
     if year > current_year:
+        print("mode: " + str(mode))
         current_year = year
         if not mode == 2:
             ee_grid = get_sat_grid()
         # process if running in standard mode
         if mode == 1:
             prc = process(cem_grid, ee_grid)
-            sp_pca = prc.sp_pca
-            t_pca = prc.t_pca
+            sp_pca = prc[0]
+            t_pca = prc[1]
+            
+    if not np.isfinite(sp_pca['rotation']) or not np.isfinite(sp_pca['scale']):
+        return throw_error("Spatial PCA returned NaN or Inf value")
+    if np.any(np.isnan(t_pca)) or not np.all(np.isfinite(t_pca)):
+        return throw_error("Temporal PCA returned NaN or Inf value")
     
     data = {
         'message': 'Run updated',
         'grid': cem_grid.tolist(),
-        'timestep': timestep,
+        'timestep': end_timestep,
         'results': {
             'sp_pca': sp_pca,
             't_pca': t_pca
@@ -226,12 +235,11 @@ def get_sat_grid():
 ###
 # process results and return to client
 def process(cem_grid, ee_grid):
-    print("processing results: " + str(timestep))
     # grids to shorelines
     shoreline = analyses.getShorelineChange(analyses.getShoreline(cem_grid))
     globals.model = np.vstack((globals.model, shoreline))
     shorline = analyses.getShorelineChange(analyses.getShoreline(ee_grid))
-    globals.observed = np.vstack((gloals.observed, shoreline))
+    globals.observed = np.vstack((globals.observed, shoreline))
 
     # spatial PCA
     sp_pca = analyses.get_spatial_pca()
@@ -240,7 +248,8 @@ def process(cem_grid, ee_grid):
     if np.shape(globals.model)[0] > 2:
         analyses.get_similarity_index()
         t_pca = globals.S[-1].tolist()
-    return {'sp_pca': sp_pca, 't_pca': t_pca}
+
+    return sp_pca, t_pca
 
 ###
 # export zip file of data

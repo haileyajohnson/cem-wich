@@ -42,7 +42,9 @@ def get_spatial_pca():
     rotation = math.acos(cos) * (math.pi)
 
     # scale = ratio between variance of modelled mode 2 and variance of observed mode 2 (interpreted as cross-shore variability)
-    scale = pca_mod.explained_variance_[1] / pca_obs.explained_variance_[1]
+    var_mod = pca_mod.explained_variance_[1]
+    var_obs = pca_obs.explained_variance_[1]
+    scale = 0 if var_mod == 0 or var_obs == 0 else var_obs / var_mod
 
     # return tuple with rotation and scale
     return {"rotation": rotation, "scale": scale}
@@ -79,7 +81,7 @@ def get_similarity_index():
         # part 1: correlation coefficient (r_k)
         r[0][k] = np.corrcoef(Eobs[k], Emod[k])[0][1]
         # part 2: ratio of explained variance
-        var_ratio[0][k] = Lmod[k]/Lobs[k]
+        var_ratio[0][k] = 0 if Lmod[k] == 0 or Lobs[k] == 0 else Lobs[k]/Lmod[k]
         # part 3: similarity score (S_k)
         S[0][k] = r[0][k] * min(var_ratio[0][k], 1/var_ratio[0][k])
     

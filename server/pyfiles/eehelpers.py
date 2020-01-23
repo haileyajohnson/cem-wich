@@ -70,12 +70,12 @@ def get_image_composite(year):
     source = _get_source(year)
 
     # get composite
-    collection = ee.ImageCollection(source.url).filterBounds(poly).filterDate(start_date, end_date) 
+    collection = ee.ImageCollection(source['url']).filterBounds(poly).filterDate(start_date, end_date) 
     # TODO: fine tune temporal resolution on ee composites
     composite = ee.Algorithms.Landsat.simpleComposite(collection)
 
     # otsu
-    water_bands = source.bands
+    water_bands = source['bands']
     ndwi = composite.normalizedDifference(water_bands)
     values = ndwi.reduceRegion(reducer = ee.Reducer.toList(), geometry = poly, scale = 10, bestEffort = True).getInfo()
     water = ndwi.gt(filters.threshold_otsu(np.array(values['nd'])))
@@ -97,7 +97,7 @@ def get_image_composite(year):
 def _get_source(year):    
     if (globals.source < 0):
         for i in range(len(sources)-1, -1, -1):
-            if (year >= sources[i].start):
+            if (year >= sources[i]['start']):
                 return sources[i]
 
     elif (source < len(sources)):
