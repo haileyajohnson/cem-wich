@@ -20,8 +20,12 @@ struct BeachGrid {
     double (*GetNextAngle)(struct BeachGrid *this, struct BeachNode *node);
     double (*GetSurroundingAngle)(struct BeachGrid *this, struct BeachNode *node);
     double (*GetAngleByDifferencingScheme)(struct BeachGrid *this, struct BeachNode *node, double wave_angle);
+		struct BeachNode* (*ReplaceNode)(struct BeachGrid *this, struct BeachNode* node);
     struct BeachNode** (*Get4Neighbors)(struct BeachGrid *this, struct BeachNode *node);
     int (*CheckIfInShadow)(struct BeachGrid *this, struct BeachNode *node, double wave_angle);
+		int (*FindBeach)(struct BeachGrid* this);
+		struct BeachNode* (*TraceLandmass)(struct BeachGrid *this, struct BeachNode *startNode, struct BeachNode* stopNode, int dir_r, int dir_c, int reverse);
+		int (*IsLandCell) (struct BeachGrid* this, int row, int col);
 };
 extern const struct BeachGridClass {
     struct BeachGrid (*new)(int rows, int cols, double cell_width, double cell_length);

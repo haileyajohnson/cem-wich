@@ -192,12 +192,11 @@ def update(timestep):
         if mode == 1:
             prc = process(cem_grid, ee_grid)
             sp_pca = prc[0]
-            t_pca = prc[1]
-            
-    if not np.isfinite(sp_pca['rotation']) or not np.isfinite(sp_pca['scale']):
-        return throw_error("Spatial PCA returned NaN or Inf value")
-    if np.any(np.isnan(t_pca)) or not np.all(np.isfinite(t_pca)):
-        return throw_error("Temporal PCA returned NaN or Inf value")
+            t_pca = prc[1]            
+            if not np.isfinite(sp_pca['rotation']) or not np.isfinite(sp_pca['scale']):
+                return throw_error("Spatial PCA returned NaN or Inf value")
+            if np.any(np.isnan(t_pca)) or not np.all(np.isfinite(t_pca)):
+                return throw_error("Temporal PCA returned NaN or Inf value")
     
     data = {
         'message': 'Run updated',
@@ -271,11 +270,10 @@ def export_zip():
     
     # results.txt
     results = StringIO()
-    if not mode == 3:
+    if mode == 1 and np.shape(globals.model)[0] > 2 and np.shape(globals.observed)[0] > 2:
         PCs = analyses.get_wave_PCs()
-        results.write("Wave-drive modes:\n")
+        results.write("Wave-driven modes:\n")
         np.savetxt(results, PCs, delimiter=',')
-    if mode == 1:
         results.write("Corrcoeffs:\n")
         np.savetxt(results, globals.r, delimiter=',')
         results.write("\n\n\nVariance ratios:\n")
@@ -291,7 +289,8 @@ def export_zip():
             z.writestr('cem_shorelines.txt', cem_shorelines.getvalue())
         if not mode == 2:
             z.writestr('gee_shorelines.txt', gee_shorelines.getvalue())
-        z.writestr('results.txt', results.getvalue())
+        if mode == 1:
+            z.writestr('results.txt', results.getvalue())
 
     buff.seek(0)
     return send_file(

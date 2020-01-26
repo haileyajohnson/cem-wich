@@ -31,3 +31,4 @@ double RandZeroToOne(void)
 {
 	return (double)rand() / RAND_MAX;
 }
+

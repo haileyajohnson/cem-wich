@@ -188,7 +188,7 @@ function onUpdate(timestep) {
 
 function onModelComplete() {
     $.get('/finalize').done(() => {
-        mapInterface.mapTransform(FilterDates(controlTab.end_year), false);
+        mapInterface.mapTransform(getFilterDates(controlTab.end_year), false);
         enableAll();
     }).fail((err) => { showErrorMessage(JSON.parse(err.responseText).message); });
 }
@@ -673,18 +673,28 @@ function WaveTab() {
          ***********/
         onAsymmetryChange: function() {
             this.a_val = this.$asymmetry.val();
+            if (this.a_val >= 0) { 
+                this.onWaveHeightChange();
+                this.onWavePeriodChange();
+                this.wave_angles = [-1];
+            }
         },
 
         onStabilityChange: function() {
             this.u_val = this.$stability.val();
+            if (this.u_val >= 0) {
+                this.onWaveHeightChange();
+                this.onWavePeriodChange();
+                this.wave_angles = [-1];
+            }
         },
 
         onWaveHeightChange: function() {
-            this.wave_heights[0] = parseFloat(this.$wave_height.val());
+            this.wave_heights = [parseFloat(this.$wave_height.val())];
         },
 
         onWavePeriodChange: function() {
-            this.wave_periods[0] = parseFloat(this.$wave_period.val());
+            this.wave_periods = [parseFloat(this.$wave_period.val())];
         },
 
         /*********
