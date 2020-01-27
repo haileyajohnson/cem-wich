@@ -79,8 +79,6 @@ double* cem_update(int saveInterval) {
 
 int cem_finalize() {
 	// free everything
-	struct BeachNode** shoreline = g_beachGrid.shoreline;
-	free(shoreline);
 	struct BeachNode** cells = g_beachGrid.cells;
 	free(cells);
 	free(outputGrid);

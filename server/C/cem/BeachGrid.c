@@ -11,11 +11,10 @@ static struct BeachGrid* SetCells(struct BeachGrid* this, struct BeachNode** cel
 	return this;
 }
 
-static struct BeachNode* SetShorelines(struct BeachGrid* this, struct BeachNode** shorelines, int num)
+static struct BeachNode* SetShoreline(struct BeachGrid* this, struct BeachNode* shoreline)
 {
-	this->shoreline = shorelines;
-	this->num_shorelines = num;
-	return shorelines;
+	this->shoreline = shoreline;
+	return shoreline;
 }
 
 static struct BeachNode* TryGetNode(struct BeachGrid* this, int row, int col)
@@ -313,192 +312,94 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 int FindBeach(struct BeachGrid* this)
 {
 	// clear current shoreline if grid already has one
-	if (this->shoreline && !BeachNode.isEmpty(this->shoreline[0]))
+	if (!BeachNode.isEmpty(this->shoreline))
 	{
-		struct BeachNode** shorelines = this->shoreline;
-		// reset all shoreline nodes to is_beach = FALSE
-		int i = 0;
-		while (i < this->num_shorelines)
-		{
-			struct BeachNode* start = this->shoreline[i];
-			struct BeachNode* curr = start;
-			do {
-				curr->is_beach = FALSE;
-				if (BeachNode.isEmpty(curr)) { break; }
-				if (!BeachNode.isEmpty(curr->prev) && curr->prev->is_boundary)
-				{
-					if (curr->prev->col == EMPTY_INT || curr->prev->row == EMPTY_INT)
-					{
-						free(curr->prev);
-					}
-					else {
-						curr->prev->is_beach = FALSE;
-						curr->prev->is_boundary = FALSE;
-					}
-				}
-				curr->prev = NULL;
-				struct BeachNode* next = curr->next;
-				curr->next = NULL;
-				curr = next;
-			} while (curr != start && !curr->is_boundary);
-			if (curr->is_boundary)
+		struct BeachNode* shoreline = this->shoreline;
+		struct BeachNode* curr = this->shoreline;
+		do {
+			curr->is_beach = FALSE;
+			if (BeachNode.isEmpty(curr)) { break; }
+			if (!BeachNode.isEmpty(curr->prev) && curr->prev->is_boundary)
 			{
-				if (curr->col == EMPTY_INT || curr->row == EMPTY_INT)
-				{
-					free(curr);
-				}
-				else {
-					curr->is_beach = FALSE;
-					curr->is_boundary = FALSE;
-				}
+				free(curr->prev);
 			}
-			i++;
+			curr->prev = NULL;
+			struct BeachNode* next = curr->next;
+			curr->next = NULL;
+			curr = next;
+		} while (!curr->is_boundary);
+
+		if (curr->is_boundary)
+		{
+			free(curr);
 		}
 		// free mem
-		(*this).SetShorelines(this, NULL, 0);
-		free(shorelines);
+		(*this).SetShoreline(this, NULL);
 	}
-
-	// empty shoreline pointer
-	struct BeachNode** shorelines = malloc(sizeof(struct BeachNode*));
-	int num_landmasses = 0;
-
+	
+	// start search downward from top left
 	int r, c;
 	for (c = 0; c < this->cols; c++) {
 		for (r = 1; r < this->rows; r++) {
-			// turn off search when we encounter boundary
 			struct BeachNode* node = (*this).TryGetNode(this, r, c);
-			if (node->is_beach)
-			{
-				// don't search below outer shoreline
-				break;
-			}
 
 			// start tracing shoreline
 			if ((*this).IsLandCell(this, r, c)) {
-				// start cell
 				struct BeachNode* startNode = node;
 				if (BeachNode.isEmpty(startNode)) { return -1; }
 
-				struct BeachNode* endNode = (*this).TraceLandmass(this, startNode, NULL, 1, 0, TRUE);
+				struct BeachNode* endNode = (*this).GetShoreline(this, startNode, NULL, 1, 0);
 				if (!endNode || BeachNode.isEmpty(endNode))
 				{
 					return -1;
 				}
 
-				// check start boundary
-				if (BeachNode.isEmpty(startNode->prev) && !BeachNode.isEmpty(startNode->next))
-				{
-					struct BeachNode* startBoundary;
-					if (startNode->GetCol(startNode) == 0) { startBoundary = BeachNode.boundary(EMPTY_INT, -1); }
-					else if (startNode->GetCol(startNode) == this->cols - 1) { startBoundary = BeachNode.boundary(EMPTY_INT, this->cols); }
-					else if (startNode->GetRow(startNode) == 0) { startBoundary = BeachNode.boundary(-1, EMPTY_INT); }
-					else if (startNode->GetRow(startNode) == this->rows - 1) { startBoundary = BeachNode.boundary(this->rows, EMPTY_INT); }
-					else {
-						startNode->is_boundary = TRUE;
-						// TODO set boundary flow
-						startBoundary = startNode;
-						startNode = startNode->next;
+				// set start boundary
+				struct BeachNode* startBoundary;
+				int startCol = startNode->GetCol(startNode);
+				int startRow = startNode->GetRow(startNode);
+				if (startCol == 0) { startBoundary = BeachNode.boundary(EMPTY_INT, -1); }
+				else if (startCol == this->cols - 1) { startBoundary = BeachNode.boundary(EMPTY_INT, this->cols); }
+				else if (startRow == 0) { startBoundary = BeachNode.boundary(-1, EMPTY_INT); }
+				else if (startRow == this->rows - 1) { startBoundary = BeachNode.boundary(this->rows, EMPTY_INT); }
+				else { // start not at grid boundary, invalid grid
+					return -1;
+				}
+				startNode->prev = startBoundary;
+				startBoundary->next = startNode;
 
-					}
-					startNode->prev = startBoundary;
-					startBoundary->next = startNode;
+				// set end boundary
+				struct BeachNode* endBoundary;
+				int endCol = endNode->GetCol(endNode);
+				int endRow = endNode->GetRow(endNode);
+				if (endCol == 0) { endBoundary = BeachNode.boundary(EMPTY_INT, -1); }
+				else if (endCol == this->cols - 1) { endBoundary = BeachNode.boundary(EMPTY_INT, this->cols); }
+				else if (endRow == 0) { endBoundary = BeachNode.boundary(-1, EMPTY_INT); }
+				else if (endRow == this->rows - 1) { endBoundary = BeachNode.boundary(this->rows, EMPTY_INT); }
+				else { // end not at grid boundary, invalid grid
+					return -1;
 				}
-				// check end boundary
-				if (BeachNode.isEmpty(endNode->next) && !BeachNode.isEmpty(endNode->prev))
-				{
-					struct BeachNode* endBoundary;
-					if (endNode->GetCol(endNode) == 0) { endBoundary = BeachNode.boundary(EMPTY_INT, -1); }
-					else if (endNode->GetCol(endNode) == this->cols - 1) { endBoundary = BeachNode.boundary(EMPTY_INT, this->cols); }
-					else if (endNode->GetRow(endNode) == 0) { endBoundary = BeachNode.boundary(-1, EMPTY_INT); }
-					else if (endNode->GetRow(endNode) == this->rows - 1) { endBoundary = BeachNode.boundary(this->rows, EMPTY_INT); }
-					else {
-						endNode->is_boundary = TRUE;
-						// TODO set boundary flow
-						endBoundary = endNode;
-						endNode = endNode->prev;
-					}
-					endNode->next = endBoundary;
-					endBoundary->prev = endNode;
-				}
+				endNode->next = endBoundary;
+				endBoundary->prev = endNode;
 
-				if (!startNode->next || !startNode->prev)
-				{
-					r = startNode->GetRow(startNode) + 1;
-					continue;
-				}
-				if (num_landmasses > 0)
-				{
-					// grow shorelines array
-					struct BeachNode** temp = realloc(shorelines, (num_landmasses + 1) * sizeof(struct BeachNode*));
-					if (temp)
-					{
-						shorelines = temp;
-					}
-					else {
-						// TODO: handle error
-						free(shorelines);
-						return -1;
-					}
-				}
-
-				shorelines[num_landmasses] = startNode;
-				num_landmasses++;
-				break;
+				(*this).SetShoreline(this, startNode);
+				return 0;
 			}
 		}
 	}
-
-	// no shoreline found
-	if (!shorelines || BeachNode.isEmpty(shorelines[0])) {
-		// free shorelines var
-		free(shorelines);
-		return -1;
-	}
-
-	(*this).SetShorelines(this, shorelines, num_landmasses);
-	return 0;
+	return -1;
 }
 
 static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* node)
 {
-	struct BeachNode* start = node;
-	struct BeachNode* stop = node;
-	if (!BeachNode.isEmpty(node->prev))
+	if (BeachNode.isEmpty(node) || node->is_boundary)
 	{
-		start = BeachNode.isEmpty(node->prev->prev) ? node->prev : node->prev->prev;
+		return NULL;
 	}
-	if (!BeachNode.isEmpty(node->next))
-	{
-		stop = BeachNode.isEmpty(node->next->next) ? node->next : node->next->next;
-	}
+	struct BeachNode* start = node->prev;
+	struct BeachNode* stop = node->next;
 
 	struct BeachNode* curr = start->next;
-	// set flag to replace shoreline head if necessary
-	int shoreline_head = -1;
-	if (start->is_boundary) {
-		int i;
-		for (i = 0; i < this->num_shorelines; i++)
-		{
-			if (this->shoreline[i] == curr)
-			{
-				shoreline_head = i;
-				break;
-			}
-		}
-	}
-
-	// detach shoreline segment
-	start->next = NULL;
-	while (curr != stop) {
-		curr->is_beach = FALSE;
-		curr->is_boundary = FALSE;
-		struct BeachNode* temp = curr->next;
-		curr->prev = NULL;
-		curr->next = NULL;
-		curr = temp;
-	}
-	stop->prev = NULL;
 
 	// get start dir - default to left if prev is null
 	int dir_r = 0;
@@ -513,40 +414,36 @@ static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* n
 		dir_c = -round(cos(angle));
 	}
 
-	struct BeachNode* endNode = (*this).TraceLandmass(this, start, stop, dir_r, dir_c, FALSE);
-	// complex shoreline change, need to do full FindShoreline
+	struct BeachNode* endNode = (*this).GetShoreline(this, start, stop, dir_r, dir_c);
+	// error: didn't replace shoreline
 	if (endNode != stop)
 	{
-		// attach start and stop nodes to allow for shoreline cleanup
-		start->next = stop;
-		stop->prev = start;
-		// TODO: return ????
 		return NULL;
 	}	
 
-	// reset shoreline head node
-	if (shoreline_head >= 0)
+	// reset shoreline head node if necessary
+	if (this->shoreline == node)
 	{
-		this->shoreline[shoreline_head] = start->next;
+		this->shoreline = start;
 	}
 
-	// TODO: return ???
-	return node;
+	// remove node from shoreline
+	node->is_beach = FALSE;
+	node->prev = NULL;
+	node->next = NULL;
+
+	return stop;
 }
 
 
 /**
 * Find shoreline between start and end cols using Moore tracing algorithm
 */
-struct BeachNode* TraceLandmass(struct BeachGrid* this, struct BeachNode* startNode, struct BeachNode* stopNode, int dir_r,  int dir_c, int reverse)
+struct BeachNode* GetShoreline(struct BeachGrid* this, struct BeachNode* startNode, struct BeachNode* stopNode, int dir_r,  int dir_c)
 {
-	struct BeachNode* endNode = startNode;
 	struct BeachNode* curr = startNode;
 
-	// search clockwise, then counterclockwise if `reverse` is TRUE
-	int search_dir = 1; // clockwise
-
-	// while not done tracing landmass
+	// while not done tracing boundary
 	while (TRUE)
 	{
 		// mark as beach
@@ -564,9 +461,9 @@ struct BeachNode* TraceLandmass(struct BeachGrid* this, struct BeachNode* startN
 		int foundNextBeach = FALSE;
 		do
 		{
-			// turn 45 degrees clockwise/counterclockwise to next neighbor
+			// turn 45 degrees clockwise to next neighbor
 			double angle = atan2(temp[0] - currRow, temp[1] - currCol);
-			angle += (search_dir) * (PI / 4);
+			angle += (PI / 4);
 			int next[2] = { currRow + round(sin(angle)), currCol + round(cos(angle)) };
 
 			// break if running off edge of grid
@@ -577,7 +474,6 @@ struct BeachNode* TraceLandmass(struct BeachGrid* this, struct BeachNode* startN
 
 			// track dir relative to previous neighbor for backtracking
 			dir_r = next[0] - temp[0];
-
 			dir_c = next[1] - temp[1];
 			temp[0] = next[0];
 			temp[1] = next[1];
@@ -590,13 +486,6 @@ struct BeachNode* TraceLandmass(struct BeachGrid* this, struct BeachNode* startN
 
 		// end landmass
 		if (!foundNextBeach) {
-			// search counterclockwise
-			if (search_dir > 0 && reverse)
-			{
-				curr = startNode;
-				search_dir = -1;
-				continue;
-			}
 			break;
 		}
 
@@ -612,54 +501,15 @@ struct BeachNode* TraceLandmass(struct BeachGrid* this, struct BeachNode* startN
 			return tempNode;
 		}
 
-		// searching clockwise
-		if (search_dir > 0) {
-		// node already a beach cell, add boundary cell and break
-			if (tempNode->is_beach) {
-				curr->next = NULL;
-				curr = startNode;
-				search_dir = -1;
-				continue;
-			}
-			curr->next = tempNode;
-			tempNode->prev = curr;
-
-			//// end if undercutting
-			//if (tempNode->GetCol(tempNode) < curr->GetCol(curr) && tempNode->GetRow(tempNode) >= curr->GetRow(curr))
-			//{
-			//	tempNode->is_beach = TRUE;
-			//	tempNode->is_boundary = TRUE;
-			//	// TODO set get flow to boundary get flow
-			//	search_dir = -1;
-			//	dir_r = 1;
-			//	dir_c = 0;
-			//	curr = startNode;
-			//	continue;
-			//}
-			endNode = tempNode;
+		// node already a beach cell, invalid grid
+		if (tempNode->is_beach) {
+			return NULL;
 		}
-		// searching counterclockwise
-		else {
-		// node already a beach cell, add boundary cell and break
-			if (tempNode->is_beach) {
-				curr->prev = NULL;
-				break;
-			}
-			curr->prev = tempNode;
-			tempNode->next = curr;
-			//// end if undercutting
-			//if (tempNode->GetCol(tempNode) > curr->GetCol(curr) && tempNode->GetRow(tempNode) >= curr->GetRow(curr))
-			//{
-			//	tempNode->is_beach = TRUE;
-			//	tempNode->is_boundary = TRUE;
-			//	// TODO set get flow to boundary get flow
-			//	break;
-			//}
-			startNode = tempNode;
-		}
+		curr->next = tempNode;
+		tempNode->prev = curr;
 		curr = tempNode;
 	}
-	return endNode;
+	return curr;
 }
 
 /**
@@ -690,9 +540,8 @@ static struct BeachGrid new(int rows, int cols, double cell_width, double cell_l
 				.current_time = 0,
 				.cells = NULL,
 				.shoreline = NULL,
-				.num_shorelines = 0,
 				.SetCells = &SetCells,
-				.SetShorelines = &SetShorelines,
+				.SetShoreline = &SetShoreline,
 				.TryGetNode = &TryGetNode,
 				.GetPrevAngle = &GetPrevAngle,
 				.GetNextAngle = &GetNextAngle,
@@ -702,7 +551,7 @@ static struct BeachGrid new(int rows, int cols, double cell_width, double cell_l
 				.Get4Neighbors = &Get4Neighbors,
 				.CheckIfInShadow = &CheckIfInShadow,
 				.FindBeach = &FindBeach,
-				.TraceLandmass = &TraceLandmass,
+				.GetShoreline = &GetShoreline,
 				.IsLandCell = &IsLandCell
 				};
 }
