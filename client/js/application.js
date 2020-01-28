@@ -685,7 +685,7 @@ function WaveTab() {
             if (this.u_val >= 0) {
                 this.onWaveHeightChange();
                 this.onWavePeriodChange();
-                this.wave_angles = [-1];
+                this.wave_angles = [-1];0
             }
         },
 

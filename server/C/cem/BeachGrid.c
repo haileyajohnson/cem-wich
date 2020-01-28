@@ -399,7 +399,7 @@ static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* n
 	struct BeachNode* start = node->prev;
 	struct BeachNode* stop = node->next;
 
-	struct BeachNode* curr = start->next;
+	struct BeachNode* curr = node;
 
 	// get start dir - default to left if prev is null
 	int dir_r = 0;
@@ -495,16 +495,27 @@ struct BeachNode* GetShoreline(struct BeachGrid* this, struct BeachNode* startNo
 		{
 			return NULL;
 		}
-		// temp node is stop node
+		
+		// curr node is stop node
 		if (tempNode == stopNode)
 		{
+			curr->next = tempNode;
+			tempNode->prev = curr;
 			return tempNode;
 		}
 
-		// node already a beach cell, invalid grid
+		// node already a beach cell, invalid grid // change to curr not tempNode
 		if (tempNode->is_beach) {
-			return NULL;
+			if (!stopNode || abs(curr->GetRow(curr) - stopNode->GetRow(stopNode)) > 1 || abs(curr->GetCol(curr) - stopNode->GetCol(stopNode)) > 1)
+			{
+				return NULL;
+			}
+
+			curr->next = stopNode;
+			stopNode->prev = curr;
+			return stopNode;
 		}
+
 		curr->next = tempNode;
 		tempNode->prev = curr;
 		curr = tempNode;

@@ -41,8 +41,8 @@ if __name__ == "__main__":
     shelfDepthAtReferencePos = 10.0
     minimumShelfDepthAtClosure = 10.0
     lengthTimestep = 1
-    saveInterval = 1
-    numTimesteps = 365
+    saveInterval = 365
+    numTimesteps = 3650
 
     asymmetry = .7
     #stability = .3
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     for r in range(nRows):
         grid[r] = (c_double * nCols)()
         for c in range(nCols):
-            grid[r][c] = import_grid[r][c]
+            grid[r][c] = import_grid[nRows - r - 1][c]
 
     # create config object
     input = Config(grid = grid, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
@@ -81,28 +81,14 @@ if __name__ == "__main__":
             lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
 
     # set library path
-    lib_path = "cem_util/_build/py_cem"
+    lib_path = "../server/C/_build/py_cem"
 
     # open library
     lib = CDLL(lib_path)
 
     # set arg/return types
-    lib.initialize.argtypes = [Config]
-    lib.initialize.restype = c_int
+    lib.run_test.argtypes = [Config, c_int]
+    lib.run_test.restype = c_int
 
-    lib.update.argtypes = [c_int]
-    lib.update.restype = c_int
-
-    lib.finalize.restype = c_int
-
-    # initialize model
-    print(lib.initialize(input))
-
-    # run model
-    i = 0
-    while i < numTimesteps:
-        temp = lib.update(saveInterval)
-        i+=saveInterval
-
-    # finalize model
-    print(lib.finalize())
+    # initialize both models
+    print(lib.run_test(input, numTimesteps, saveInterval))

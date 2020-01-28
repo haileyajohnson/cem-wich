@@ -252,15 +252,6 @@ struct BeachNode* OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 	{
 		node->frac_full = 0;
 	}
-
-	// recurse through neighbors
-	for (i = 0; i < 4; i++)
-	{
-		if (!BeachNode.isEmpty(neighbors[i]) && !neighbors[i]->is_boundary && neighbors[i]->frac_full < 0.0)
-		{
-			OopsImEmpty(grid, neighbors[i]);
-		}
-	}
 	free(neighbors);
 
 	return (*grid).ReplaceNode(grid, node);
@@ -291,18 +282,18 @@ struct BeachNode* OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 			if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full < 1.0)
 			{
 				num_cells++;
+				total_space += (1 - neighbors[i]->frac_full);
 			}
 		}
 	}
 
-	double delta_fill = (node->frac_full - 1) / num_cells;
 	for (i = 0; i < 4; i++)
 	{
 		struct BeachNode* neighbor = neighbors[i];
 		if (!BeachNode.isEmpty(neighbor) && neighbor->frac_full < 1.0 && (none_empty || neighbor->frac_full <= 0.0))
 		{
 			double percent_available = (1 - neighbor->frac_full) / total_space;
-			double delta_fill = node->frac_full * percent_available;
+			double delta_fill = (node->frac_full - 1) * percent_available;
 			neighbor->frac_full += delta_fill;
 		}
 	}
@@ -312,15 +303,6 @@ struct BeachNode* OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 		node->frac_full = 1;
 	}
 
-	// recurse through neighbors
-	for (i = 0; i < 4; i++)
-	{
-		if (!BeachNode.isEmpty(neighbors[i]) && !neighbors[i]->is_boundary && neighbors[i]->frac_full > 1)
-		{
-			OopsImFull(grid, neighbors[i]);
-		}
-	}
-
 	free(neighbors);
 
 	return (*grid).ReplaceNode(grid, node);
@@ -328,15 +310,34 @@ struct BeachNode* OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 
 void FixBeach(struct BeachGrid* grid)
 {
-	struct BeachNode* start = grid->shoreline;
-	struct BeachNode* curr = start;
+	int done = TRUE;
+	struct BeachNode* curr = grid->shoreline;
+
+	// pass for over/under-filled cells
+	while (!curr->is_boundary)
+	{
+		if (curr->frac_full < 0.0) {
+			curr = OopsImEmpty(grid, curr);
+			done = FALSE;
+		}
+		else if (curr->frac_full > 1.0)
+		{
+			curr = OopsImFull(grid, curr);
+			done = FALSE;
+		}
+		else
+		{
+			curr = curr->next;
+		}
+	}
+
+	curr = grid->shoreline;
 
 	// smooth outset corners
 	while (!curr->is_boundary)
 	{
 		struct BeachNode** neighbors = (*grid).Get4Neighbors(grid, curr);
 
-		int needs_fix = TRUE;
 		int num_cells = 0;
 		int j;
 		for (j = 0; j < 4; j++)
@@ -344,21 +345,18 @@ void FixBeach(struct BeachGrid* grid)
 			if (BeachNode.isEmpty(neighbors[j])) { continue; }
 			if (neighbors[j]->frac_full >= 1.0)
 			{
-				needs_fix = FALSE;
+				break;
 			}
 			else if (neighbors[j]->frac_full > 0.0)
 			{
 				num_cells++;
 			}
-		}
-
-		if (needs_fix) // no solid land in neighborhood
-		{
 			// distribute to beach neighbors
 			if (num_cells > 0)
 			{
 				double delta_fill = curr->frac_full / num_cells;
 				curr->frac_full = 0;
+				done = FALSE;
 				for (j = 0; j < 4; j++)
 				{
 					if (BeachNode.isEmpty(neighbors[j])) { continue; }
@@ -374,26 +372,9 @@ void FixBeach(struct BeachGrid* grid)
 					}
 				}
 			}
-			else // push sed back to shoreline
+			else // error
 			{
-				int r = curr->GetRow(curr) + 1;
-				int c = curr->GetCol(curr);
-				struct BeachNode* temp = (*grid).TryGetNode(grid, r, c);
-
-				while (!BeachNode.isEmpty(temp) && !(temp->frac_full > 0.0))
-				{
-					r--;
-					temp = (*grid).TryGetNode(grid, r, c);
-				}
-				if (!BeachNode.isEmpty(temp))
-				{
-					temp->frac_full == curr->frac_full;
-					curr->frac_full = 0;
-					if (temp->frac_full > 1.0)
-					{
-						OopsImFull(grid, temp);
-					}
-				}
+				return;
 			}
 		}
 		curr = curr->next;
@@ -408,6 +389,7 @@ void FixBeach(struct BeachGrid* grid)
 		struct BeachNode* next = curr->next;
 		if (abs(next->GetRow(next) - prev->GetRow(prev)) == 1 && abs(next->GetCol(next) - prev->GetCol(prev)) == 1)
 		{
+			done = FALSE;
 			if (curr == grid->shoreline)
 			{
 				grid->shoreline = next;
@@ -416,24 +398,15 @@ void FixBeach(struct BeachGrid* grid)
 			next->prev = prev;
 			curr->next = NULL;
 			curr->prev = NULL;
+			curr->is_beach = FALSE;
 			curr = prev;
 		}
 		curr = curr->next;
 	}
 
-
-	// one more pass for over/under-filled cells
-	curr = grid->shoreline;
-	while (!curr->is_boundary)
+	if (!done)
 	{
-		if (curr->frac_full < 0.0) {
-			OopsImEmpty(grid, curr);
-		}
-		else if (curr->frac_full > 1.0)
-		{
-			OopsImFull(grid, curr);
-		}
-		curr = curr->next;
+		FixBeach(grid);
 	}
 }
 
