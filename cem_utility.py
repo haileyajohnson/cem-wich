@@ -20,29 +20,6 @@ class Mode(Enum):
     CEM = 2
     GEE = 3
 
-# configuration information passed to CEM lib
-class Config(Structure):
-    _fields_ = [
-        ("grid", POINTER(POINTER(c_double))),
-        ("waveHeights", POINTER(c_double)),
-        ("waveAngles", POINTER(c_double)),
-        ('wavePeriods', POINTER(c_double)),
-        ('asymmetry', c_double),
-        ('stability', c_double),
-        ('numWaveInputs', c_int),
-        ("nRows", c_int),
-        ("nCols", c_int),
-        ("cellWidth", c_double),
-        ("cellLength", c_double),
-        ("shelfSlope", c_double),
-        ("shorefaceSlope", c_double),
-		("crossShoreReferencePos", c_int),
-		("shelfDepthAtReferencePos", c_double),
-		("minimumShelfDepthAtClosure", c_double),
-        ("lengthTimestep", c_double),
-        ("numTimesteps", c_int),
-        ("saveInterval", c_int)]
-
 # path to built CEM lib
 import platform
 lib_path = "server/C/_build/py_cem.so"
@@ -134,16 +111,16 @@ def initialize():
             waveAngles[i] = theta[i]
 
         # config object
-        input = Config(grid = grid, nRows = globals.nRows,  nCols = globals.nCols, cellWidth = globals.colSize, cellLength = globals.rowSize,
+        input = config.Config(grid = grid, nRows = globals.nRows,  nCols = globals.nCols, cellWidth = globals.colSize, cellLength = globals.rowSize,
             asymmetry = input_data['asymmetry'], stability = input_data['stability'], numWaveInputs = num_wave_inputs,
             waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
             shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
-            crossShoreReferencePos = input_data['crossShoreRef'], shelfDepthAtReferencePos = input_data['refDepth'],
-            minimumShelfDepthAtClosure = input_data['minClosureDepth'], numTimesteps = numTimesteps,
+            crossShoreReferencePos = 0, shelfDepthAtReferencePos = 0, minimumShelfDepthAtClosure = 0,
+            depthOfClosure = input_data['depthOfClosure'], numTimesteps = numTimesteps,
             lengthTimestep = lengthTimestep, saveInterval = saveInterval)
 
         # init
-        lib.initialize.argtypes = [Config]
+        lib.initialize.argtypes = [config.Config]
         lib.initialize.restype = c_int
         lib.update.argtypes = [c_int]
         lib.update.restype = POINTER(c_double)

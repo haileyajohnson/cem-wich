@@ -6,27 +6,9 @@ import random
 import math
 from datetime import datetime
 
-class Config(Structure):
-    _fields_ = [
-        ("grid", POINTER(POINTER(c_double))),
-        ("waveHeights", POINTER(c_double)),
-        ("waveAngles", POINTER(c_double)),
-        ('wavePeriods', POINTER(c_double)),
-        ('asymmetry', c_double),
-        ('stability', c_double),
-        ('numWaveInputs', c_int),
-        ("nRows", c_int),
-        ("nCols", c_int),
-        ("cellWidth", c_double),
-        ("cellLength", c_double),
-        ("shelfSlope", c_double),
-        ("shorefaceSlope", c_double),
-		("crossShoreReferencePos", c_int),
-		("shelfDepthAtReferencePos", c_double),
-		("minimumShelfDepthAtClosure", c_double),
-        ("lengthTimestep", c_double),
-        ("numTimesteps", c_int),
-        ("saveInterval", c_int)]
+import sys
+sys.path.append('..')
+from server.pyfiles import config
         
 if __name__ == "__main__": 
     # wait for vs debugger
@@ -82,20 +64,20 @@ if __name__ == "__main__":
             
 
     # create config objects
-    input_orig = Config(grid = grid_orig, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods, 
+    input_orig = config.Config(grid = grid_orig, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods, 
             asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
             nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
             shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
             shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
-            lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
+            depthOfClosure = 0, lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
             
     # create config object
-    input_new = Config(grid = grid_new, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+    input_new = config.Config(grid = grid_new, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
             asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
             nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
             shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
             shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
-            lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
+            depthOfClosure = 0, lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
 
     # set library paths
     lib_path_orig = "cem_orig/_build/test_cem"
@@ -107,9 +89,9 @@ if __name__ == "__main__":
     lib_new = CDLL(lib_path_new)
 
     # set arg/return types
-    lib_orig.run_test.argtypes = [Config, c_int]
+    lib_orig.run_test.argtypes = [config.Config, c_int]
     lib_orig.run_test.restype = c_int
-    lib_new.run_test.argtypes = [Config, c_int]
+    lib_new.run_test.argtypes = [config.Config, c_int]
     lib_new.run_test.restype = c_int
 
     # initialize both models

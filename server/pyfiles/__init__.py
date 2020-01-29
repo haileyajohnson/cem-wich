@@ -1,1 +1,1 @@
-__all__ = ["analyses", "eehelpers", "globals"]
+__all__ = ["analyses", "config", "eehelpers", "globals"]

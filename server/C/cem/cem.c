@@ -117,7 +117,8 @@ void SedimentTransport()
 		myConfig.shelfDepthAtReferencePos,
 		myConfig.shelfSlope,
 		myConfig.shorefaceSlope,
-		myConfig.minimumShelfDepthAtClosure);
+		myConfig.minimumShelfDepthAtClosure,
+		myConfig.depthOfClosure);
 	NetVolumeChange(&g_beachGrid);
 
 	TransportSediment(&g_beachGrid,
@@ -125,7 +126,8 @@ void SedimentTransport()
 		myConfig.shelfDepthAtReferencePos,
 		myConfig.shelfSlope,
 		myConfig.shorefaceSlope,
-		myConfig.minimumShelfDepthAtClosure);
+		myConfig.minimumShelfDepthAtClosure,
+		myConfig.depthOfClosure);
 	FixBeach(&g_beachGrid);
 }
 

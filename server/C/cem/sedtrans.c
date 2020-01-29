@@ -82,7 +82,7 @@ double GetTransportVolumePotential(double alpha, double wave_height, double time
 	return fabs(.67 * rho * powf(GRAVITY, 3.0 / 2.0) * powf(wave_height, 5.0 / 2.0) * cos(alpha) * sin(alpha) * timestep_length);
 }
 
-void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth)
+void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth, double depthOfClosure)
 {
 	double cell_area = grid->cell_width * grid->cell_length;
 
@@ -113,7 +113,7 @@ void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, double ref_depth, d
 
 		double total_volume_needed = volume_needed_left + volume_needed_right;
 		double shore_angle = (*grid).GetNextAngle(grid, curr);
-		double depth = GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
+		double depth = depthOfClosure ? depthOfClosure : GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
 		double volume_available = curr->frac_full * cell_area * depth;
 		struct BeachNode* node_behind = GetNodeInDir(grid, curr, GetDir(shore_angle));
 		if (!BeachNode.isEmpty(node_behind) && node_behind->frac_full >= 1.0)
@@ -177,14 +177,14 @@ void NetVolumeChange(struct BeachGrid* grid)
 	}
 }
 
-void TransportSediment(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth)
+void TransportSediment(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth, double depthOfClosure)
 {
 	double cell_area = grid->cell_width * grid->cell_length;
 	struct BeachNode* curr = grid->shoreline;
 
 	while (!curr->is_boundary) {
 		double shore_angle = (*grid).GetNextAngle(grid, curr);
-		double depth = GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
+		double depth = depthOfClosure ? depthOfClosure : GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
 		double net_area_change = curr->net_volume_change / depth;
 		curr->frac_full = curr->frac_full + net_area_change / cell_area;
 		if (curr->frac_full < 0.0)

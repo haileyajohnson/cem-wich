@@ -5,27 +5,9 @@ import random
 import math
 from datetime import datetime
 
-class Config(Structure):
-    _fields_ = [
-        ("grid", POINTER(POINTER(c_double))),
-        ("waveHeights", POINTER(c_double)),
-        ("waveAngles", POINTER(c_double)),
-        ('wavePeriods', POINTER(c_double)),
-        ('asymmetry', c_double),
-        ('stability', c_double),
-        ('numWaveInputs', c_int),
-        ("nRows", c_int),
-        ("nCols", c_int),
-        ("cellWidth", c_double),
-        ("cellLength", c_double),
-        ("shelfSlope", c_double),
-        ("shorefaceSlope", c_double),
-		("crossShoreReferencePos", c_int),
-		("shelfDepthAtReferencePos", c_double),
-		("minimumShelfDepthAtClosure", c_double),
-        ("lengthTimestep", c_double),
-        ("numTimesteps", c_int),
-        ("saveInterval", c_int)]
+import sys
+sys.path.append('..')
+from server.pyfiles import config
    
 if __name__ == "__main__": 
     # wait for vs debugger
@@ -73,12 +55,12 @@ if __name__ == "__main__":
             grid[r][c] = import_grid[nRows - r - 1][c]
 
     # create config object
-    input = Config(grid = grid, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+    input = config.Config(grid = grid, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
             asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
             nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
             shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
             shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
-            lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
+            depthOfClosure = 0, lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
 
     # set library path
     lib_path = "../server/C/_build/py_cem"
@@ -87,7 +69,7 @@ if __name__ == "__main__":
     lib = CDLL(lib_path)
 
     # set arg/return types
-    lib.run_test.argtypes = [Config, c_int]
+    lib.run_test.argtypes = [config.Config, c_int]
     lib.run_test.restype = c_int
 
     # initialize both models

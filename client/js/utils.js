@@ -57,9 +57,7 @@ function validateData(data) {
     if (!data.wavePeriods) { return -1; }
     if (!data.shelfSlope) { return -1; }
     if (!data.shorefaceSlope) { return -1; }
-    if (!data.crossShoreRef) { return -1; }
-    if (!data.refDepth) { return -1; }
-    if (!data.minClosureDepth) { return -1; }
+    if (!data.depthOfClosure) { return -1; }
     if (!data.numTimesteps || data.numTimesteps <= 0) { return -1; }
     if (!data.lengthTimestep || data.lengthTimestep <= 0) { return -1; }
     if (!data.saveInterval || data.saveInterval <=0) { return -1; }

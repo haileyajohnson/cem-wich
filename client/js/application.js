@@ -136,9 +136,7 @@ function onRun() {
         waveAngles: this.waveTab.wave_angles,
         shelfSlope: parseFloat(this.controlTab.shelf_slope),
         shorefaceSlope: parseFloat(this.controlTab.shoreface_slope),
-        crossShoreRef: parseFloat(this.controlTab.cross_shore_ref),
-        refDepth: parseFloat(this.controlTab.ref_depth),
-        minClosureDepth: parseFloat(this.controlTab.min_closure_depth),
+        depthOfClosure: parseFloat(this.controlTab.closure_depth),
         numTimesteps: controlTab.num_timesteps,
         lengthTimestep: parseFloat(this.controlTab.length_timestep),
         saveInterval: parseInt(this.controlTab.save_interval),
@@ -731,18 +729,14 @@ function ControlsTab() {
 
         $shelf_slope: $("input[name=shelf-slope]"),
         $shoreface_slope: $("input[name=shoreface-slope]"),
-        $cross_shore_ref: $("input[name=cross-shore-reference]"),
-        $ref_depth: $("input[name=shelf-depth-at-ref]"),
-        $min_closure_depth: $("input[name=min-shelf-depth]"),
+        $closure_depth: $("input[name=closure-depth]"),
         $end_year: $("input[name=end-date]"),
         $length_timestep: $("input[name=timestep]"),
         $save_interval: $("input[name=save-interval]"),
 
         shelf_slope: .001,
         shoreface_slope: .01,
-        cross_shore_ref: 10.0,
-        ref_depth: 10.0,
-        min_closure_depth: 10.0,
+        closure_depth: 10.0,
         end_year: new Date().getFullYear() - 1,
         length_timestep: 1,
         save_interval: 365,
@@ -755,9 +749,7 @@ function ControlsTab() {
             // attach listeners
             this.$shelf_slope.change(() => { this.onShelfSlopeChange(); });
             this.$shoreface_slope.change(() => { this.onShorefaceSlopeChange(); });
-            this.$cross_shore_ref.change(() => { this.onCrossShoreRefChange(); });
-            this.$ref_depth.change(() => { this.onRefDepthChange(); });
-            this.$min_closure_depth.change(() => { this.onMinClosureDepthChange(); });
+            this.$closure_depth.change(() => { this.onClosureDepthChange(); });
             this.$end_year.change(() => { this.onEndYearChange(); });
             this.$length_timestep.change(() => { this.onTimestepLengthChange(); });
             this.$save_interval.change(() => { this.onSaveIntervalChange(); });
@@ -783,16 +775,8 @@ function ControlsTab() {
             this.shoreface_slope = this.$shoreface_slope.val();
         },
         
-        onCrossShoreRefChange: function() {
-            this.cross_shore_ref = this.$cross_shore_ref.val();
-        },
-        
-        onRefDepthChange: function() {
-            this.ref_depth = this.$ref_depth.val();
-        },
-        
-        onMinClosureDepthChange: function() {
-            this.min_closure_depth = this.$min_closure_depth.val();
+        onClosureDepthChange: function() {
+            this.closure_depth = this.$closure_depth.val();
         },
 
         onEndYearChange: function() {
@@ -818,9 +802,7 @@ function ControlsTab() {
             this.getNumTimesteps();     
             this.$shelf_slope.val(this.shelf_slope);
             this.$shoreface_slope.val(this.shoreface_slope);
-            this.$cross_shore_ref.val(this.cross_shore_ref);
-            this.$ref_depth.val(this.ref_depth);
-            this.$min_closure_depth.val(this.min_closure_depth);
+            this.$closure_depth.val(this.closure_depth);
             this.$end_year.val(this.end_year);
             this.$length_timestep.val(this.length_timestep);
             this.$save_interval.val(this.save_interval);  

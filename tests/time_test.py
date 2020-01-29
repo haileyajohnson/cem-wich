@@ -7,27 +7,9 @@ import psutil
 import time
 import sys
 
-class Config(Structure):
-    _fields_ = [
-        ("grid", POINTER(POINTER(c_double))),
-        ("waveHeights", POINTER(c_double)),
-        ("waveAngles", POINTER(c_double)),
-        ('wavePeriods', POINTER(c_double)),
-        ('asymmetry', c_double),
-        ('stability', c_double),
-        ('numWaveInputs', c_int),
-        ("nRows", c_int),
-        ("nCols", c_int),
-        ("cellWidth", c_double),
-        ("cellLength", c_double),
-        ("shelfSlope", c_double),
-        ("shorefaceSlope", c_double),
-		("crossShoreReferencePos", c_int),
-		("shelfDepthAtReferencePos", c_double),
-		("minimumShelfDepthAtClosure", c_double),
-        ("lengthTimestep", c_double),
-        ("numTimesteps", c_int),
-        ("saveInterval", c_int)]
+import sys
+sys.path.append('..')
+from server.pyfiles import config
    
 if __name__ == "__main__": 
     input("Press Enter to continue...")  
@@ -37,13 +19,13 @@ if __name__ == "__main__":
     lib_path = "cem_orig/_build/test_cem"
     lib_orig = CDLL(lib_path)
 
-    lib_new.initialize.argtypes = [Config]
+    lib_new.initialize.argtypes = [config.Config]
     lib_new.initialize.restype = c_int
     lib_new.update.argtypes = [c_int]
     lib_new.update.restype = c_int
     lib_new.finalize.restype = c_int
     
-    lib_orig.initialize.argtypes = [Config]
+    lib_orig.initialize.argtypes = [config.Config]
     lib_orig.initialize.restype = c_int
     lib_orig.update.argtypes = [c_int]
     lib_orig.update.restype = c_int
@@ -122,18 +104,18 @@ if __name__ == "__main__":
                         waveAngles[t] = waveAngles[t] * -1
 
                 # create config object
-                input_orig = Config(grid = grid_orig, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+                input_orig = config.Config(grid = grid_orig, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
                         asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
                         nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
                         shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
                         shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
-                        lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
-                input_new = Config(grid = grid_new, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+                        depthOfClosure = 0, lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
+                input_new = config.Config(grid = grid_new, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
                         asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
                         nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
                         shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
                         shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
-                        lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
+                        depthOfClosure = 0, lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
 
 
                 #### Run new ####
