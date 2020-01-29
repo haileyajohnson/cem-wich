@@ -415,10 +415,27 @@ static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* n
 	}
 
 	struct BeachNode* endNode = (*this).GetShoreline(this, start, stop, dir_r, dir_c);
-	// error: didn't replace shoreline
 	if (endNode != stop)
 	{
-		return NULL;
+		// edge of grid - add boundary node
+		if (endNode->GetCol(endNode) == this->cols - 1)
+		{
+			while (!stop->is_boundary)
+			{
+				struct BeachNode* next = stop->next;
+				stop->is_beach = FALSE;
+				stop->prev = NULL;
+				stop->next = NULL;
+				stop = next;
+			}
+			endNode->next = stop;
+			stop->prev = endNode;
+		}
+		// error: didn't replace shoreline
+		else
+		{
+			return NULL;
+		}
 	}	
 
 	// reset shoreline head node if necessary

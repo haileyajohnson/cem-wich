@@ -24,7 +24,7 @@ if __name__ == "__main__":
     minimumShelfDepthAtClosure = 10.0
     lengthTimestep = 1
     saveInterval = 365
-    numTimesteps = 3650
+    numTimesteps = 3650 * 3
 
     asymmetry = .7
     #stability = .3

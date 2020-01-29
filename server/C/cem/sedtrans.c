@@ -207,7 +207,7 @@ struct BeachNode* OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 	if (node->frac_full >= -0.000001)
 	{
 		node->frac_full = 0.0;
-		return node->next;
+		return (*grid).ReplaceNode(grid, node);
 	}
 	struct BeachNode** neighbors = (*grid).Get4Neighbors(grid, node);
 
@@ -339,37 +339,46 @@ void FixBeach(struct BeachGrid* grid)
 		struct BeachNode** neighbors = (*grid).Get4Neighbors(grid, curr);
 
 		int num_cells = 0;
+		double total_space = 0.0;
+		int needs_fix = TRUE;
 		int j;
 		for (j = 0; j < 4; j++)
 		{
 			if (BeachNode.isEmpty(neighbors[j])) { continue; }
 			if (neighbors[j]->frac_full >= 1.0)
 			{
+				needs_fix = FALSE;
 				break;
 			}
 			else if (neighbors[j]->frac_full > 0.0)
 			{
 				num_cells++;
+				total_space += (1 - neighbors[j]->frac_full);
 			}
+		}
+
+		if (needs_fix)
+		{
 			// distribute to beach neighbors
 			if (num_cells > 0)
 			{
-				double delta_fill = curr->frac_full / num_cells;
-				curr->frac_full = 0;
-				done = FALSE;
+				double delta_fill = min(curr->frac_full, total_space);
+				curr->frac_full -= delta_fill;
 				for (j = 0; j < 4; j++)
 				{
-					if (BeachNode.isEmpty(neighbors[j])) { continue; }
-					if (neighbors[j]->frac_full < 1.0 && neighbors[j]->frac_full > 0.0)
+					struct BeachNode* neighbor = neighbors[j];
+					if (BeachNode.isEmpty(neighbor)) { continue; }
+					if (neighbor->frac_full < 1.0 && neighbor->frac_full > 0.0)
 					{
-						neighbors[j]->frac_full += delta_fill;
-						if (neighbors[j]->frac_full > 1.0)
-						{
-							delta_fill = 1.0 - neighbors[j]->frac_full;
-							neighbors[j]->frac_full == 1.0;
-							curr->frac_full += delta_fill;
-						}
+						double percent_fill = delta_fill * ((1 - neighbor->frac_full) / total_space);
+						neighbor->frac_full += percent_fill;
 					}
+				}
+				if (curr->frac_full <= 0.0)
+				{
+					done = FALSE;
+					curr = (*grid).ReplaceNode(grid, curr);
+					curr = curr->prev; // backtrack
 				}
 			}
 			else // error
