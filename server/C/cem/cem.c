@@ -42,10 +42,10 @@ void test_OutputGrid();
 // TODO: Add error and data return
 int cem_initialize(Config config)
 {
+	clock_t t = clock();
 	srand(time(NULL));
 	current_time_step = 0;
 	current_time = 0.0;
-
 
 	myConfig = config;
 	g_wave_climate = WaveClimate.new(myConfig.wavePeriods, myConfig.waveAngles, myConfig.waveHeights,
@@ -58,6 +58,9 @@ int cem_initialize(Config config)
 		return -1;
 	}
 	outputGrid = malloc(myConfig.nRows * myConfig.nCols * sizeof(double));
+
+	t = clock() - t;
+	printf("initialize (new): %f\n", ((double)t) / CLOCKS_PER_SEC);
 
 	return 0;
 }
@@ -107,11 +110,15 @@ void InitializeBeachGrid()
 
 void SedimentTransport()
 {
+	clock_t t = clock();
 	WaveTransformation(&g_beachGrid,
 		g_wave_climate.GetWaveAngle(&g_wave_climate, current_time_step),
 		g_wave_climate.GetWavePeriod(&g_wave_climate, current_time_step),
 		g_wave_climate.GetWaveHeight(&g_wave_climate, current_time_step),
 		myConfig.lengthTimestep);
+	t = clock() - t;
+	//printf("WaveTransformation (new): %f\n", ((double)t) / CLOCKS_PER_SEC);
+	t = clock();
 	GetAvailableSupply(&g_beachGrid,
 		myConfig.crossShoreReferencePos,
 		myConfig.shelfDepthAtReferencePos,
@@ -120,6 +127,9 @@ void SedimentTransport()
 		myConfig.minimumShelfDepthAtClosure,
 		myConfig.depthOfClosure);
 	NetVolumeChange(&g_beachGrid);
+	t = clock() - t;
+	//printf("NetVolumeChange (new): %f\n", ((double)t) / CLOCKS_PER_SEC);
+	t = clock();
 
 	TransportSediment(&g_beachGrid,
 		myConfig.crossShoreReferencePos,
@@ -128,7 +138,12 @@ void SedimentTransport()
 		myConfig.shorefaceSlope,
 		myConfig.minimumShelfDepthAtClosure,
 		myConfig.depthOfClosure);
+	t = clock() - t;
+	//printf("TransportSediment (new): %f\n", ((double)t) / CLOCKS_PER_SEC);
+	t = clock();
 	FixBeach(&g_beachGrid);
+	t = clock() - t;
+	//printf("FixBeach (new): %f\n", ((double)t) / CLOCKS_PER_SEC);
 }
 
 /* ----- CONFIGURATION AND OUTPUT FUNCTIONS -----*/

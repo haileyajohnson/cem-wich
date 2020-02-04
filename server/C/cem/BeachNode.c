@@ -162,6 +162,8 @@ static struct BeachNode empty() {
 			.prev_timestamp = EMPTY_INT,
 			.next_timestamp = EMPTY_INT,
 			.surrounding_timestamp = EMPTY_INT,
+			.in_shadow = EMPTY_INT,
+			.shadow_timestamp = EMPTY_INT,
 			.GetRow = NULL,
 			.GetCol = NULL,
 			.GetFlowDirection = NULL,
@@ -190,6 +192,8 @@ static struct BeachNode* boundary(int r, int j) {
 			.prev_timestamp = EMPTY_INT,
 			.next_timestamp = EMPTY_INT,
 			.surrounding_timestamp = EMPTY_INT,
+			.in_shadow = EMPTY_INT,
+			.shadow_timestamp = EMPTY_INT,
 			.GetRow = &GetBoundaryRow,
 			.GetCol = &GetBoundaryCol,
 			.GetFlowDirection = &GetBoundaryFlowDirection,
@@ -223,6 +227,8 @@ static int isEmpty(struct BeachNode* node)
 		|| node->prev_timestamp != EMPTY_INT
 		|| node->next_timestamp != EMPTY_INT
 		|| node->surrounding_timestamp != EMPTY_INT
+		|| node->in_shadow != EMPTY_INT
+		|| node->shadow_timestamp != EMPTY_INT
 		|| node->GetRow != NULL
 		|| node->GetCol != NULL
 		|| node->GetFlowDirection != NULL

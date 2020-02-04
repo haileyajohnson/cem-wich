@@ -277,11 +277,18 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 	{
 		return FALSE;
 	}
+
+	if (node->shadow_timestamp == this->current_time)
+	{
+		return node->in_shadow;
+	}
+
 	int row = node->GetRow(node);
 	int col = node->GetCol(node);
 	int i = 1;
 
 	double shadow_step = 0.2;
+	node->shadow_timestamp = this->current_time;
 
 	while (TRUE)
 	{

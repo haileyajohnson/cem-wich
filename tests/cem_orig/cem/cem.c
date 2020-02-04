@@ -141,6 +141,7 @@ int run_test(Config config, int numTimesteps, int saveInterval) {
 }
 
 int initialize(Config config) {
+	clock_t t = clock();
 	myConfig = config;
 	cell_width = config.cellWidth;
 	cell_length = config.cellLength;
@@ -176,6 +177,8 @@ int initialize(Config config) {
 
 	current_time_step = 0;
 
+	t = clock() - t;
+	printf("initialize (old): %f\n", ((double)t) / CLOCKS_PER_SEC);
 	return 0;
 }
 
@@ -210,17 +213,29 @@ int update(int saveInterval) {
 			}
 		}
 
+		clock_t t = clock();
 		/*LMV*/ ShadowSweep();
 
 		DetermineAngles();
 
 		DetermineSedTransport();
 
+		t = clock() - t;
+		//printf("WaveTransformation (old): %f\n", ((double)t) / CLOCKS_PER_SEC);
+		t = clock();
 		FlowInCell();
 		/*LMV*/ FixFlow();
+		t = clock() - t;
+		//printf("NetVolumeChange (old): %f\n", ((double)t) / CLOCKS_PER_SEC);
+		t = clock();
 		/*LMV*/ TransportSedimentSweep();
+		t = clock() - t;
+		//printf("TransportSediment (old): %f\n", ((double)t) / CLOCKS_PER_SEC);
+		t = clock();
 
 		FixBeach();
+		t = clock() - t;
+		//printf("FixBeach (old): %f\n", ((double)t) / CLOCKS_PER_SEC);
 		current_time_step++;
 		current_time += myConfig.lengthTimestep;
 	}
@@ -1897,17 +1912,17 @@ void SaveLineToFile(void)
 	 /*  Save file name will add extension '.' and the current_time_step
 			*/
 {
-	int is_beach[X_MAX][Y_MAX];
+	int is_beach[X_MAX][Y_MAX] = { 0 };
 
 	int x, y;
 	int offset = Y_MAX / 2;
-	for (x = 0; x < myConfig.nRows; x++)
-	{
-		for (y = 0; y < myConfig.nCols; y++)
-		{
-			is_beach[x][y] = 0;
-		}
-	}
+	//for (x = 0; x < myConfig.nRows; x++)
+	//{
+	//	for (y = 0; y < myConfig.nCols; y++)
+	//	{
+	//		is_beach[x][y] = 0;
+	//	}
+	//}
 
 	char savefile_name[40] = "test/orig_shoreline.txt";
 	FILE* savefile = fopen(savefile_name, "w");

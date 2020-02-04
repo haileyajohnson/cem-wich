@@ -22,6 +22,7 @@ extern "C" {
 		int crossShoreReferencePos;
 		double shelfDepthAtReferencePos;
 		double minimumShelfDepthAtClosure;
+		double depthOfClosure;
 		double lengthTimestep;
 		int numTimesteps;
 		int saveInterval;

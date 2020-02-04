@@ -83,6 +83,12 @@ if __name__ == "__main__":
                 waveAngles[t] = random.random() * (math.pi/4)  # wave angle based 0 to 45
                 wavePeriods[t] = (random.random()*10) + 5 # random wave period 5 to 15 seconds     
 
+
+            # vars to save times + mems
+            time_orig = 0
+            time_new = 0
+            mem_orig = 0
+            mem_new = 0
             # run each test 10 times
             for k in range(10):
                 asymmetry = random.random() * 0.4 + 0.3
@@ -90,12 +96,6 @@ if __name__ == "__main__":
 
                 # create wave inputs
                 random.seed(5)
-
-                # vars to save times + mems
-                time_orig = 0
-                time_new = 0
-                mem_orig = 0
-                mem_new = 0
 
                 for t in range(numTimesteps):
                     if random.random() >= stability:
@@ -144,7 +144,7 @@ if __name__ == "__main__":
                 time_orig = time_orig + (end-start)
                 mem_orig = mem_orig + (process.memory_info().rss - mem)
 
-            print("Size: " + str(nCols) + "   t: " + str(numTimesteps) + "\n")
+            print("\nSize: " + str(nCols) + "   t: " + str(numTimesteps))
             print("Orig\ntime: " + str(time_orig/10) + " mem: " + str(mem_orig/10))
             print("New\ntime: " + str(time_new/10) + " mem: " + str(mem_new/10))
     sys.exit(0)
