@@ -245,6 +245,7 @@ struct BeachNode* OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 			double percent_available = neighbor->frac_full / total_sed;
 			double delta_fill = node->frac_full * percent_available;
 			neighbor->frac_full += delta_fill;
+			if (neighbor->is_boundary) { free(neighbor); }
 		}
 	}
 
@@ -295,6 +296,7 @@ struct BeachNode* OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 			double percent_available = (1 - neighbor->frac_full) / total_space;
 			double delta_fill = (node->frac_full - 1) * percent_available;
 			neighbor->frac_full += delta_fill;
+			if (neighbor->is_boundary) { free(neighbor); }
 		}
 	}
 
@@ -372,6 +374,7 @@ void FixBeach(struct BeachGrid* grid)
 					{
 						double percent_fill = delta_fill * ((1 - neighbor->frac_full) / total_space);
 						neighbor->frac_full += percent_fill;
+						if (neighbor->is_boundary) { free(neighbor); }
 					}
 				}
 				if (curr->frac_full <= 0.0)
@@ -383,6 +386,7 @@ void FixBeach(struct BeachGrid* grid)
 			}
 			else // error
 			{
+				free(neighbors);
 				return;
 			}
 		}

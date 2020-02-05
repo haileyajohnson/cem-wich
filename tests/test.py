@@ -15,8 +15,8 @@ if __name__ == "__main__":
     input("Press Enter to continue...")  
         
     # create basic input variables
-    nRows = 26
-    nCols = 28
+    nRows = 100
+    nCols = 300
     cellWidth = 300
     cellLength = 300
     shelfSlope = 0.001
@@ -26,7 +26,7 @@ if __name__ == "__main__":
     minimumShelfDepthAtClosure = 10.0
     lengthTimestep = 1
     saveInterval = 365
-    numTimesteps = 365 * 20
+    numTimesteps = 365*10
 
     asymmetry = 1
     stability = .7
@@ -48,7 +48,7 @@ if __name__ == "__main__":
         wavePeriods[i] = (random.random()*10) + 5 # random wave period 5 to 15 seconds
 
     # create grid input
-    import_grid = pd.read_excel("test/input/shoreline_config.xlsx")
+    import_grid = pd.read_excel("test/input/murray.xlsx")
     import_grid = import_grid.values
     grid_orig = ((POINTER(c_double)) * nRows)()
     for r in range(nRows):
@@ -80,8 +80,8 @@ if __name__ == "__main__":
             depthOfClosure = 0, lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
 
     # set library paths
-    lib_path_orig = "cem_orig/_build/test_cem"
-    #lib_path_orig = "cem_boundary_conds/_build/test_cem"
+    #lib_path_orig = "cem_orig/_build/test_cem"
+    lib_path_orig = "cem_boundary_conds/_build/test_cem"
     lib_path_new = "../server/C/_build/py_cem"
 
     # open libraries

@@ -130,6 +130,7 @@ int run_test(Config config, int numTimesteps, int saveInterval) {
 	int i = 0;
 	while (i < numTimesteps)
 	{
+		printf("%d\n", i);
 		int steps = (i + saveInterval) < numTimesteps ? saveInterval : (numTimesteps - i);
 		if (update(steps) != 0) { exit(1); }
 		i += saveInterval;

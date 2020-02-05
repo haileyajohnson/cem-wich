@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <Windows.h>
+#include <Psapi.h>
 
 #include "consts.h"
 #include "config.h"
@@ -141,7 +143,6 @@ int run_test(Config config, int numTimesteps, int saveInterval) {
 }
 
 int initialize(Config config) {
-	clock_t t = clock();
 	myConfig = config;
 	cell_width = config.cellWidth;
 	cell_length = config.cellLength;
@@ -177,8 +178,8 @@ int initialize(Config config) {
 
 	current_time_step = 0;
 
-	t = clock() - t;
-	printf("initialize (old): %f\n", ((double)t) / CLOCKS_PER_SEC);
+	//t = clock() - t;
+	//printf("initialize (old): %f\n", ((double)t) / CLOCKS_PER_SEC);
 	return 0;
 }
 
@@ -190,6 +191,7 @@ int update(int saveInterval) {
 	
 	/*  Loop for Duration at the current wave sign and wave angle */
 	for (xx = 0; xx < saveInterval; xx++) {
+
 		periodic_boundary_copy(); /* Copy visible data to external model - creates
 															 boundaries
 		/*  Calculate Wave Angle */
@@ -213,29 +215,17 @@ int update(int saveInterval) {
 			}
 		}
 
-		clock_t t = clock();
 		/*LMV*/ ShadowSweep();
 
 		DetermineAngles();
 
 		DetermineSedTransport();
 
-		t = clock() - t;
-		//printf("WaveTransformation (old): %f\n", ((double)t) / CLOCKS_PER_SEC);
-		t = clock();
 		FlowInCell();
 		/*LMV*/ FixFlow();
-		t = clock() - t;
-		//printf("NetVolumeChange (old): %f\n", ((double)t) / CLOCKS_PER_SEC);
-		t = clock();
 		/*LMV*/ TransportSedimentSweep();
-		t = clock() - t;
-		//printf("TransportSediment (old): %f\n", ((double)t) / CLOCKS_PER_SEC);
-		t = clock();
 
 		FixBeach();
-		t = clock() - t;
-		//printf("FixBeach (old): %f\n", ((double)t) / CLOCKS_PER_SEC);
 		current_time_step++;
 		current_time += myConfig.lengthTimestep;
 	}
@@ -246,9 +236,14 @@ int update(int saveInterval) {
 }
 
 int finalize() {
+	PROCESS_MEMORY_COUNTERS pmc;
+	if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+	{
+		printf("\WorkingSetSize (old): 0x%08X - %u\n", pmc.PeakWorkingSetSize, pmc.PeakWorkingSetSize / 1024);
+	}
 	free2d((void**)PercentFullSand);
 
-	printf("Run Complete.");
+	printf("Run Complete.\n");
 
 	return 0;
 }
@@ -835,7 +830,7 @@ char FindIfInShadow(int xin, int yin, int ShadMax)
 	int ycheck = yin;
 	int iteration = 1;
 
-	while ((xcheck < ShadMax) && (ycheck >= ymin) && (ycheck < ymax)) {
+	while ((xcheck < ShadMax) && (ycheck >= -1) && (ycheck < (2 * Y_MAX))) {
 		/*  Find a cell along the projection line moving against wave direction */
 
 		xdistance = iteration * ShadowStepDistance * cos(WaveAngle);

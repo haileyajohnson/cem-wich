@@ -54,7 +54,7 @@ if __name__ == "__main__":
     process = psutil.Process()
 
     #### iterate grid sizes ####
-    for i in range(1):
+    for i in range(2,3):
         nRows = nRows_vals[i]
         nCols = nCols_vals[i]
         filename = filename_vals[i]
@@ -90,7 +90,7 @@ if __name__ == "__main__":
             mem_orig = 0
             mem_new = 0
             # run each test 10 times
-            for k in range(10):
+            for k in range(1):
                 asymmetry = random.random() * 0.4 + 0.3
                 stability = random.random() * 0.4 + 0.3
 
@@ -109,7 +109,7 @@ if __name__ == "__main__":
                         nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
                         shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
                         shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
-                        depthOfClosure = 0, lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
+                        depthOfClosure = 0, lengthTimestep = lengthTimestep, saveInterval = numTimesteps, numTimesteps = numTimesteps)
                 input_new = config.Config(grid = grid_new, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
                         asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
                         nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
@@ -119,17 +119,17 @@ if __name__ == "__main__":
 
 
                 #### Run new ####
-                start = time.time()
-                mem = process.memory_info().rss
-                temp = lib_new.initialize(input_new)
-                i = 0
-                while i < numTimesteps:
-                    temp = lib_new.update(saveInterval)
-                    i+=saveInterval
-                temp = lib_new.finalize()
-                end = time.time()
-                time_new = time_new + (end-start)
-                mem_new = mem_new + (process.memory_info().rss - mem)
+                # start = time.time()
+                # mem = process.memory_info().rss
+                # temp = lib_new.initialize(input_new)
+                # i = 0
+                # while i < numTimesteps:
+                #     temp = lib_new.update(saveInterval)
+                #     i+=saveInterval
+                # temp = lib_new.finalize()
+                # end = time.time()
+                # time_new = time_new + (end-start)
+                # mem_new = mem_new + (process.memory_info().rss - mem)
 
                 #### Run original ####
                 start = time.time()

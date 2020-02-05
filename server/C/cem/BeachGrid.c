@@ -283,37 +283,59 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 		return node->in_shadow;
 	}
 
-	int row = node->GetRow(node);
-	int col = node->GetCol(node);
-	int i = 1;
+	// start at corner TODO: switch to centroid
+	int node_r = node->GetRow(node);
+	int node_c = node->GetCol(node);
+	double r = (double)node_r;
+	double c = (double)node_c;
+	double cos_angle = cos(wave_angle);
+	double sin_angle = sin(wave_angle);
+	int r_sign = cos_angle >= 0 ? -1 : 1;
+	int c_sign = sin_angle >= 0 ? -1 : 1;
 
-	double shadow_step = 0.2;
 	node->shadow_timestamp = this->current_time;
 
 	while (TRUE)
 	{
-		int r = row - (int)rint(i * shadow_step * cos(wave_angle));
-		int c = col - (int)rint(i * shadow_step * sin(wave_angle));
+		int next_r = ceil(r + r_sign);
+		int next_c = ceil(c + c_sign);
+		double d_r = fabs(((next_r - r) * this->cell_length) / cos_angle);
+		double d_c = fabs(((next_c - c) * this->cell_width) / sin_angle);
+
+		if (d_r > d_c)
+		{
+			r = (double)next_r;
+			c += (c_sign * fabs(d_r * sin_angle)) / this->cell_width;
+		}
+		else
+		{
+			c = (double)next_c;
+			r += (r_sign * fabs(d_c * cos_angle)) / this->cell_length;
+		}
 
 		if (r < 0 || r >= (*this).rows || c < 0 || c >= (*this).cols)
 		{
-			return FALSE;
+			node->in_shadow = FALSE;
+			break;
 		}
 
-		struct BeachNode* temp = TryGetNode(this, r, c);
+		int row = floor(r);
+		int col = floor(c);
+
+		struct BeachNode* temp = TryGetNode(this, row, col);
 		if (BeachNode.isEmpty(temp))
 		{
-			return FALSE;
+			node->in_shadow = FALSE;
+			break;
 		}
 
-		if (temp->frac_full == 1 && (r - 1) < (row - (node->frac_full + fabs((c - col) / tan(wave_angle)))))
+		if (temp->frac_full == 1 && (row - 1) < (node_r - (node->frac_full + fabs((col - node_c) / tan(wave_angle)))))
 		{
-			return TRUE;
+			node->in_shadow = TRUE;
+			break;
 		}
-
-		i++;
 	}
-	return FALSE;
+	return node->in_shadow;
 }
 
 int FindBeach(struct BeachGrid* this)
