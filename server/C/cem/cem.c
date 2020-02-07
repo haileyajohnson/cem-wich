@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-#include <Windows.h>
-#include <Psapi.h>
+//#include <Windows.h>
+//#include <Psapi.h>
 
 #include "consts.h"
 #include "BeachGrid.h"
@@ -82,11 +82,11 @@ double* cem_update(int saveInterval) {
 }
 
 int cem_finalize() {
-	PROCESS_MEMORY_COUNTERS pmc;
-	if (GetProcessMemoryInfo(GetCurrentProcess(),	&pmc, sizeof(pmc)))
-	{
-		printf("\WorkingSetSize (new): 0x%08X - %u\n", pmc.PeakWorkingSetSize, pmc.PeakWorkingSetSize / 1024);
-	}
+	//PROCESS_MEMORY_COUNTERS pmc;
+	//if (GetProcessMemoryInfo(GetCurrentProcess(),	&pmc, sizeof(pmc)))
+	//{
+	//	printf("\WorkingSetSize (new): 0x%08X - %u\n", pmc.PeakWorkingSetSize, pmc.PeakWorkingSetSize / 1024);
+	//}
 	// free everything
 	struct BeachNode* curr = g_beachGrid.shoreline;
 	free(curr->prev);

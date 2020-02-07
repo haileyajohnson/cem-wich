@@ -302,7 +302,7 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 		double d_r = fabs(((next_r - r) * this->cell_length) / cos_angle);
 		double d_c = fabs(((next_c - c) * this->cell_width) / sin_angle);
 
-		if (d_r > d_c)
+		if (d_r < d_c)
 		{
 			r = (double)next_r;
 			c += (c_sign * fabs(d_r * sin_angle)) / this->cell_width;

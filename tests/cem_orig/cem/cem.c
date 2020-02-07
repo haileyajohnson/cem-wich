@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-#include <Windows.h>
-#include <Psapi.h>
+//#include <Windows.h>
+//#include <Psapi.h>
 
 #include "consts.h"
 #include "config.h"
@@ -236,11 +236,11 @@ int update(int saveInterval) {
 }
 
 int finalize() {
-	PROCESS_MEMORY_COUNTERS pmc;
-	if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
-	{
-		printf("\WorkingSetSize (old): 0x%08X - %u\n", pmc.PeakWorkingSetSize, pmc.PeakWorkingSetSize / 1024);
-	}
+	//PROCESS_MEMORY_COUNTERS pmc;
+	//if (GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof(pmc)))
+	//{
+	//	printf("\WorkingSetSize (old): 0x%08X - %u\n", pmc.PeakWorkingSetSize, pmc.PeakWorkingSetSize / 1024);
+	//}
 	free2d((void**)PercentFullSand);
 
 	printf("Run Complete.\n");
