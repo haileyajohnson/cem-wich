@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-//#include <Windows.h>
-//#include <Psapi.h>
 
 #include "consts.h"
 #include "BeachGrid.h"
@@ -82,21 +80,8 @@ double* cem_update(int saveInterval) {
 }
 
 int cem_finalize() {
-	//PROCESS_MEMORY_COUNTERS pmc;
-	//if (GetProcessMemoryInfo(GetCurrentProcess(),	&pmc, sizeof(pmc)))
-	//{
-	//	printf("\WorkingSetSize (new): 0x%08X - %u\n", pmc.PeakWorkingSetSize, pmc.PeakWorkingSetSize / 1024);
-	//}
 	// free everything
-	struct BeachNode* curr = g_beachGrid.shoreline;
-	free(curr->prev);
-	curr->prev = NULL;
-	while (!curr->next->is_boundary) {
-		curr = curr->next;
-	}
-	free(curr->next);
-	curr->next = NULL;
-
+	g_beachGrid.FreeShoreline(&g_beachGrid);
 	struct BeachNode** cells = g_beachGrid.cells;
 	free2d(cells);
 	free(outputGrid);
@@ -116,7 +101,7 @@ void InitializeBeachGrid()
 		for (c = 0; c < myConfig.nCols; c++)
 		{
 			double val = myConfig.grid[r][c];
-			nodes[r][c] = BeachNode.new(val, r, c, myConfig.cellWidth, myConfig.cellLength);
+			nodes[r][c] = BeachNode.new(val, r, c);
 		}
 	}
 
@@ -186,7 +171,7 @@ void test_LogShoreline() {
 				fprintf(savefile, " --");
 				continue;
 			}
-			fprintf(savefile, " %d", node->is_beach);
+			fprintf(savefile, " %d", node->properties != NULL);
 		}
 		fprintf(savefile, "\n");
 	}
