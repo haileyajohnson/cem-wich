@@ -26,30 +26,29 @@ function getColor(feature) {
 sources = [
 // Landsat 5 access info
 {
+    id: 0,
     name: "LS5",
-    year: 1985,
-    startFilter: "1985-01-01",
-    endFilter: "1985-12-31",
+    start: 1985,
+    end: 2011,
     bands: ['B2', 'B4'],
     url:"LANDSAT/LT05/C01/T1"
 },
-
 // Landsat 7 access info
 {
+    id: 1,
     name: "LS7",
-    year: 1999,
-    startFilter: "1999-01-01",
-    endFilter: "1999-12-31",
+    start: 1999,
+    end: 9999,
     bands: ['B2', 'B4'],
     url:"LANDSAT/LE07/C01/T1"
 },
 
 // Landsat 8 access info
 {
+    id: 2,
     name: "LS8",
-    year: 2014,
-    startFilter: "2014-01-01",
-    endFilter: "2014-12-31",
+    start: 2014,
+    end: 9999,
     bands: ['B3', 'B5'],
     url:"LANDSAT/LC08/C01/T1"
 }];
@@ -65,7 +64,6 @@ function MapInterface() {
         gridSource: null,
         modelSource: null,
         imLayer: null,
-        modelLayer:null,
 
         drawingMode: false,
         editMode: false,
@@ -74,7 +72,6 @@ function MapInterface() {
         numCols: 100,
         numRows:  50,
         rotation: 0,
-        source: sources[0],
 
         initMap: function() {
             // initialize earth engine
@@ -119,6 +116,20 @@ function MapInterface() {
              
             // create CEM source
             this.modelSource = new ol.source.Vector({}); 
+            // add to map
+            var modelLayer = new ol.layer.Vector({source: this.modelSource, 
+                style: function(feature, resolution) {
+                    return new ol.style.Style({                        
+                        stroke: new ol.style.Stroke({
+                            color: [255, 255, 255, 0]
+                        }),
+                        fill: new ol.style.Fill({
+                            color: getColor(feature)
+                        })
+                    });
+                }});
+            modelLayer.setZIndex(4);
+            this.map.addLayer(modelLayer);
 
             // create Bing Maps layer
             var bingLayer = new ol.layer.Tile({
@@ -173,18 +184,19 @@ function MapInterface() {
         mapTransform: function(filterDates, makeGrid){
             // clear
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
-
+            var source = this.getSource(gridTab.start_year);
             var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
             // get image
             try {
-                var dataset = ee.ImageCollection(this.source.url).filterBounds(poly).filterDate(filterDates[0], filterDates[1]);
+                var dataset = ee.ImageCollection(source.url).filterBounds(poly).filterDate(filterDates[0], filterDates[1]);
                 var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
             } catch(error) {
-                return error;
+                showErrorMessage("Error generating composite image.");
+                return -1;
             }
             
             // Otsu thresholding to classify as land/water
-            var water_bands = this.source.bands;
+            var water_bands = source.bands;
             var ndwi = composite.normalizedDifference(water_bands);
 
             var values = ndwi.reduceRegion({
@@ -194,17 +206,21 @@ function MapInterface() {
                 bestEffort: true
             });
 
+            // returns water mask: water = 1, land = 0
             var water = ndwi.gt(this.otsu(values.get('nd')));
+            // remove small features
             var minConnectivity = 50;
             var connectCount = water.connectedPixelCount(minConnectivity, true);
-            // create mask
-            var land_pix = water.eq(0).and(connectCount.lt(minConnectivity));
-            var water_pix = water.eq(1).and(connectCount.lt(minConnectivity)).multiply(-1);
-            var mask = water.add(land_pix).add(water_pix).not();
+            var unconnect_land_pix = water.eq(0).and(connectCount.lt(minConnectivity));
+            var unconnect_water_pix = water.eq(1).and(connectCount.lt(minConnectivity)).multiply(-1); // mask = negative ones on low connectivity water pixels
+            // 1. add mask of ones for low connectivity land pixels
+            // 2. add mask of -1 for low connectivity water pixels
+            // 3. invert: land = 1, water = 0
+            var mask = water.add(unconnect_land_pix).add(unconnect_water_pix).not();
 
             // smooth
             var gaussian = ee.Kernel.gaussian({
-                radius: 1
+                radius: 3
             });            
             var smooth = mask.convolve(gaussian).clip(poly);
 
@@ -217,6 +233,7 @@ function MapInterface() {
             if (makeGrid) {
                 this.createGrid(smooth);
             }
+            return 0;
         },
 
         /**
@@ -235,15 +252,27 @@ function MapInterface() {
             }
 
             var fc = new ee.FeatureCollection(features);
-                    
-            // Reduce the region. The region parameter is the Feature geometry.
-            var dict = image.reduceRegions({
-                reducer: ee.Reducer.mean(),
-                collection: fc,
-                scale: 30
-            });
-
-            var infoGrid = dict.getInfo();
+            // Reduce features to mean value
+            var maxTries = 8;
+            var numTries = 0;
+            while (numTries < maxTries) {
+                try {
+                    var dict = image.reduceRegions({
+                        reducer: ee.Reducer.mean(),
+                        collection: fc,
+                        scale: 30
+                    });
+        
+                    var infoGrid = dict.getInfo();
+                    break;
+                } catch (e) {
+                    numTries++;
+                    if (numTries == maxTries) {
+                        showErrorMessage("Max tries exceeded: could not get info from EE server")
+                        return;
+                    }
+                }
+            }
             var numCells = infoGrid.features.length;
 
             // get fill of each cell feature
@@ -255,13 +284,28 @@ function MapInterface() {
                 this.cemGrid[rc[0]][rc[1]] = polyFill[i];
             }
 
+            for (var c = 0; c < this.numCols; c++) {
+                var fill = false;
+                for (var r = 0; r < this.numRows; r++) {
+                    if (fill) {
+                        this.cemGrid[r][c] = 1
+                        continue;
+                    }
+                    if (this.cemGrid[r][c] >= 0.1) {
+                        fill = true;
+                        continue;
+                    }
+                    this.cemGrid[r][c] = 0;
+                }
+            }
+
             this.updateDisplay(this.cemGrid);
         },
 
         updateDisplay: function(grid) {
             // clear source
-            //this.modelSource.clear();
-            if (this.modelLayer) { this.map.removeLayer(this.modelLayer); }
+            this.modelSource.clear();
+            //if (this.modelLayer) { this.map.removeLayer(this.modelLayer); }
 
             // make polygons
             for (var r = 0; r < this.numRows; r++)
@@ -275,21 +319,7 @@ function MapInterface() {
                     }));
                 }
             }
-
-            // add to map
-            this.modelLayer = new ol.layer.Vector({source: this.modelSource, 
-                style: function(feature, resolution) {
-                    return new ol.style.Style({                        
-                        stroke: new ol.style.Stroke({
-                            color: [255, 255, 255, 0]
-                        }),
-                        fill: new ol.style.Fill({
-                            color: getColor(feature)
-                        })
-                    });
-                }});
-            this.modelLayer.setZIndex(4);
-            this.map.addLayer(this.modelLayer);
+            this.modelSource.refresh();
         },
 
         /**
@@ -570,14 +600,34 @@ function MapInterface() {
         },
 
         /**
+         * Get appropriate satellite mission
+         */
+        getSource: function(year) {
+            source = gridTab.source;
+            if (source < 0) {
+                for (var i = sources.length - 1; i >= 0 ; i--){
+                    if (year >= sources[i].start) {
+                        return sources[i];
+                    }
+                }
+            }
+            else if (source < sources.length) {
+                if (year < sources[source].start) {
+                    showErrorMessage("Time range out of bounds for the provided source.")
+                }
+                return sources[source];
+            }
+            showErrorMessage("Invalid source input")
+        },
+
+        /**
          * reset map
          */
         clearMap: function() {
             this.boundsSource.clear();
             this.gridSource.clear();
-            //this.modelSource.clear();
+            this.modelSource.clear();
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
-            if (this.modelLayer) {this.map.removeLayer(this.modelLayer);}
             this.box = null;
             this.polyGrid = [];
             this.cemGrid = [];

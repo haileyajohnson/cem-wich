@@ -85,7 +85,7 @@ static FLOW_DIR GetBoundaryFlowDirection(struct BeachNode* this)
 static FLOW_DIR GetFlowDirection(struct BeachNode* this)
 {
 	FLOW_DIR next_dir = this->transport_dir;
-	FLOW_DIR prev_dir = this->prev->is_boundary ? this->prev->GetFlowDirection(this->prev) : this->prev->transport_dir;
+	FLOW_DIR prev_dir = this->prev->transport_dir == EMPTY_INT ? this->prev->GetFlowDirection(this->prev) : this->prev->transport_dir;
 
 	if (prev_dir == RIGHT)
 	{
@@ -98,7 +98,7 @@ static FLOW_DIR GetFlowDirection(struct BeachNode* this)
 			return CONVERGENT;
 		}
 	}
-	else
+	else if (prev_dir == LEFT)
 	{
 		if (next_dir == RIGHT)
 		{
@@ -108,6 +108,10 @@ static FLOW_DIR GetFlowDirection(struct BeachNode* this)
 		{
 			return LEFT;
 		}
+	}
+	else
+	{
+		return next_dir;
 	}
 }
 
@@ -125,6 +129,12 @@ static struct BeachNode new(double frac_full, int r, int c, double cell_width, d
 				.cell_length = cell_length,
 				.next = NULL,
 				.prev = NULL,
+				.prev_angle = EMPTY_double,
+				.next_angle = EMPTY_double,
+				.surrounding_angle = EMPTY_double,
+				.prev_timestamp = EMPTY_INT,
+				.next_timestamp = EMPTY_INT,
+				.surrounding_timestamp = EMPTY_INT,
 				.GetRow = &GetRow,
 				.GetCol = &GetCol,
 				.GetFlowDirection = &GetFlowDirection,
@@ -134,18 +144,26 @@ static struct BeachNode new(double frac_full, int r, int c, double cell_width, d
 
 static struct BeachNode empty() {
 	return (struct BeachNode) {
-		.frac_full = EMPTY_DOUBLE,
+		.frac_full = EMPTY_double,
 			.transport_dir = EMPTY_INT,
-			.transport_potential = EMPTY_DOUBLE,
-			.net_volume_change = EMPTY_DOUBLE,
+			.transport_potential = EMPTY_double,
+			.net_volume_change = EMPTY_double,
 			.is_beach = EMPTY_INT,
 			.is_boundary = EMPTY_INT,
 			.row = EMPTY_INT,
 			.col = EMPTY_INT,
-			.cell_width = EMPTY_DOUBLE,
-			.cell_length = EMPTY_DOUBLE,
+			.cell_width = EMPTY_double,
+			.cell_length = EMPTY_double,
 			.next = NULL,
 			.prev = NULL,
+			.prev_angle = EMPTY_double,
+			.next_angle = EMPTY_double,
+			.surrounding_angle = EMPTY_double,
+			.prev_timestamp = EMPTY_INT,
+			.next_timestamp = EMPTY_INT,
+			.surrounding_timestamp = EMPTY_INT,
+			.in_shadow = EMPTY_INT,
+			.shadow_timestamp = EMPTY_INT,
 			.GetRow = NULL,
 			.GetCol = NULL,
 			.GetFlowDirection = NULL,
@@ -156,18 +174,26 @@ static struct BeachNode empty() {
 static struct BeachNode* boundary(int r, int j) {
 	struct BeachNode* ptr = malloc(sizeof(struct BeachNode));
 	*ptr = (struct BeachNode) {
-		.frac_full = EMPTY_DOUBLE,
+		.frac_full = EMPTY_double,
 			.transport_dir = EMPTY_INT,
-			.transport_potential = EMPTY_DOUBLE,
-			.net_volume_change = EMPTY_DOUBLE,
+			.transport_potential = EMPTY_double,
+			.net_volume_change = EMPTY_double,
 			.is_beach = TRUE,
 			.is_boundary = TRUE,
 			.row = r,
 			.col = j,
-			.cell_width = EMPTY_DOUBLE,
-			.cell_length = EMPTY_DOUBLE,
+			.cell_width = EMPTY_double,
+			.cell_length = EMPTY_double,
 			.next = NULL,
 			.prev = NULL,
+			.prev_angle = EMPTY_double,
+			.next_angle = EMPTY_double,
+			.surrounding_angle = EMPTY_double,
+			.prev_timestamp = EMPTY_INT,
+			.next_timestamp = EMPTY_INT,
+			.surrounding_timestamp = EMPTY_INT,
+			.in_shadow = EMPTY_INT,
+			.shadow_timestamp = EMPTY_INT,
 			.GetRow = &GetBoundaryRow,
 			.GetCol = &GetBoundaryCol,
 			.GetFlowDirection = &GetBoundaryFlowDirection,
@@ -179,22 +205,30 @@ static struct BeachNode* boundary(int r, int j) {
 
 static int isEmpty(struct BeachNode* node)
 {
-	if (node == NULL)
+	if (!node)
 	{
 		return TRUE;
 	}
 
-	if (node->frac_full != EMPTY_DOUBLE
+	if (node->frac_full != EMPTY_double
 		|| node->transport_dir != EMPTY_INT
-		|| node->transport_potential != EMPTY_DOUBLE
-		|| node->net_volume_change != EMPTY_DOUBLE
+		|| node->transport_potential != EMPTY_double
+		|| node->net_volume_change != EMPTY_double
 		|| node->is_beach != EMPTY_INT
 		|| node->row != EMPTY_INT
 		|| node->col != EMPTY_INT
-		|| node->cell_width != EMPTY_DOUBLE
-		|| node->cell_length != EMPTY_DOUBLE
+		|| node->cell_width != EMPTY_double
+		|| node->cell_length != EMPTY_double
 		|| node->next != NULL
 		|| node->prev != NULL
+		|| node->prev_angle != EMPTY_double
+		|| node->next_angle != EMPTY_double
+		|| node->surrounding_angle != EMPTY_double
+		|| node->prev_timestamp != EMPTY_INT
+		|| node->next_timestamp != EMPTY_INT
+		|| node->surrounding_timestamp != EMPTY_INT
+		|| node->in_shadow != EMPTY_INT
+		|| node->shadow_timestamp != EMPTY_INT
 		|| node->GetRow != NULL
 		|| node->GetCol != NULL
 		|| node->GetFlowDirection != NULL
@@ -234,11 +268,11 @@ static double GetAngle(struct BeachNode* node1, struct BeachNode* node2)
 
 	while (angle > PI)
 	{
-		angle -= 2 * PI;
+		angle -= 2.0 * PI;
 	}
 	while (angle < -PI)
 	{
-		angle += 2 * PI;
+		angle += 2.0 * PI;
 	}
 	return angle;
 }

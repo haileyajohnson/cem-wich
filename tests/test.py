@@ -6,31 +6,17 @@ import random
 import math
 from datetime import datetime
 
-class Config(Structure):
-    _fields_ = [
-        ("grid", POINTER(POINTER(c_double))),
-        ("waveHeights", POINTER(c_double)),
-        ("waveAngles", POINTER(c_double)),
-        ('wavePeriods', POINTER(c_double)),
-        ("nRows", c_int),
-        ("nCols", c_int),
-        ("cellWidth", c_double),
-        ("cellLength", c_double),
-        ("shelfSlope", c_double),
-        ("shorefaceSlope", c_double),
-		("crossShoreReferencePos", c_int),
-		("shelfDepthAtReferencePos", c_double),
-		("minimumShelfDepthAtClosure", c_double),
-        ("lengthTimestep", c_double),
-        ("saveInterval", c_int)]
+import sys
+sys.path.append('..')
+from server.pyfiles import config
         
 if __name__ == "__main__": 
     # wait for vs debugger
     input("Press Enter to continue...")  
         
     # create basic input variables
-    nRows = 26
-    nCols = 28
+    nRows = 100
+    nCols = 300
     cellWidth = 300
     cellLength = 300
     shelfSlope = 0.001
@@ -39,11 +25,11 @@ if __name__ == "__main__":
     shelfDepthAtReferencePos = 10.0
     minimumShelfDepthAtClosure = 10.0
     lengthTimestep = 1
-    saveInterval = 1
-    numTimesteps = 365
+    saveInterval = 365
+    numTimesteps = 365*10
 
-    asymmetry = .7
-    stability = .4
+    asymmetry = 1
+    stability = .7
 
     # create wave inputs
     # random.seed(datetime.now())
@@ -62,20 +48,36 @@ if __name__ == "__main__":
         wavePeriods[i] = (random.random()*10) + 5 # random wave period 5 to 15 seconds
 
     # create grid input
-    import_grid = pd.read_excel("test/input/shoreline_config.xlsx")
+    import_grid = pd.read_excel("test/input/murray.xlsx")
     import_grid = import_grid.values
-    grid = ((POINTER(c_double)) * nRows)()
+    grid_orig = ((POINTER(c_double)) * nRows)()
     for r in range(nRows):
-        grid[r] = (c_double * nCols)()
+        grid_orig[r] = (c_double * nCols)()
         for c in range(nCols):
-            grid[r][c] = import_grid[r][c]
+            grid_orig[r][c] = import_grid[r][c]
+            
+    grid_new = ((POINTER(c_double)) * nRows)()
+    for r in range(nRows):
+        grid_new[r] = (c_double * nCols)()
+        for c in range(nCols):
+            grid_new[r][c] = import_grid[nRows - r - 1][c]
+            
 
-    # create config object
-    input = Config(grid = grid, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+    # create config objects
+    input_orig = config.Config(grid = grid_orig, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods, 
+            asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
             nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
             shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
             shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
-            lengthTimestep = lengthTimestep, saveInterval = saveInterval)
+            depthOfClosure = 0, lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
+            
+    # create config object
+    input_new = config.Config(grid = grid_new, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+            asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
+            nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
+            shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
+            shelfDepthAtReferencePos = shelfDepthAtReferencePos, minimumShelfDepthAtClosure = minimumShelfDepthAtClosure,
+            depthOfClosure = 0, lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
 
     # set library paths
     #lib_path_orig = "cem_orig/_build/test_cem"
@@ -87,11 +89,11 @@ if __name__ == "__main__":
     lib_new = CDLL(lib_path_new)
 
     # set arg/return types
-    lib_orig.run_test.argtypes = [Config, c_int]
+    lib_orig.run_test.argtypes = [config.Config, c_int]
     lib_orig.run_test.restype = c_int
-    lib_new.run_test.argtypes = [Config, c_int]
+    lib_new.run_test.argtypes = [config.Config, c_int]
     lib_new.run_test.restype = c_int
 
     # initialize both models
-    print(lib_orig.run_test(input, numTimesteps, saveInterval))
-    print(lib_new.run_test(input, numTimesteps, saveInterval))
+    print(lib_orig.run_test(input_orig, numTimesteps, saveInterval))
+    print(lib_new.run_test(input_new, numTimesteps, saveInterval))

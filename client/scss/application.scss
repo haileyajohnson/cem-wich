@@ -19,13 +19,11 @@ html, body {
         color: #fff!important;
         background-color: #000!important;
         z-index: 4;
-        width: 98%;
         padding: 1%;
     }
 
     .progress-bar {    
         color: #000!important;
-        width: 100%;
         margin-top: 8px;
         padding: 0 0.5%;
     }
@@ -73,6 +71,20 @@ html, body {
         background-color: #ff9800;
         border-color: #ff9800;
     }
+
+    .mode-section {
+        margin-left: 1%;
+        font-size: 14px;
+
+        .section-title {
+            float:left;
+            margin-top: 3px;
+        }
+        .mode-input {
+            float: left;
+            margin-top: 3px;
+        }
+    }
 }
 
 /* map and input panes*/
@@ -81,6 +93,30 @@ html, body {
     width: 98%;
     padding: 1%;
     overflow: auto;
+
+    #error-container {        
+        padding: 1px 5px;
+        background-color: #F6B759;
+        margin-bottom: 4px;
+        height: 26px;
+        display: none;
+
+        #error-message {
+            display: inline-flex;
+            vertical-align: middle;
+        }
+
+        #close {
+            float:right;
+            display:inline-block;
+            padding:2px 5px;
+            background:#F6B759;
+        }
+        #close:hover{
+            color:#fff;
+            cursor: pointer;
+        }
+    }
 
     .section {
         margin-bottom: 8px;
@@ -118,8 +154,8 @@ html, body {
     }
 
     .content-pane {
-        padding: 15px;
-        height: 100%;
+        padding: 2.5%;
+        height: 95%;
         overflow: auto;
     }
 
@@ -151,10 +187,17 @@ html, body {
     .output-pane {
         background-color: #d3d3d3;
         overflow: auto;
-        height: 250px;
+        height: 230px;
         width: 95%;
-        white-space: pre;
         padding: 5px 10px;
+
+        .output-table{
+            width: 100%;
+
+            th {
+                border: 1px solid black;
+            }
+        }
     }
 
     /* Edit modal window */

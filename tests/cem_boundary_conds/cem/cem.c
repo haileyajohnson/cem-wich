@@ -130,6 +130,7 @@ int run_test(Config config, int numTimesteps, int saveInterval) {
 	int i = 0;
 	while (i < numTimesteps)
 	{
+		printf("%d\n", i);
 		int steps = (i + saveInterval) < numTimesteps ? saveInterval : (numTimesteps - i);
 		if (update(steps) != 0) { exit(1); }
 		i += saveInterval;
@@ -167,7 +168,7 @@ int initialize(Config config) {
 	FixBeach();
 
 	FindBeachCells(0);
-	SaveLineToFile();
+	//SaveLineToFile();
 
 	return 0;
 }
@@ -305,7 +306,7 @@ void FindBeachCells(int ystart)
 		 * direction     */
 		 /* Jump off and start again closer to middle */
 
-		if ((NextY < 1) || ((NextY == Y[0]) && (NextX == X[0])) ||
+		if ((NextY < 0) || ((NextY == Y[0]) && (NextX == X[0])) ||
 			(z > MaxBeachLength - 2)) {
 			FellOffArray = 'y';
 			ZeroVars();
@@ -903,8 +904,8 @@ void DetermineAngles(void)
 		{
 			/* math revised 6-03 */
 
-			ShorelineAngle[i] = atan2(((X[i + 1] - (PercentFullSand[X[i + 1]][Y[i + 1]])) -
-				(X[i] - (PercentFullSand[X[i]][Y[i]]))) * cell_length, (Y[i + 1] - Y[i]) * cell_width);
+			ShorelineAngle[i] = atan2((X[i + 1] - X[i] - (PercentFullSand[X[i + 1]][Y[i + 1]] + PercentFullSand[X[i]][Y[i]]))* cell_length, 
+				(Y[i + 1] - Y[i]) * cell_width);
 
 			if (ShorelineAngle[i] > PI) {
 				ShorelineAngle[i] -= 2.0 * PI;
@@ -915,25 +916,22 @@ void DetermineAngles(void)
 			/* function revised 1-04 - asusme if goin right, on regular shore */
 			/*  'regular' beach */
 		{
-			ShorelineAngle[i] = atan2(
-				((X[i + 1] + (PercentFullSand[X[i + 1]][Y[i + 1]])) -
-				(X[i] + (PercentFullSand[X[i]][Y[i]]))) * cell_length, (Y[i + 1] - Y[i]) * cell_width);
+			ShorelineAngle[i] = atan2((X[i + 1] - X[i] + (PercentFullSand[X[i + 1]][Y[i + 1]] - PercentFullSand[X[i]][Y[i]])) * cell_length, 
+					(Y[i + 1] - Y[i]) * cell_width);
 		}
 
 		else if (Y[i] == Y[i + 1] && X[i] > X[i + 1])
 			/*  Shore up and down, on right side */
 		{
 			ShorelineAngle[i] = atan2((X[i + 1] - X[i]) * cell_length,
-				((Y[i + 1] + (PercentFullSand[X[i + 1]][Y[i + 1]])) -
-				(Y[i] + (PercentFullSand[X[i]][Y[i]]))) * cell_width);
+				(Y[i + 1] - Y[i] + (PercentFullSand[X[i + 1]][Y[i + 1]] - PercentFullSand[X[i]][Y[i]])) * cell_width);
 		}
 
 		else if (Y[i] == Y[i + 1] && X[i] < X[i + 1])
 			/* Shore up and down, on left side */
 		{
 			ShorelineAngle[i] = atan2((X[i + 1] - X[i]) * cell_length,
-				((Y[i + 1] - (PercentFullSand[X[i + 1]][Y[i + 1]])) -
-				(Y[i] - (PercentFullSand[X[i]][Y[i]]))) * cell_width);
+				(Y[i + 1] - Y[i] - (PercentFullSand[X[i + 1]][Y[i + 1]] + PercentFullSand[X[i]][Y[i]])) * cell_width);
 		}
 
 		else {
@@ -1187,7 +1185,7 @@ void SedTrans(int i, int From, double ShoreAngle, char MaxT, int Last)
 	 /* so no attempt made to make this a more perfect imperfection */
 
 	VolumeAcrossBorder[i] =
-		fabs(1.1 * rho * Raise(GRAVITY, 3.0 / 2.0) * Raise(WvHeight, 2.5) *
+		fabs(.67 * rho * Raise(GRAVITY, 3.0 / 2.0) * Raise(WvHeight, 2.5) *
 			cos(Angle) * sin(Angle) * myConfig.lengthTimestep); /*LMV - now global array*/
 
 /*LMV VolumeIn/Out is now calculated below in AdjustShore */
@@ -1209,7 +1207,7 @@ void FlowInCell(void)
 {
 	int i;
 
-	/* float AverageFull; */
+	/* double AverageFull; */
 	double TotalPercentInBeaches = 0.;
 
 	for (i = 1; i < TotalBeachCells-1; i++) {
@@ -1250,7 +1248,7 @@ void FixFlow(void)
 											 in cell behind) LMV */
 
 	double Depth; /* Depth of current cell */
-	/* float        DeltaArea;       Holds change in area for cell (m^2) */
+	/* double        DeltaArea;       Holds change in area for cell (m^2) */
 	double Distance;   /* distance from shore to intercept of equilib. profile and
 											 overall slope (m) */
 	double Xintercept; /* X position of intercept of equilib. profile and overall
@@ -1660,7 +1658,7 @@ void FixBeach(void)
 /* Hopefully addresses strange problems caused by filling/emptying of cells */
 /* Looks at entire data set */
 /* Find unattached pieces of sand and moves them back to the shore */
-/* Takes care of 'floating bits' of sand */
+/* Takes care of 'doubleing bits' of sand */
 /* Also takes care of over/under filled beach pieces */
 /* Revised 5/21/02 to move sand to all adjacent neighbors sandrevt.c */
 /* Changes global variable PercentFullSand[][] */
@@ -1699,7 +1697,7 @@ void FixBeach(void)
 			/* Take care of situations that shouldn't exist */
 
 			if ((PercentFullSand[x][y]) < -0.000001) {
-				/* RCL changed  0.0 to 10E-6--floating-pt equality is messy */
+				/* RCL changed  0.0 to 10E-6--doubleing-pt equality is messy */
 				OopsImEmpty(x, y);
 			}
 
@@ -1793,7 +1791,7 @@ void FixBeach(void)
 		done = TRUE;
 		for (x = 1; x < X_MAX - 1; x++) {
 			for (y = 1; y < Y_MAX - 1; y++) {
-				if ((PercentFullSand[x][y] > 1.0) || PercentFullSand[x][y] < -0.000001)
+				if ((PercentFullSand[x][y] > 1.0) || PercentFullSand[x][y] < 0.0)
 					done = FALSE;
 				if (PercentFullSand[x][y] > 1.0) {
 					OopsImFull(x, y);

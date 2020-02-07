@@ -6,7 +6,7 @@
 // config vars
 var configJSON;
 const CLIENT_ID = '762501139172-rjf0ia3vv9edu6gg0m46aoij519khuk7.apps.googleusercontent.com';
-var socket;
+var mode;
 
 // application interface objects
 var mapInterface;
@@ -22,6 +22,8 @@ var modal;
 // jQuery
 var $saveButton;
 var $loadButton;
+var $errorMessage;
+var $errorContainer;
 
 function loadApp() {
     // Attempt to authenticate using existing credentials.
@@ -35,26 +37,15 @@ function initialize() {
     // create applicaiton interfaces
     mapInterface = MapInterface();
     mapInterface.initMap();
-
-
-    // start up the SocketIO connection to the server
-    socket = io.connect('http://' + document.domain + ':' + location.port + '/request');
-    // this is a callback that triggers when the results event is emitted by the server.
-    socket.on('results_ready', (msg) => {
-        onUpdate(msg);
-    });
-    socket.on('model_complete', (msg) => {
-        onModelComplete(msg);
-    });
     
     // create tabs
     gridTab = GridTab();
-    gridTab.init();
     waveTab = WaveTab();
-    waveTab.init();
-    controlTab = ControlsTab()
-    controlTab.init();
+    controlTab = ControlsTab();
     runTab = RunTab();
+    gridTab.init();
+    waveTab.init();
+    controlTab.init();
     runTab.init();
     
     // create modal dialog window
@@ -64,9 +55,27 @@ function initialize() {
     // init buttons
     $saveButton = $(".save-button");
     $loadButton = $(".load-button");
+    $errorContainer = $("#error-container");
+    $errorContainer.hide();
+    $errorMessage = $("#error-message");
+    $("#close").click(() => { hideErrorMessage(); })
 
     // open grid tab
     onTabChange(gridTab);
+
+    // set up mode inputs
+    mode = 1;
+    $('input[type=radio][name=mode]:first').attr("checked", true);
+    $('input[type=radio][name=mode]').change(function(){ mode = parseInt(this.value); });
+}
+
+function showErrorMessage(msg) {
+    $errorMessage.text(msg);
+    $errorContainer.show();
+}
+
+function hideErrorMessage() {
+    $errorContainer.hide();
 }
 
 /**
@@ -112,34 +121,74 @@ function onRun() {
     // create payload
     var input_data = {
         grid: mapInterface.cemGrid,
+        nRows: mapInterface.numRows,
+        nCols: mapInterface.numCols,
+        polyGrid: mapInterface.polyGrid,
+        source: gridTab.source,
+        start: gridTab.start_year,
+        geometry: mapInterface.box.getCoordinates(),
         cellWidth: mapInterface.getCellWidth(),
         cellLength: mapInterface.getCellLength(),
         asymmetry: parseFloat(this.waveTab.a_val),
         stability: parseFloat(this.waveTab.u_val),
-        waveHeight: parseFloat(this.waveTab.wave_height),
-        wavePeriod: parseFloat(this.waveTab.wave_period),
+        waveHeights: this.waveTab.wave_heights,
+        wavePeriods: this.waveTab.wave_periods,
+        waveAngles: this.waveTab.wave_angles,
         shelfSlope: parseFloat(this.controlTab.shelf_slope),
         shorefaceSlope: parseFloat(this.controlTab.shoreface_slope),
+        depthOfClosure: parseFloat(this.controlTab.closure_depth),
         numTimesteps: controlTab.num_timesteps,
         lengthTimestep: parseFloat(this.controlTab.length_timestep),
-        saveInterval: parseInt(this.controlTab.save_interval)
+        saveInterval: parseInt(this.controlTab.save_interval),
+        mode: mode
     }
     // ensure necessary values are present and valid
     var status = validateData(input_data);
     if (status == 0) {
-        socket.emit('run', input_data);
+        // pass to python
+        $.post('/initialize', {
+            type: "json",
+            input_data: JSON.stringify(input_data)
+        }).done((resp) => {
+            onUpdate(0); 
+        }).fail((err) => {
+            showErrorMessage(JSON.parse(err.responseText).message);
+        });
+    } else {
+        showErrorMessage("One or more inputs are invalid.");
     }
 }
 
-function onUpdate(msg) {
-    mapInterface.updateDisplay(msg.grid);
-    runTab.displayTimestep(msg.time);
-    runTab.updateOutput(msg);
+function onUpdate(timestep) {
+    $.get('/update/' + timestep).done((resp) => {
+        try {
+            resp = JSON.parse(resp);
+            if (resp.status != 200) {
+                throw(new Error(resp.message))
+            }
+        } catch (err){
+            showErrorMessage(err.message);
+            return;
+        }
+        new_time = resp.timestep;
+        runTab.displayTimestep(new_time);
+        if (resp.grid.length > 0) {
+            mapInterface.updateDisplay(resp.grid);
+        }
+        runTab.updateOutput(resp.results, new_time);
+        if (new_time < controlTab.num_timesteps) {
+            onUpdate(new_time);
+        } else {
+            onModelComplete();
+        }
+    }).fail((err) => { showErrorMessage(JSON.parse(err.responseText).message); });
 }
 
-function onModelComplete(msg) {
-    mapInterface.mapTransform(getEndFilterDates(), false);
-    enableAll();
+function onModelComplete() {
+    $.get('/finalize').done(() => {
+        mapInterface.mapTransform(getFilterDates(controlTab.end_year), false);
+        enableAll();
+    }).fail((err) => { showErrorMessage(JSON.parse(err.responseText).message); });
 }
 
 /*********
@@ -153,6 +202,7 @@ function onModelComplete(msg) {
     // grid tab
     gridTab.$clearButton.disable();
     gridTab.$editButton.disable();
+    gridTab.$start_year.disable();
 
     // wave tab
     waveTab.$asymmetry.disable();
@@ -169,7 +219,7 @@ function onModelComplete(msg) {
 
     // run tab
     runTab.$runButton.enable();
-    runTab.$outputButton.disable();
+    runTab.$outputButton.enable();
 
  }
 
@@ -180,6 +230,7 @@ function onModelComplete(msg) {
     // grid tab
     gridTab.$clearButton.enable();
     gridTab.$editButton.enable();
+    gridTab.$start_year.enable();
 
     // wave tab
     waveTab.$asymmetry.enable();
@@ -199,14 +250,9 @@ function onModelComplete(msg) {
     runTab.$outputButton.enable();
  }
 
- function getEndFilterDates() {
-    var endYear = this.controlTab.end_year;
-    if (endYear >= 2012 && mapInterface.source.name == "LS5") {
-        mapInterface.source = sources[1];
-    }
-    
-    var start_date = endYear + "-01-01";
-    var end_date = endYear + "-12-01";
+ function getFilterDates(year) {
+    var start_date = year + "-01-01";
+    var end_date = year + "-12-31";
     return [start_date, end_date];
  }
 
@@ -228,16 +274,34 @@ function updateJSON() {
         rotation: mapInterface.rotation,
         numRows: mapInterface.numRows,
         numCols: mapInterface.numCols,
-        grid: mapInterface.cemGrid
+        source: gridTab.source,
+        startYear: gridTab.start_year,
     };
     if (coords) {
         gridConfig.points = [coords[0], coords[2]];
     }
     configJSON.gridConfig = gridConfig;
 
-    // TODO save wave inputs
+    // save wave inputs
+    configJSON.waveConfig = {
+        asymmetry: waveTab.a_val,
+        stability: waveTab.u_val,
+        waveHeights: waveTab.wave_heights,
+        wavePeriods: waveTab.wave_periods,
+        waveAngles: waveTab.wave_angles
+    };
 
-    // TODO save config inputs
+    // save config inputs
+    configJSON.controlConfig = {
+        shelfSlope: controlTab.shelf_slope,
+        shorefaceSlope: controlTab.shoreface_slope,
+        crossShoreRef: controlTab.cross_shore_ref,
+        refDepth: controlTab.ref_depth,
+        minClosureDepth: controlTab.min_closure_depth,
+        endYear: controlTab.end_year,
+        lengthTimestep: controlTab.length_timestep,
+        saveInterval: controlTab.save_interval
+    };
 }
 
 function importJSON(newContent) {
@@ -247,24 +311,50 @@ function importJSON(newContent) {
     configJSON = JSON.parse(newContent);
 
     // load map view settings
-    mapInterface.map.getView().setCenter(configJSON.viewSettings.center);
-    mapInterface.map.getView().setZoom(configJSON.viewSettings.zoom);
+    if (configJSON.viewSettings) {
+        if (configJSON.viewSettings.center) { mapInterface.map.getView().setCenter(configJSON.viewSettings.center); }
+        if (configJSON.viewSettings.zoom) { mapInterface.map.getView().setZoom(configJSON.viewSettings.zoom); }
+    }
 
     // load grid inputs
     var gridConfig = configJSON.gridConfig;
-    mapInterface.setNumRows(gridConfig.numRows);
-    mapInterface.setNumCols(gridConfig.numCols);
-    mapInterface.map.getView().setRotation(gridConfig.rotation);  
-    mapInterface.cemGrid = gridConfig.grid;
-    if (gridConfig.points) {
-        var points = gridConfig.points;
-        mapInterface.updateBox(points[0][0], points[0][1], points[1][0], points[1][1]);
+    if (gridConfig) {
+        if (gridConfig.numRows) { mapInterface.setNumRows(gridConfig.numRows); }
+        if (gridConfig.numCols) { mapInterface.setNumCols(gridConfig.numCols); }
+        if (gridConfig.rotation) { mapInterface.map.getView().setRotation(gridConfig.rotation); }
+        gridTab.source = gridConfig.source ? gridConfig.source : gridTab.source;
+        gridTab.start_year = gridConfig.startYear ? gridConfig.startYear : gridTab.start_year;
+        if (gridConfig.points) {
+            var points = gridConfig.points;
+            mapInterface.updateBox(points[0][0], points[0][1], points[1][0], points[1][1]);
+        }
+        gridTab.setAllValues();
     }
-    gridTab.setAllValues();
 
-    // TODO: load wave inpts
+    // load wave inpts
+    var waveConfig = configJSON.waveConfig;
+    if (waveConfig) {
+        waveTab.a_val = waveConfig.asymmetry;
+        waveTab.u_val = waveConfig.stability;
+        waveTab.wave_heights = waveConfig.waveHeights;
+        waveTab.wave_periods = waveConfig.wavePeriods;
+        waveTab.wave_angles = waveConfig.waveAngles;
+        waveTab.setAllValues();
+    }
 
-    // TODO: load config inputs
+    // load config inputs
+    var controlConfig = configJSON.controlConfig;
+    if (controlConfig) {
+        controlTab.shelf_slope = controlConfig.shelfSlope ? controlConfig.shelfSlope : controlTab.shelf_slope;
+        controlTab.shoreface_slope = controlConfig.shorefaceSlope ? controlConfig.shorefaceSlope : controlTab.shoreface_slope;
+        controlTab.cross_shore_ref = controlConfig.crossShoreRef ? controlConfig.crossShoreRef : controlTab.cross_shore_ref;
+        controlTab.ref_depth = controlConfig.refDepth ? controlConfig.refDepth : controlTab.ref_depth;
+        controlTab.min_closure_depth = controlConfig.minClosureDepth ? controlConfig.minClosureDepth : controlTab.min_closure_depth;
+        controlTab.end_year = controlConfig.endYear ? controlConfig.endYear : controlTab.end_year;
+        controlTab.length_timestep = controlConfig.lengthTimestep ? controlConfig.lengthTimestep : controlTab.length_timestep;
+        controlTab.save_interval = controlConfig.saveInterval ? controlConfig.saveInterval : controlTab.save_interval;
+        controlTab.setAllValues();
+    }
 }
 
 function saveConfig() {    
@@ -275,11 +365,11 @@ function saveConfig() {
     a.click();
 }
 
- function loadConfig() {
+function loadConfig() {
     // getting a hold of the file reference
     var file = this.event.target.files[0];
     if (!file) { return; }
-    
+
     // setting up the reader
     var reader = new FileReader();
     reader.readAsText(file,'UTF-8');
@@ -289,7 +379,23 @@ function saveConfig() {
         importJSON(content)
     };
     this.event.target.value = '';
- }
+}
+
+function uploadWaveFile() {    
+    // getting a hold of the file reference
+    var file = event.target.files[0];
+    if (!file) { return; }
+
+    // setting up the reader
+    var reader = new FileReader();
+    reader.readAsText(file,'UTF-8');
+
+    reader.onload = (readerEvent) => {
+        var content = readerEvent.target.result;
+        waveTab.readWaveFile(content);
+    };
+    this.event.target.value = '';
+}
 
 /**
  * Grid tab view
@@ -303,17 +409,23 @@ function GridTab() {
         
         $numRows: $("input[name=numRows]"),       
         $numCols: $("input[name=numCols]"),
+        $cellSize: $(".cell-dimensions"),
 
         $lon1: $("input[name=lon1]"),
         $lat1: $("input[name=lat1]"),
         $lon2: $("input[name=lon2]"),
         $lat2: $("input[name=lat2]"),
         $coords: $(".coord"),
+        $start_year: $("input[name=start-date]"),
 
         $drawButton: $(".draw-button"),
         $submitButton: $(".submit-button"),
         $clearButton: $(".clear-button"),
         $editButton: $(".edit-button"),
+        $exportButton: $(".export-button"),
+
+        source: -1,
+        start_year: 1985,
 
         init: function() {
             // add input listeners
@@ -322,23 +434,25 @@ function GridTab() {
             this.$numRows.change(() => { this.onNumRowsChange(); });
             this.$numCols.change(() => { this.onNumColsChange(); });
             this.$coords.change(() => { this.onCoordsChange(); });
+            this.$start_year.change(() => { this.onStartYearChange(); });
 
             // add button listeners
             this.$drawButton.click(() => { this.onDrawClicked(); });
             this.$submitButton.click(() => { this.onSubmitClicked(); });
             this.$clearButton.click(() => { this.onClearClicked(); });
             this.$editButton.click(() => { this.toggleEdit(); });
+            this.$exportButton.click(() => { this.exportGrid(); });
 
-
-            $('input[type=radio]').click(function(){
-                    mapInterface.source = sources[this.value];
+            $('input[type=radio][name=source]').click(($elem) => {
+                    this.source = $elem.value;
             });
-            $('input[type=radio]:first').attr("checked", true);
+            $('input[type=radio][name=source]:first').attr("checked", true);
 
             // disable buttons
             this.$submitButton.disable();
             this.$clearButton.disable();
             this.$editButton.disable();
+            this.$exportButton.disable();
 
             // initialize
             this.setAllValues();
@@ -348,30 +462,22 @@ function GridTab() {
          * click listeners
          *****************/
         onSubmitClicked: function() {
-            this.$coords.disable();
+            if (mapInterface.mapTransform(getFilterDates(gridTab.start_year), true) == 0) {
+                this.$coords.disable();
 
-            this.$drawButton.disable();
-            $loadButton.disable();
-            $('input[type=radio]').disable();
-            this.$numRows.disable();
-            this.$numCols.disable();
-            this.$submitButton.disable();
+                this.$drawButton.disable();
+                $loadButton.disable();
+                $('input[type=radio][name=source]').disable();
+                this.$numRows.disable();
+                this.$numCols.disable();
+                this.$submitButton.disable();
+                this.$start_year.disable();      
+                this.$editButton.enable();
+                this.$exportButton.enable();
+                runTab.$runButton.enable();
 
-            mapInterface.mapTransform([mapInterface.source.startFilter, mapInterface.source.endFilter], true);
-            
-            // send to server
-            var grid_data = {
-                nRows: mapInterface.numRows,
-                nCols: mapInterface.numCols,
-                polyGrid: mapInterface.polyGrid,
-                source: mapInterface.source.name,
-                year: mapInterface.source.year,
-                geometry: mapInterface.box.getCoordinates()
+                this.$cellSize.text("Cell size: " + mapInterface.getCellLength().toFixed(3) + "m x " + mapInterface.getCellWidth().toFixed(3) + "m");
             }
-            socket.emit('submit', grid_data);
-            
-            this.$editButton.enable();
-            runTab.$runButton.enable();
         },
 
         onClearClicked: function() {
@@ -381,16 +487,16 @@ function GridTab() {
             this.setRotation();
             this.$coords.val("");
             this.$coords.enable();
-            $('input[type=radio]').enable();            
+            $('input[type=radio][name=source]').enable();            
             this.$numRows.enable();
             this.$numCols.enable();
-            
+            this.$start_year.enable();
+
             this.$drawButton.enable();
             this.$submitButton.disable();
             this.$editButton.disable();
             this.$clearButton.disable();
-
-
+            this.$exportButton.disable();
             
             $loadButton.enable();
             runTab.$runButton.disable();
@@ -405,6 +511,20 @@ function GridTab() {
         toggleEdit: function() {
             this.$editButton.attr("selected") ? this.$editButton.removeAttr("selected") : this.$editButton.attr("selected", "selected");
             mapInterface.toggleEditMode();
+        },        
+
+        exportGrid: function() {
+            var a = document.createElement("a");
+            var content = "data:text/csv;charset=utf-8,";
+            // write nRows and nCols
+            content += mapInterface.numRows + ", " + mapInterface.numCols + "\n";
+            // write row size and col size
+            content += mapInterface.getCellLength() + ", " + mapInterface.getCellWidth() + "\n";
+            // write grid
+            content += mapInterface.cemGrid.map(e => e.join(",")).join("\n");
+            a.href = encodeURI(content);
+            a.download = "grid.txt";
+            a.click();
         },
 
         /*****************
@@ -443,6 +563,12 @@ function GridTab() {
                 deg_to_rad(tryParseFloat(this.$rotation.val()), mapInterface.rotation));
         },
 
+        onStartYearChange: function() {
+            this.start_year = this.$start_year.val();
+            controlTab.getNumTimesteps();
+            runTab.displayTimestep(0);
+        },
+
         /*********
          * setters
          *********/        
@@ -450,7 +576,9 @@ function GridTab() {
             this.setRotation();
             this.$numRows.val(mapInterface.numRows);
             this.$numCols.val(mapInterface.numCols);
-            this.setCoords();
+            this.setCoords();            
+            $("input[type=radio][name=source][value=" + this.source + "]").attr("checked", true);
+            this.$start_year.val(this.start_year);
         },        
 
         setRotation: function() {    
@@ -491,24 +619,51 @@ function WaveTab() {
         $stability: $("input[name=u-input]"),
         $wave_height: $("input[name=wave-height]"),       
         $wave_period: $("input[name=wave-period]"),
+        $upload_button: $(".upload-button"),
 
-        a_val: null,
-        u_val: null,
-        wave_height: null,
-        wave_period: null,
+        a_val: 50,
+        u_val: 50,
+        wave_heights: [1.5],
+        wave_periods: [10],
+        wave_angles: [-1],
 
         init: function() {
             this.$tab.click(() => { onTabChange(this); });
             // init values
-            this.a_val = this.$asymmetry.val();
-            this.u_val = this.$stability.val();
-            this.wave_height = this.$wave_height.val();
-            this.wave_period = this.$wave_period.val();
+            this.setAllValues();
             // attach listeners
             this.$asymmetry.change(() => { this.onAsymmetryChange(); });
             this.$stability.change(() => { this.onStabilityChange(); });
             this.$wave_height.change(() => { this.onWaveHeightChange(); });
             this.$wave_period.change(() => { this.onWavePeriodChange(); });
+            this.$upload_button.click(() => { $('#wave-file-input').trigger('click'); });
+        },
+
+        readWaveFile: function(csv) {
+            try {
+                var H = [];
+                var T = [];
+                var theta = [];
+                var rows = csv.split('\n');
+                for (var i = 0; i < rows.length; i++) {
+                    var cols = rows[i].split(',');
+                    if (cols[0]) {
+                        H.push(parseFloat(cols[0]));
+                        T.push(parseFloat(cols[1]));
+                        theta.push(parseFloat(cols[2]));
+                    }
+                }
+                this.wave_heights = H;
+                this.wave_periods = T;
+                this.wave_angles = theta;
+
+                this.disableWaveInput();
+                this.a_val = -1;
+                this.u_val = -1;
+            } catch (e)
+            {
+                return 1;
+            }
         },
 
         /***********
@@ -516,20 +671,51 @@ function WaveTab() {
          ***********/
         onAsymmetryChange: function() {
             this.a_val = this.$asymmetry.val();
+            if (this.a_val >= 0) { 
+                this.onWaveHeightChange();
+                this.onWavePeriodChange();
+                this.wave_angles = [-1];
+            }
         },
 
         onStabilityChange: function() {
             this.u_val = this.$stability.val();
+            if (this.u_val >= 0) {
+                this.onWaveHeightChange();
+                this.onWavePeriodChange();
+                this.wave_angles = [-1];0
+            }
         },
 
         onWaveHeightChange: function() {
-            this.wave_height = this.$wave_height.val();
+            this.wave_heights = [parseFloat(this.$wave_height.val())];
         },
 
         onWavePeriodChange: function() {
-            this.wave_period = this.$wave_period.val();
-        }
+            this.wave_periods = [parseFloat(this.$wave_period.val())];
+        },
 
+        /*********
+         * setters
+         *********/
+        setAllValues: function() {
+            if (this.a_val && this.u_val) {
+                this.$asymmetry.val(this.a_val);
+                this.$stability.val(this.u_val);
+                this.$wave_height.val(this.wave_heights[0]);
+                this.$wave_period.val(this.wave_periods[0]);
+            }
+            else {
+                this.disableWaveInput();
+            }
+        },
+
+        disableWaveInput: function() {
+            this.$asymmetry.disable();
+            this.$stability.disable();
+            this.$wave_height.disable();
+            this.$wave_period.disable();
+        }
     }
 }
 
@@ -543,36 +729,39 @@ function ControlsTab() {
 
         $shelf_slope: $("input[name=shelf-slope]"),
         $shoreface_slope: $("input[name=shoreface-slope]"),
+        $closure_depth: $("input[name=closure-depth]"),
         $end_year: $("input[name=end-date]"),
         $length_timestep: $("input[name=timestep]"),
         $save_interval: $("input[name=save-interval]"),
 
-        shelf_slope: null,
-        shoreface_slope: null,
-        end_year: null,
-        length_timestep: null,
-        save_interval: null,
+        shelf_slope: .001,
+        shoreface_slope: .01,
+        closure_depth: 10.0,
+        end_year: new Date().getFullYear() - 1,
+        length_timestep: 1,
+        save_interval: 365,
         num_timesteps: null,
 
         init: function() {
             this.$tab.click(() => { onTabChange(this); });
             // init values
-            this.shelf_slope = this.$shelf_slope.val();
-            this.shoreface_slope = this.$shoreface_slope.val();
-            this.end_year = this.$end_year.val();
-            this.length_timestep = this.$length_timestep.val();
-            this.save_interval = this.$save_interval.val();
+            this.setAllValues();
             // attach listeners
             this.$shelf_slope.change(() => { this.onShelfSlopeChange(); });
             this.$shoreface_slope.change(() => { this.onShorefaceSlopeChange(); });
+            this.$closure_depth.change(() => { this.onClosureDepthChange(); });
             this.$end_year.change(() => { this.onEndYearChange(); });
             this.$length_timestep.change(() => { this.onTimestepLengthChange(); });
             this.$save_interval.change(() => { this.onSaveIntervalChange(); });
-            this.getNumTimesteps();
         },
 
         getNumTimesteps: function() {
-            this.num_timesteps = parseInt(Math.round((this.end_year - mapInterface.source.year) * (365/this.length_timestep)))
+            var startDate = new Date(gridTab.start_year + "-01-01");
+            var endDate = new Date(this.end_year + "-12-31");
+            var millis = endDate.getTime() - startDate.getTime();
+            var days = millis / (1000 * 60 * 60 * 24);
+            this.num_timesteps = Math.floor(days / this.length_timestep);
+            if (runTab) { runTab.displayNumTimesteps(); }
         },
 
         /***********
@@ -585,6 +774,10 @@ function ControlsTab() {
         onShorefaceSlopeChange: function() {
             this.shoreface_slope = this.$shoreface_slope.val();
         },
+        
+        onClosureDepthChange: function() {
+            this.closure_depth = this.$closure_depth.val();
+        },
 
         onEndYearChange: function() {
             this.end_year = this.$end_year.val();
@@ -594,10 +787,25 @@ function ControlsTab() {
 
         onTimestepLengthChange: function() {
             this.length_timestep = this.$length_timestep.val();
+            this.getNumTimesteps();
+            runTab.displayTimestep(0);
         },
 
         onSaveIntervalChange: function() {
             this.save_interval = this.$save_interval.val();
+        },
+
+        /*********
+         * setters
+         *********/
+        setAllValues: function() {
+            this.getNumTimesteps();     
+            this.$shelf_slope.val(this.shelf_slope);
+            this.$shoreface_slope.val(this.shoreface_slope);
+            this.$closure_depth.val(this.closure_depth);
+            this.$end_year.val(this.end_year);
+            this.$length_timestep.val(this.length_timestep);
+            this.$save_interval.val(this.save_interval);  
         }
     }
 }
@@ -610,7 +818,7 @@ function RunTab() {
         $elem: $(".run-tab"),
         $tab: $("#run-tab"),
         
-        $output: $(".output-pane"),
+        $output: $(".output-table > tbody"),
         $timestep: $(".timestep"),
         $runButton: $(".run-button"),
         $outputButton: $(".output-button"),
@@ -623,31 +831,52 @@ function RunTab() {
             this.$outputButton.disable();
 
             this.displayTimestep(0);
-            this.$output.text('t \tdif  \t\tPCA\n');
+            this.displayNumTimesteps();
         },
 
         /***********
          * callbacks
          ***********/
-        updateOutput: function(msg) {
-            var text = this.$output.text();
-            var pca = msg.sp_pca;
-            var pca_str = "";
-            for (var i = 0; i < 2; i++) {
-                num = pca[i]*100;
-                num = num.toPrecision(4);
-                pca_str += num + ", "
+        updateOutput: function(msg, timestep) {
+            var $trow = $("<tr></tr>");
+            $trow.append($("<td></td>").text(timestep));
+
+            var shape = msg.sp_pca;
+            if (shape.hasOwnProperty("rotation")) {
+                $trow.append($("<td></td>").text((shape.rotation).toFixed(3)));
+            } else {
+                $trow.append($("<td></td>").text("---"));
             }
-            text += msg.time + ":\t" + (100*msg.dif).toFixed(4) + '\t' + pca_str + "\n";
-            this.$output.text(text);
+            if (shape.hasOwnProperty("scale")) {
+                $trow.append($("<td></td>").text((shape.scale).toFixed(3)));
+            } else {
+                $trow.append($("<td></td>").text("---"));
+            }
+
+            var S = msg.t_pca;
+            if (S.length >= 3) {
+                $trow.append($("<td></td>").text(S[0].toFixed(3)))
+                .append($("<td></td>").text(S[1].toFixed(3)))
+                .append($("<td></td>").text(S[2].toFixed(3)));
+            } else {
+                $trow.append($("<td></td>").text("---"))
+                .append($("<td></td>").text("---"))
+                .append($("<td></td>").text("---"));
+            }
+
+            $trow.appendTo(this.$output);
         },
 
         clearOutput: function() {
-            this.$output.text("");
+            this.$output.empty();
         },
 
         displayTimestep: function(t) {
-            this.$timestep.text("T = " + t + " out of " + controlTab.num_timesteps);
+            $(this.$timestep.find(".current-step")[0]).text("t = " + t);
+        },
+
+        displayNumTimesteps: function() {
+            $(this.$timestep.find(".num-timesteps")[0]).text(controlTab.num_timesteps);
         }
     }
 }

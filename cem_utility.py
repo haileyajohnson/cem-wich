@@ -1,73 +1,40 @@
-from flask import Flask, render_template, request, jsonify
-from flask_socketio import SocketIO, emit
+from flask import Flask, render_template, send_file, request, jsonify
 import json
+app = Flask(__name__, static_folder="_dist")
+from ctypes import *
 import math
 import numpy as np
-from skimage import filters
-from sklearn.decomposition import PCA
-app = Flask(__name__, static_folder="_dist")
-app.config["SECRET_KEY"] = "secret!"
-socketio = SocketIO(app)
-
+import multiprocessing as mp
 import ee
 import os
+from io import StringIO, BytesIO
+from enum import Enum
+import zipfile
 
-from ctypes import *
-from threading import Thread
+from server.pyfiles import *
 
-class Config(Structure):
-    _fields_ = [
-        ("grid", POINTER(POINTER(c_float))),
-        ("nRows", c_int),
-        ("nCols", c_int),
-        ("cellWidth", c_float),
-        ("cellLength", c_float),
-        ("asymmetry", c_double),
-        ("stability", c_double),
-        ("waveHeight", c_double),
-        ("wavePeriod", c_double),
-        ("shelfSlope", c_double),
-        ("shorefaceSlope", c_double),
-        ("numTimesteps", c_int),
-        ("lengthTimestep", c_double),
-        ("saveInterval", c_int)]
+# mode application is running in
+mode = None
+class Mode(Enum):
+    BOTH = 1
+    CEM = 2
+    GEE = 3
 
+# path to built CEM lib
 import platform
 lib_path = "server/C/_build/py_cem.so"
 if platform.system() == "Windows":
     lib_path = "server/C/_build/py_cem"
 lib = CDLL(lib_path)
 
-# globals
-source = None
-polyGrid = None
-geometry = None
-nRows = None
-nCols = None
-year = 0
+numTimesteps = None
+saveInterval = None
+lenTimestep = None
+start_year = None
+current_year = None
 
-def process(grid, timestep):
-    ret = np.ctypeslib.as_array(grid, shape=[nRows,nCols])
-    print('get im')
-    # get satellite composite
-    im = get_image_composite()
-    print('convert im')
-    # convert to grid
-    eeGrid = make_cem_grid(im)
-    print('get dif')
-    # flat difference
-    dif = get_flat_difference(grid, eeGrid)
-    # spatial PCA
-    sp_pca = get_spatial_pca(grid, eeGrid)
-    # temporal PCA
-    # TODO
-    emit('results_ready', {'grid':ret.tolist(), 'time':timestep, 'dif': dif})
-    print('emitted event')
-
-def finalize():
-    emit('model_complete', {})
-
-
+###
+# start application
 @app.route("/")
 def startup():
     service_account = 'cem-ee-utility@cem-ee-utility.iam.gserviceaccount.com'    
@@ -80,137 +47,244 @@ def startup():
         else:
             continue
     return render_template("application.html", distDir=distDir)
-
-@socketio.on('submit', namespace='/request')
-def get_grid_info(grid_info):
-    global nRows, nCols, polyGrid, geometry, source, year
-    nRows = grid_info['nRows']
-    nCols = grid_info['nCols']
-    polyGrid = np.asarray(grid_info['polyGrid'])
-    geometry = grid_info['geometry']
-    source = grid_info['source']
-    year = grid_info['year']
-
-
-@socketio.on('run', namespace='/request')
-def get_input_data(input_data):
-    global year
-    # build cell grid
-    grid = ((POINTER(c_float)) * nRows)()
-    for r in range(nRows):
-        grid[r] = (c_float * nCols)()
-        for c in range(nCols):
-            grid[r][c] = input_data['grid'][r][c]
     
-    numTimesteps = 1#input_data['numTimesteps']
+###
+# run CEM
+@app.route('/initialize', methods = ['POST'])
+def initialize():
+    global numTimesteps, saveInterval, lenTimestep, start_year, current_year, mode
+    jsdata = request.form['input_data']
+    input_data = json.loads(jsdata)
+    print("run cem")
+    status = 0
+    # initialize global variables
+    globals.nRows = input_data['nRows']
+    globals.nCols = input_data['nCols']
+    globals.rowSize = input_data['cellLength']
+    globals.colSize = input_data['cellWidth']
+    globals.polyGrid = np.asarray(input_data['polyGrid'])
+    globals.geometry = input_data['geometry']
+    globals.source = input_data['source']
+    start_year = input_data['start']
+    current_year = start_year
+    mode = input_data['mode']
+
+    # build cell grid
+    input_grid = input_data['grid']
+    grid = ((POINTER(c_double)) * globals.nRows)()
+    for r in range(globals.nRows):
+        grid[r] = (c_double * globals.nCols)()
+        for c in range(globals.nCols):
+            grid[r][c] = input_grid[r][c]
+
+    # initialize reference shoreline and shoreline matrices    
+    globals.ref_shoreline = analyses.getShoreline(input_grid)
+    globals.model = np.array([]).reshape(0, globals.nCols)
+    globals.observed = np.array([]).reshape(0, globals.nCols)
+
+    # initialize exported variables
+    globals.S = np.array([]).reshape(0, 3)
+    globals.r = np.array([]).reshape(0, 3)
+    globals.var_ratio = np.array([]).reshape(0, 3)
+        
+    # run variables
+    numTimesteps = input_data['numTimesteps']
     saveInterval = input_data['saveInterval']
     lengthTimestep = input_data['lengthTimestep']
 
-    input = Config(grid = grid, nRows = nRows,  nCols = nCols, cellWidth = input_data['cellWidth'], cellLength = input_data['cellLength'],
-        asymmetry = input_data['asymmetry'], stability = input_data['stability'], waveHeight = input_data['waveHeight'],
-        wavePeriod = input_data['wavePeriod'], shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
-        numTimesteps = numTimesteps, lengthTimestep = lengthTimestep, saveInterval = saveInterval)
+    if not mode == 3:
+        # build wave inputs
+        H = input_data['waveHeights']
+        T = input_data['wavePeriods']
+        theta = input_data['waveAngles']
+        num_wave_inputs = len(H)
+        if not len(T) == num_wave_inputs or not len(theta) == num_wave_inputs:
+            return throw_error("Length of wave inputs do not match") 
+        waveHeights = (c_double * num_wave_inputs)()
+        wavePeriods = (c_double * num_wave_inputs)()
+        waveAngles = (c_double * num_wave_inputs)()
+        for i in range(num_wave_inputs):
+            waveHeights[i] = H[i]
+        for i in range(num_wave_inputs):
+            wavePeriods[i] = T[i]
+        for i in range(num_wave_inputs):
+            waveAngles[i] = theta[i]
 
-    lib.initialize.argtypes = [Config]
-    lib.initialize.restype = c_int
-    status = lib.initialize(input)
+        # config object
+        input = config.Config(grid = grid, nRows = globals.nRows,  nCols = globals.nCols, cellWidth = globals.colSize, cellLength = globals.rowSize,
+            asymmetry = input_data['asymmetry'], stability = input_data['stability'], numWaveInputs = num_wave_inputs,
+            waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
+            shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
+            crossShoreReferencePos = 0, shelfDepthAtReferencePos = 0, minimumShelfDepthAtClosure = 0,
+            depthOfClosure = input_data['depthOfClosure'], numTimesteps = numTimesteps,
+            lengthTimestep = lengthTimestep, saveInterval = saveInterval)
 
-    lib.update.argtypes = [c_int]
-    lib.update.restype = np.ctypeslib.ndpointer(dtype=np.float64, ndim=2, shape=[nRows, nCols])#POINTER(c_double)
-    i = 0
-    # TODO multiprocessing
-    while i < numTimesteps:
-        ret = lib.update(saveInterval)
-        i+=saveInterval
-        year+=lengthTimestep/365
-        process(ret, i)
+        # init
+        lib.initialize.argtypes = [config.Config]
+        lib.initialize.restype = c_int
+        lib.update.argtypes = [c_int]
+        lib.update.restype = POINTER(c_double)
+        lib.finalize.restype = c_int
 
-    lib.finalize()
-    finalize()
+        status = lib.initialize(input)
 
-def get_image_composite():
-    # build request
-    url = get_source_url()
-    poly = ee.Geometry.Polygon(geometry[0])
-    start_date = str(math.floor(year)) +  "-01-01"
-    end_date = str(math.floor(year)) + "-12-01"
-    # get composite
-    collection = ee.ImageCollection(url).filterBounds(poly).filterDate(start_date, end_date) 
-    # TODO: fine tune temporal resolution on ee composites
-    composite = ee.Algorithms.Landsat.simpleComposite(collection)
-    # otsu
-    water_bands = get_source_bands()
-    ndwi = composite.normalizedDifference(water_bands)
+    # return response
+    if status == 0:
+        return json.dumps({'message': 'Run initialized', 'status': 200})   
+    return throw_error("Run failed to initialize")
 
-    values = ndwi.reduceRegion(reducer = ee.Reducer.toList(), geometry = poly, scale = 10, bestEffort = True).getInfo()
+###
+# update
+@app.route('/update/<int:timestep>', methods = ['GET'])
+def update(timestep):
+    global current_year
+    # update time counters
+    steps = min(saveInterval, numTimesteps-timestep)
+    end_timestep = timestep + 365 if mode == 3 else timestep + steps
+    year = current_year + math.floor(end_timestep/365)
+    # init values
+    ee_grid = []
+    cem_grid = []
+    sp_pca = []
+    t_pca = []
+    # run CEM if not in GEE only mode
+    if not mode == 3:
+        try:
+            out = lib.update(steps)
+        except:
+            print("Error on run update")
+            return throw_error("Error on run update")   
 
-    water = ndwi.gt(filters.threshold_otsu(np.array(values['nd'])))
-    minConnectivity = 50
-    connectCount = water.connectedPixelCount(minConnectivity, True)
-    land_pix = water.eq(0) and connectCount.lt(minConnectivity)
-    water_pix = (water.eq(1) and connectCount.lt(minConnectivity)).multiply(-1)
-    mask = water.add(land_pix).add(water_pix).Not()
+        cem_grid = np.ctypeslib.as_array(out, shape=[globals.nRows, globals.nCols])
+        if np.any(np.isnan(cem_grid)) or not np.all(np.isfinite(cem_grid)):
+            return throw_error("CEM returned NaN or Inf value")
 
-    gaussian = ee.Kernel.gaussian(1)
-            
-    smooth = mask.convolve(gaussian).clip(poly)
-    return smooth
-
-def make_cem_grid(im):
-    global polyGrid            
-    features = []
-    for r in range(nRows):
-        for c in range(nCols):
-            features.append(ee.Feature(ee.Geometry.Polygon(polyGrid[r][c].tolist())))
-
-    fc = ee.FeatureCollection(features)
-            
-    # Reduce the region. The region parameter is the Feature geometry.
-    dict = im.reduceRegions(reducer = ee.Reducer.mean(), collection = fc, scale = 30)
-
-    info = dict.getInfo().get('features')
-
-    eeGrid = np.empty((nRows, nCols), float)
-    i = 0
-    for r in range(nRows):
-        for c in range(nCols):
-            feature = info[i]
-            fill = feature['properties']['mean']
-            eeGrid[r][c] = fill
-            i += 1
-    return eeGrid
-
-def get_flat_difference(grid, eeGrid):
-    dif = 0
-    for r in range(nRows):
-        for c in range(nCols):
-            dif += abs(eeGrid[r][c] - grid[r][c])
-    return dif/(nRows*nCols)
-
-def get_spatial_pca(grid, eeGrid):
-    return
-
-# TODO
-def get_temporal_pca(grid, eeGrid):
-    return
-
-def get_source_url():
-    global source, year
-    if source == "LS5" and year >= 2012:
-        source = "LS7"
+    # update satellite shoreline
+    if year > current_year:
+        print("mode: " + str(mode))
+        current_year = year
+        if not mode == 2:
+            ee_grid = get_sat_grid()
+        # process if running in standard mode
+        if mode == 1:
+            prc = process(cem_grid, ee_grid)
+            sp_pca = prc[0]
+            t_pca = prc[1]            
+            if not np.isfinite(sp_pca['rotation']) or not np.isfinite(sp_pca['scale']):
+                return throw_error("Spatial PCA returned NaN or Inf value")
+            if np.any(np.isnan(t_pca)) or not np.all(np.isfinite(t_pca)):
+                return throw_error("Temporal PCA returned NaN or Inf value")
     
-    if (source == "LS5"):
-        return "LANDSAT/LT05/C01/T1"
-    elif (source == "LS7"):
-        return "LANDSAT/LE07/C01/T1"
-    else:
-        return "LANDSAT/LC08/C01/T1"
+    data = {
+        'message': 'Run updated',
+        'grid': cem_grid.tolist(),
+        'timestep': end_timestep,
+        'results': {
+            'sp_pca': sp_pca,
+            't_pca': t_pca
+        },
+        'status': 200
+    }
+    return json.dumps(data), 200
 
-def get_source_bands():    
-    if (source == "LS8"):
-        return ["B3", "B5"]
-    else:
-        return ["B2", "B4"]
+### 
+# finalize
+@app.route('/finalize', methods = ['GET'])
+def finalize():
+    status = 0
+    if not mode == 3:
+        status = lib.finalize()
+    if status == 0:
+        return json.dumps({'message': 'Run finalized', 'status': 200}), 200
+    return throw_error('Run failed to finalize')
+    
+###
+# get remote-sensed shoreline for supplied date
+def get_sat_grid():
+    # get moving window composite
+    print("get im")
+    im = eehelpers.get_image_composite(current_year)
+    # convert to grid
+    print("convert im")
+    return eehelpers.make_cem_grid(im)
+
+###
+# process results and return to client
+def process(cem_grid, ee_grid):
+    # grids to shorelines
+    shoreline = analyses.getShorelineChange(analyses.getShoreline(cem_grid))
+    globals.model = np.vstack((globals.model, shoreline))
+    shorline = analyses.getShorelineChange(analyses.getShoreline(ee_grid))
+    globals.observed = np.vstack((globals.observed, shoreline))
+
+    # spatial PCA
+    sp_pca = analyses.get_spatial_pca()
+    # temporal PCA
+    t_pca = []
+    if np.shape(globals.model)[0] > 2:
+        analyses.get_similarity_index()
+        t_pca = globals.S[-1].tolist()
+
+    return sp_pca, t_pca
+
+###
+# export zip file of data
+@app.route('/download-zip')
+def export_zip():
+    # reference shoreline
+    ref_shoreline = StringIO()
+    np.savetxt(ref_shoreline, globals.ref_shoreline, delimiter=',')
+
+    # cem_shorelines.txt
+    if not mode == 3:
+        cem_shorelines = StringIO()    
+        np.savetxt(cem_shorelines, globals.model, delimiter=',')
+
+    # gee_shorelines.txt
+    if not mode == 2:
+        gee_shorelines = StringIO()
+        np.savetxt(gee_shorelines, globals.observed, delimiter=',')
+    
+    # results.txt
+    results = StringIO()
+    if mode == 1 and np.shape(globals.model)[0] > 2 and np.shape(globals.observed)[0] > 2:
+        PCs = analyses.get_wave_PCs()
+        results.write("Wave-driven modes:\n")
+        np.savetxt(results, PCs, delimiter=',')
+        results.write("Corrcoeffs:\n")
+        np.savetxt(results, globals.r, delimiter=',')
+        results.write("\n\n\nVariance ratios:\n")
+        np.savetxt(results, globals.var_ratio, delimiter=',')
+        results.write("\n\n\nSimlarity scores:\n")
+        np.savetxt(results, globals.S, delimiter=',')
+
+    # create zip file in memory
+    buff = BytesIO()
+    with zipfile.ZipFile(buff, mode='w') as z:
+        z.writestr('ref_shoreline.txt', ref_shoreline.getvalue())
+        if not mode == 3:
+            z.writestr('cem_shorelines.txt', cem_shorelines.getvalue())
+        if not mode == 2:
+            z.writestr('gee_shorelines.txt', gee_shorelines.getvalue())
+        if mode == 1:
+            z.writestr('results.txt', results.getvalue())
+
+    buff.seek(0)
+    return send_file(
+        buff,
+        mimetype='application/zip',
+        as_attachment=True,
+        attachment_filename='results.zip'
+    )
+
+@app.errorhandler(500)
+def throw_error(message):
+    error = {
+        'message': message,
+        'status': 500
+    }
+    return json.dumps(error), 500
+
 
 if __name__ == "__main__":
-    socketio.run(app, host="localhost", port=8080)
+    app.run(host="localhost", port=8080)

@@ -7,8 +7,8 @@
 
 
 double GetTransportVolumePotential(double alpha, double wave_height, double timestep_length);
-void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node);
-void OopsImFull(struct BeachGrid* grid, struct BeachNode* node);
+struct BeachNode* OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node);
+struct BeachNode* OopsImFull(struct BeachGrid* grid, struct BeachNode* node);
 double GetDepthOfClosure(struct BeachNode* node, int ref_pos, double shelf_depth_at_ref_pos, double shelf_slope, double shoreface_slope, double shore_angle, double min_shelf_depth_at_closure, int cell_size);
 double ModTowardZero(double a, double m);
 double RoundRadians(double angle, double round_to, double bias);
@@ -22,223 +22,205 @@ void WaveTransformation(struct BeachGrid* grid, double wave_angle, double wave_p
 	double refract_step = 0.2;                  // (meters) step size to iterate through depth
 	double k_break = 0.5;                       // coefficient such that waves break at Hs > k_break*depth
 
-	int i = 0;
-	while (i < grid->num_shorelines)
+	struct BeachNode* curr = grid->shoreline;
+
+	while (!curr->is_boundary)
 	{
-		struct BeachNode* start = grid->shoreline[i];
-		struct BeachNode* curr = start;
+		curr->transport_potential = 0;
 
-		do {
-			curr->transport_potential = 0;
+		double alpha_deep;
+		double shore_angle = (*grid).GetAngleByDifferencingScheme(grid, curr, wave_angle);
+		alpha_deep = abs(shore_angle - EMPTY_double) < 1 ? PI / 4 : wave_angle - shore_angle;
 
-			double alpha_deep;
-			double shore_angle = (*grid).GetAngleByDifferencingScheme(grid, curr, wave_angle);
-			alpha_deep = wave_angle - shore_angle;
-
-			if (fabs(alpha_deep) > (0.995 * PI / 2))
-			{
-				curr = curr->next;
-				continue;
-			}
-
-			double local_wave_height = wave_height;
-			double c_deep = (GRAVITY * wave_period) / (2 * PI);
-			double l_deep = c_deep * wave_period;
-			double local_depth = start_depth + refract_step;
-			double local_alpha;
-
-			do {
-				// iterate
-				local_depth -= refract_step;
-
-				// non-iterative eqn or L, from Fenton & McKee
-				double wave_length = l_deep * powf(tanh(powf(powf(2.0 * PI / wave_period, 2.0) * (local_depth / GRAVITY), .75)), 2.0 / 3.0);
-				double local_c = wave_length / wave_period;
-
-				// n = 1/2(1+2kh/sinh(kh)) Komar 5.21
-				// kh = 2 pi depth/L  from k = 2 pi/L
-				double kh = 2 * PI * local_depth / wave_length;
-				double n = 0.5 * (1 + 2.0 * kh / sinh(2.0 * kh));
-
-				// Calculate angle, assuming shore parallel contours and no conv/div of rays from Komar 5.47
-				local_alpha = asin(local_c / c_deep * sin(alpha_deep));
-
-				// Determine wave height from refract calcs, from Komar 5.49
-				local_wave_height = wave_height * sqrt(fabs((c_deep * cos(alpha_deep)) / (local_c * 2.0 * n * cos(local_alpha))));
-
-			} while (local_wave_height <= k_break * local_depth && local_depth >= refract_step);
-			
-			// sed transport_potential
-			curr->transport_potential = GetTransportVolumePotential(local_alpha, local_wave_height, timestep_length);
-
+		if (fabs(alpha_deep) > (0.995 * PI / 2))
+		{
 			curr = curr->next;
-		} while (curr != start && !curr->is_boundary);
-		i++;
+			continue;
+		}
+
+		double local_wave_height = wave_height;
+		double c_deep = (GRAVITY * wave_period) / (2 * PI);
+		double l_deep = c_deep * wave_period;
+		double local_depth = start_depth;
+		double local_alpha;
+
+		while (TRUE) {
+			// non-iterative eqn or L, from Fenton & McKee
+			double wave_length = l_deep * powf(tanh(powf(powf(2.0 * PI / wave_period, 2.0) * local_depth / GRAVITY, .75)), 2.0 / 3.0);
+			double local_c = wave_length / wave_period;
+
+			// n = 1/2(1+2kh/sinh(kh)) Komar 5.21
+			// kh = 2 pi depth/L  from k = 2 pi/L
+			double kh = 2 * PI * local_depth / wave_length;
+			double n = 0.5 * (1 + 2.0 * kh / sinh(2.0 * kh));
+
+			// Calculate angle, assuming shore parallel contours and no conv/div of rays from Komar 5.47
+			local_alpha = asin(local_c / c_deep * sin(alpha_deep));
+
+			// Determine wave height from refract calcs, from Komar 5.49
+			local_wave_height = wave_height * sqrtf(fabs((c_deep * cos(alpha_deep)) / (local_c * 2.0 * n * cos(local_alpha))));
+
+			// wave break condition
+			if (local_wave_height > k_break * local_depth || local_depth <= refract_step)
+			{
+				break;
+			}
+			// iterate
+			local_depth -= refract_step;
+		}
+
+		// sed transport_potential
+		curr->transport_potential = GetTransportVolumePotential(local_alpha, local_wave_height, timestep_length);
+
+		curr = curr->next;
 	}
 }
 
 double GetTransportVolumePotential(double alpha, double wave_height, double timestep_length)
 {
 	int rho = 1020;         // (kg/m^3) density of salt water
-	return fabs(1.1 * rho * powf(GRAVITY, 3.0 / 2.0) * powf(wave_height, 5.0 / 2.0) * cos(alpha) * sin(alpha) * timestep_length);
+	return fabs(.67 * rho * powf(GRAVITY, 3.0 / 2.0) * powf(wave_height, 5.0 / 2.0) * cos(alpha) * sin(alpha) * timestep_length);
 }
 
-void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth)
+void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth, double depthOfClosure)
 {
 	double cell_area = grid->cell_width * grid->cell_length;
 
-	int i = 0;
-	while (i < grid->num_shorelines)
+	struct BeachNode* curr = grid->shoreline;
+
+	while (!curr->is_boundary)
 	{
-		struct BeachNode* start = grid->shoreline[i];
+		double volume_needed_left = 0.0;
+		double volume_needed_right = 0.0;
 
-		struct BeachNode* curr = start;
+		struct BeachNode* prev = curr->prev;
 
-		do {
-			double volume_needed_left = 0.0;
-			double volume_needed_right = 0.0;
+		FLOW_DIR dir = (*curr).GetFlowDirection(curr);
+		switch (dir) {
+		case RIGHT:
+			volume_needed_right = curr->GetTransportPotential(curr);
+			break;
+		case DIVERGENT:
+			volume_needed_right = curr->GetTransportPotential(curr);
+			volume_needed_left = prev->GetTransportPotential(prev);
+			break;
+		case CONVERGENT:
+			break;
+		case LEFT:
+			volume_needed_left = prev->GetTransportPotential(prev);
+			break;
+		}
 
-			struct BeachNode* prev = curr->prev;
+		double total_volume_needed = volume_needed_left + volume_needed_right;
+		double shore_angle = (*grid).GetNextAngle(grid, curr);
+		double depth = depthOfClosure ? depthOfClosure : GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
+		double volume_available = curr->frac_full * cell_area * depth;
+		struct BeachNode* node_behind = GetNodeInDir(grid, curr, GetDir(shore_angle));
+		if (!BeachNode.isEmpty(node_behind) && node_behind->frac_full >= 1.0)
+		{
+			volume_available += node_behind->frac_full * cell_area * depth;
+		}
 
-			FLOW_DIR dir = (*curr).GetFlowDirection(curr);
-			switch (dir) {
-			case RIGHT:
-				volume_needed_right = curr->GetTransportPotential(curr);
-				break;
-			case DIVERGENT:
-				volume_needed_right = curr->GetTransportPotential(curr);
-				volume_needed_left = prev->GetTransportPotential(prev);
-				break;
-			case CONVERGENT:
-				break;
-			case LEFT:
-				volume_needed_left = prev->GetTransportPotential(prev);
-				break;
-			}
-
-			double total_volume_needed = volume_needed_left + volume_needed_right;
-			double shore_angle = (*grid).GetNextAngle(grid, curr);
-			double depth = GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
-			double volume_available = curr->frac_full * cell_area * depth;
-			struct BeachNode* node_behind = GetNodeInDir(grid, curr, GetDir(shore_angle));
-			if (!BeachNode.isEmpty(node_behind) && node_behind->frac_full >= 1.0)
+		if (total_volume_needed > volume_available)
+		{
+			if (dir == DIVERGENT)
 			{
-				volume_available += node_behind->frac_full * cell_area * depth;
+				curr->prev->transport_potential = total_volume_needed == 0 ? 0.0 : (volume_needed_left / total_volume_needed) * volume_available;
+				curr->transport_potential = total_volume_needed == 0 ? 0.0 : (volume_needed_right / total_volume_needed) * volume_available;
 			}
-
-			if (total_volume_needed > volume_available)
+			else if (dir == RIGHT)
 			{
-				if (dir == DIVERGENT)
-				{
-					curr->prev->transport_potential = total_volume_needed == 0 ? 0.0 : (volume_needed_left / total_volume_needed) * volume_available;
-					curr->transport_potential = total_volume_needed == 0 ? 0.0 : (volume_needed_right / total_volume_needed) * volume_available;
-				}
-				else if (dir == RIGHT)
-				{
-					volume_available += prev->GetTransportPotential(prev);
-					curr->transport_potential = volume_available < curr->GetTransportPotential(curr) ? volume_available : curr->GetTransportPotential(curr);
-				}
-				else if (dir == LEFT)
-				{
-					volume_available += curr->GetTransportPotential(curr);
-					prev->transport_potential = volume_available < prev->GetTransportPotential(prev) ? volume_available : prev->GetTransportPotential(prev);
-				}
+				volume_available += prev->GetTransportPotential(prev);
+				curr->transport_potential = volume_available < curr->GetTransportPotential(curr) ? volume_available : curr->GetTransportPotential(curr);
 			}
+			else if (dir == LEFT)
+			{
+				volume_available += curr->GetTransportPotential(curr);
+				prev->transport_potential = volume_available < prev->GetTransportPotential(prev) ? volume_available : prev->GetTransportPotential(prev);
+			}
+		}
 
-			curr = curr->next;
-		} while (curr != start && !curr->is_boundary);
-		i++;
+		curr = curr->next;
 	}
 }
 
 void NetVolumeChange(struct BeachGrid* grid)
 {
-	int i = 0;
-	while (i < grid->num_shorelines)
-	{
-		struct BeachNode* start = grid->shoreline[i];
-		struct BeachNode* curr = start;
+	struct BeachNode* curr = grid->shoreline;
 
-		do {
-			double volume_in = 0.0;
-			double volume_out = 0.0;
+	while (!curr->is_boundary) {
+		double volume_in = 0.0;
+		double volume_out = 0.0;
 
-			struct BeachNode* prev = curr->prev;
+		struct BeachNode* prev = curr->prev;
 
-			FLOW_DIR dir = (*curr).GetFlowDirection(curr);
-			switch (dir)
-			{
-			case RIGHT:
-				volume_in = prev->GetTransportPotential(prev);
-				volume_out = curr->GetTransportPotential(curr);
-				break;
-			case DIVERGENT:
-				volume_out = curr->GetTransportPotential(curr) + prev->GetTransportPotential(prev);
-				break;
-			case CONVERGENT:
-				volume_in = curr->GetTransportPotential(curr) + prev->GetTransportPotential(prev);
-				break;
-			case LEFT:
-				volume_in = curr->GetTransportPotential(curr);
-				volume_out = prev->GetTransportPotential(prev);
-				break;
-			}
-			curr->net_volume_change = volume_in - volume_out;
-			curr = curr->next;
-		} while (curr != start && !curr->is_boundary);
-		i++;
+		FLOW_DIR dir = (*curr).GetFlowDirection(curr);
+		switch (dir)
+		{
+		case RIGHT:
+			volume_in = prev->GetTransportPotential(prev);
+			volume_out = curr->GetTransportPotential(curr);
+			break;
+		case DIVERGENT:
+			volume_out = curr->GetTransportPotential(curr) + prev->GetTransportPotential(prev);
+			break;
+		case CONVERGENT:
+			volume_in = curr->GetTransportPotential(curr) + prev->GetTransportPotential(prev);
+			break;
+		case LEFT:
+			volume_in = curr->GetTransportPotential(curr);
+			volume_out = prev->GetTransportPotential(prev);
+			break;
+		}
+		curr->net_volume_change = volume_in - volume_out;
+		curr = curr->next;
 	}
 }
 
-int TransportSediment(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth)
+void TransportSediment(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth, double depthOfClosure)
 {
-
-	int FIND_BEACH_FLAG = FALSE;
 	double cell_area = grid->cell_width * grid->cell_length;
-	int i = 0;
-	while (i < grid->num_shorelines)
-	{
-		struct BeachNode* start = grid->shoreline[i];
-		struct BeachNode* curr = start;
+	struct BeachNode* curr = grid->shoreline;
 
-		do {
-			double shore_angle = (*grid).GetNextAngle(grid, curr);
-			double depth = GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
-			double net_area_change = curr->net_volume_change / depth;
-			curr->frac_full = curr->frac_full + net_area_change / cell_area;
-			if (curr->frac_full < -0.000001)
-			{
-				OopsImEmpty(grid, curr);
-				FIND_BEACH_FLAG = TRUE;
-			}
-			else if (curr->frac_full > 1)
-			{
-				OopsImFull(grid, curr);
-				FIND_BEACH_FLAG = TRUE;
-			}
-			else if (curr->frac_full == 0)
-			{
-				FIND_BEACH_FLAG = TRUE;
-			}
+	while (!curr->is_boundary) {
+		double shore_angle = (*grid).GetNextAngle(grid, curr);
+		double depth = depthOfClosure ? depthOfClosure : GetDepthOfClosure(curr, ref_pos, ref_depth, shelf_slope, shoreface_slope, shore_angle, min_depth, grid->cell_length);
+		double net_area_change = curr->net_volume_change / depth;
+		curr->frac_full = curr->frac_full + net_area_change / cell_area;
+		if (curr->frac_full < 0.0)
+		{
+			 curr = OopsImEmpty(grid, curr);
+		}
+		else if (curr->frac_full > 1.0)
+		{
+			curr = OopsImFull(grid, curr);
+		}
+		else
+		{
 			curr = curr->next;
-		} while (curr != start && !curr->is_boundary);
-		i++;
+		}
 	}
-	return FIND_BEACH_FLAG;
 }
 
-void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
+struct BeachNode* OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 {
+	if (node->frac_full >= -0.000001)
+	{
+		node->frac_full = 0.0;
+		return (*grid).ReplaceNode(grid, node);
+	}
 	struct BeachNode** neighbors = (*grid).Get4Neighbors(grid, node);
 
 	int num_cells = 0;
+	double total_sed = 0.0;
 	int none_full = FALSE;
 	int i;
 	for (i = 0; i < 4; i++)
 	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full >= 1)
+		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full >= 1.0)
 		{
 			num_cells++;
+			total_sed += neighbors[i]->frac_full;
 		}
 	}
 
@@ -247,19 +229,23 @@ void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 		none_full = TRUE;
 		for (i = 0; i < 4; i++)
 		{
-			if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 0)
+			if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 0.0)
 			{
 				num_cells++;
+				total_sed += neighbors[i]->frac_full;
 			}
 		}
 	}
 
-	double delta_fill = node->frac_full / num_cells;
 	for (i = 0; i < 4; i++)
 	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 0 && (none_full || neighbors[i]->frac_full >= 1))
+		struct BeachNode* neighbor = neighbors[i];
+		if (!BeachNode.isEmpty(neighbor) && neighbor->frac_full > 0.0 && (none_full || neighbor->frac_full >= 1.0))
 		{
-			neighbors[i]->frac_full += delta_fill;
+			double percent_available = neighbor->frac_full / total_sed;
+			double delta_fill = node->frac_full * percent_available;
+			neighbor->frac_full += delta_fill;
+			if (neighbor->is_boundary) { free(neighbor); }
 		}
 	}
 
@@ -267,32 +253,25 @@ void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node)
 	{
 		node->frac_full = 0;
 	}
-
-	// recurse through neighbors
-	for (i = 0; i < 4; i++)
-	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full < -0.000001)
-		{
-			OopsImEmpty(grid, neighbors[i]);
-		}
-	}
 	free(neighbors);
 
-	return;
+	return (*grid).ReplaceNode(grid, node);
 }
 
-void OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
+struct BeachNode* OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 {
 	struct BeachNode** neighbors = (*grid).Get4Neighbors(grid, node);
 
 	int num_cells = 0;
+	double total_space = 0.0;
 	int none_empty = FALSE;
 	int i;
 	for (i = 0; i < 4; i++)
 	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full <= 0)
+		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full <= 0.0)
 		{
 			num_cells++;
+			total_space += (1 - neighbors[i]->frac_full);
 		}
 	}
 
@@ -301,19 +280,23 @@ void OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 		none_empty = TRUE;
 		for (i = 0; i < 4; i++)
 		{
-			if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full < 1)
+			if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full < 1.0)
 			{
 				num_cells++;
+				total_space += (1 - neighbors[i]->frac_full);
 			}
 		}
 	}
 
-	double delta_fill = (node->frac_full - 1) / num_cells;
 	for (i = 0; i < 4; i++)
 	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full < 1 && (none_empty || neighbors[i]->frac_full <= 0))
+		struct BeachNode* neighbor = neighbors[i];
+		if (!BeachNode.isEmpty(neighbor) && neighbor->frac_full < 1.0 && (none_empty || neighbor->frac_full <= 0.0))
 		{
-			neighbors[i]->frac_full += delta_fill;
+			double percent_available = (1 - neighbor->frac_full) / total_space;
+			double delta_fill = (node->frac_full - 1) * percent_available;
+			neighbor->frac_full += delta_fill;
+			if (neighbor->is_boundary) { free(neighbor); }
 		}
 	}
 
@@ -322,115 +305,122 @@ void OopsImFull(struct BeachGrid* grid, struct BeachNode* node)
 		node->frac_full = 1;
 	}
 
-	// recurse through neighbors
-	for (i = 0; i < 4; i++)
+	free(neighbors);
+
+	return (*grid).ReplaceNode(grid, node);
+}
+
+void FixBeach(struct BeachGrid* grid)
+{
+	int done = TRUE;
+	struct BeachNode* curr = grid->shoreline;
+
+	// pass for over/under-filled cells
+	while (!curr->is_boundary)
 	{
-		if (!BeachNode.isEmpty(neighbors[i]) && neighbors[i]->frac_full > 1)
+		if (curr->frac_full < 0.0) {
+			curr = OopsImEmpty(grid, curr);
+			done = FALSE;
+		}
+		else if (curr->frac_full > 1.0)
 		{
-			OopsImFull(grid, neighbors[i]);
+			curr = OopsImFull(grid, curr);
+			done = FALSE;
+		}
+		else
+		{
+			curr = curr->next;
 		}
 	}
 
-	free(neighbors);
+	curr = grid->shoreline;
 
-	return;
-}
-
-int FixBeach(struct BeachGrid* grid)
-{
-	int FIND_BEACH_FLAG = FALSE;
-	// smooth corners
-	int i = 0;
-	while (i < grid->num_shorelines)
+	// smooth outset corners
+	while (!curr->is_boundary)
 	{
-		struct BeachNode* start = grid->shoreline[i];
-		struct BeachNode* curr = start;
+		struct BeachNode** neighbors = (*grid).Get4Neighbors(grid, curr);
 
-		do {
-			struct BeachNode** neighbors = (*grid).Get4Neighbors(grid, curr);
-
-			int needs_fix = TRUE;
-			int num_cells = 0;
-			int j;
-			for (j = 0; j < 4; j++)
+		int num_cells = 0;
+		double total_space = 0.0;
+		int needs_fix = TRUE;
+		int j;
+		for (j = 0; j < 4; j++)
+		{
+			if (BeachNode.isEmpty(neighbors[j])) { continue; }
+			if (neighbors[j]->frac_full >= 1.0)
 			{
-				if (BeachNode.isEmpty(neighbors[j])) { continue; }
-				if (neighbors[j]->frac_full >= 1.0)
-				{
-					needs_fix = FALSE;
-				}
-				else if (neighbors[j]->frac_full > 0)
-				{
-					num_cells++;
-				}
+				needs_fix = FALSE;
+				break;
 			}
-
-			if (needs_fix) // no solid land in neighborhood
+			else if (neighbors[j]->frac_full > 0.0)
 			{
-				// distribute to beach neighbors
-				if (num_cells > 0)
+				num_cells++;
+				total_space += (1 - neighbors[j]->frac_full);
+			}
+		}
+
+		if (needs_fix)
+		{
+			// distribute to beach neighbors
+			if (num_cells > 0)
+			{
+				double delta_fill = min(curr->frac_full, total_space);
+				curr->frac_full -= delta_fill;
+				for (j = 0; j < 4; j++)
 				{
-					double delta_fill = curr->frac_full / num_cells;
-					curr->frac_full = 0;
-					for (j = 0; j < 4; j++)
+					struct BeachNode* neighbor = neighbors[j];
+					if (BeachNode.isEmpty(neighbor)) { continue; }
+					if (neighbor->frac_full < 1.0 && neighbor->frac_full > 0.0)
 					{
-						if (BeachNode.isEmpty(neighbors[j])) { continue; }
-						if (neighbors[j]->frac_full < 1.0 && neighbors[j]->frac_full > 0)
-						{
-							neighbors[j]->frac_full += delta_fill;
-							if (neighbors[j]->frac_full > 1.0)
-							{
-								OopsImFull(grid, neighbors[j]);
-								FIND_BEACH_FLAG = TRUE;
-							}
-						}
+						double percent_fill = delta_fill * ((1 - neighbor->frac_full) / total_space);
+						neighbor->frac_full += percent_fill;
+						if (neighbor->is_boundary) { free(neighbor); }
 					}
 				}
-				else // push sed back to shoreline
+				if (curr->frac_full <= 0.0)
 				{
-					int r = curr->GetRow(curr) + 1;
-					int c = curr->GetCol(curr);
-					struct BeachNode* temp = (*grid).TryGetNode(grid, r, c);
-
-					while (!BeachNode.isEmpty(temp) && !(temp->frac_full > 0))
-					{
-						r--;
-						temp = (*grid).TryGetNode(grid, r, c);
-					}
-					if (!BeachNode.isEmpty(temp))
-					{
-						temp->frac_full == curr->frac_full;
-						curr->frac_full = 0;
-						if (temp->frac_full > 1.0)
-						{
-							OopsImFull(grid, temp);
-							FIND_BEACH_FLAG = TRUE;
-						}
-					}
+					done = FALSE;
+					curr = (*grid).ReplaceNode(grid, curr);
+					curr = curr->prev; // backtrack
 				}
 			}
-			curr = curr->next;
-			free(neighbors);
-		} while (curr != start && !curr->is_boundary);
-
-
-		// one more pass for over/under-filled cells
-		curr = grid->shoreline[i];
-		do {
-			if (curr->frac_full < -0.000001) {
-				OopsImEmpty(grid, curr);
-				FIND_BEACH_FLAG = TRUE;
-			}
-			else if (curr->frac_full > 1.0)
+			else // error
 			{
-				OopsImFull(grid, curr);
-				FIND_BEACH_FLAG = TRUE;
+				free(neighbors);
+				return;
 			}
-			curr = curr->next;
-		} while (curr != start && !curr->is_boundary);
-		i++;
+		}
+		curr = curr->next;
+		free(neighbors);
 	}
-	return FIND_BEACH_FLAG;
+
+	// remove inset corners
+	curr = grid->shoreline;
+	while (!curr->is_boundary)
+	{
+		struct BeachNode* prev = curr->prev;
+		struct BeachNode* next = curr->next;
+		if (abs(next->GetRow(next) - prev->GetRow(prev)) == 1 && abs(next->GetCol(next) - prev->GetCol(prev)) == 1)
+		{
+			done = FALSE;
+			if (curr == grid->shoreline)
+			{
+				grid->shoreline = next;
+			}
+			prev->next = next;
+			next->prev = prev;
+			curr->next = NULL;
+			curr->prev = NULL;
+			curr->is_beach = FALSE;
+			curr = prev;
+		}
+		curr = curr->next;
+	}
+
+	if (!done)
+	{
+		FixBeach(grid);
+	}
 }
 
 

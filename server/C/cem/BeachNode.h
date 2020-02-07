@@ -8,8 +8,8 @@ extern "C" {
 #include "consts.h"
 	
 struct BeachNode {
-    double frac_full, transport_potential, net_volume_change, cell_width, cell_length;
-		int is_beach, is_boundary, row, col;
+    double frac_full, transport_potential, net_volume_change, cell_width, cell_length, prev_angle, next_angle, surrounding_angle;
+		int is_beach, is_boundary, row, col, prev_timestamp, next_timestamp, surrounding_timestamp, in_shadow, shadow_timestamp;
 		int (*GetRow)(struct BeachNode* this);
 		int (*GetCol)(struct BeachNode* this);
     FLOW_DIR transport_dir;
