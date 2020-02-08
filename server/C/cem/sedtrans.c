@@ -352,7 +352,7 @@ void FixBeach(struct BeachGrid* grid)
 		int j;
 		for (j = 0; j < 4; j++)
 		{
-			if (neighbors[j]) { continue; }
+			if (!neighbors[j]) { continue; }
 			if (neighbors[j]->frac_full >= 1.0)
 			{
 				needs_fix = FALSE;

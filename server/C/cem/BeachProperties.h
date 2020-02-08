@@ -14,7 +14,7 @@ struct BeachProperties {
 };
 
 extern const struct BeachPropertiesClass {
-	struct BeachProperties*(*new)();
+	struct BeachProperties (*new)(void);
 } BeachProperties;
 
 #if defined(__cplusplus)

@@ -24,7 +24,7 @@ void FreeShoreline(struct BeachGrid* this)
 {
 	struct BeachNode* shoreline = this->shoreline;
 	struct BeachNode* curr = this->shoreline;
-	do {
+	while (!curr->is_boundary) {
 		free(curr->properties);
 		curr->properties = NULL;
 		if (!curr) { break; }
@@ -37,7 +37,7 @@ void FreeShoreline(struct BeachGrid* this)
 		struct BeachNode* next = curr->next;
 		curr->next = NULL;
 		curr = next;
-	} while (!curr->is_boundary);
+	}
 
 	if (curr->is_boundary)
 	{
@@ -293,7 +293,7 @@ static struct BeachNode** Get4Neighbors(struct BeachGrid* this, struct BeachNode
 	for (i = 0; i < 4; i++)
 	{
 		neighbors[i] = TryGetNode(this, rows[i], cols[i]);
-		if (neighbors[i]) {
+		if (!neighbors[i]) {
 			struct BeachNode* neighbor = BeachNode.boundary(EMPTY_INT, EMPTY_INT);
 			neighbor->frac_full = node->frac_full > 1.0 ? 0.0 : 1.0;
 			neighbors[i] = neighbor;
@@ -508,7 +508,8 @@ struct BeachNode* GetShoreline(struct BeachGrid* this, struct BeachNode* startNo
 	{
 		// mark as beach
 		if (!curr) { return NULL; }
-		struct BeachProperties* props = BeachProperties.new();
+		struct BeachProperties* props = malloc(sizeof(struct BeachProperties));
+		*props = BeachProperties.new();
 		curr->properties = props;
 
 		// backtrack
@@ -607,27 +608,27 @@ static struct BeachGrid new(int rows, int cols, double cell_width, double cell_l
 	g_cell_width = cell_width;
 	g_cell_length = cell_length;
 
-		return (struct BeachGrid) {
-				.rows = rows,
-				.cols = cols,
-				.current_time = 0,
-				.cells = NULL,
-				.shoreline = NULL,
-				.SetCells = &SetCells,
-				.SetShoreline = &SetShoreline,
-				.FreeShoreline = &FreeShoreline,
-				.TryGetNode = &TryGetNode,
-				.GetPrevAngle = &GetPrevAngle,
-				.GetNextAngle = &GetNextAngle,
-				.GetSurroundingAngle = &GetSurroundingAngle,
-				.GetAngleByDifferencingScheme = &GetAngleByDifferencingScheme,
-				.ReplaceNode = &ReplaceNode,
-				.Get4Neighbors = &Get4Neighbors,
-				.CheckIfInShadow = &CheckIfInShadow,
-				.FindBeach = &FindBeach,
-				.GetShoreline = &GetShoreline,
-				.IsLandCell = &IsLandCell
-				};
+	return (struct BeachGrid) {
+			.rows = rows,
+			.cols = cols,
+			.current_time = 0,
+			.cells = NULL,
+			.shoreline = NULL,
+			.SetCells = &SetCells,
+			.SetShoreline = &SetShoreline,
+			.FreeShoreline = &FreeShoreline,
+			.TryGetNode = &TryGetNode,
+			.GetPrevAngle = &GetPrevAngle,
+			.GetNextAngle = &GetNextAngle,
+			.GetSurroundingAngle = &GetSurroundingAngle,
+			.GetAngleByDifferencingScheme = &GetAngleByDifferencingScheme,
+			.ReplaceNode = &ReplaceNode,
+			.Get4Neighbors = &Get4Neighbors,
+			.CheckIfInShadow = &CheckIfInShadow,
+			.FindBeach = &FindBeach,
+			.GetShoreline = &GetShoreline,
+			.IsLandCell = &IsLandCell
+			};
 }
 
 const struct BeachGridClass BeachGrid = { .new = &new };

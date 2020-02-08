@@ -131,14 +131,15 @@ static struct BeachNode new(double frac_full, int r, int c){
 	};
 }
 
-static struct BeachNode* boundary(int r, int j) {
+static struct BeachNode* boundary(int r, int c) {
 	struct BeachNode* ptr = malloc(sizeof(struct BeachNode));
-	struct BeachProperties* props = BeachProperties.new();
+	struct BeachProperties* props = malloc(sizeof(struct BeachProperties));
+	*props = BeachProperties.new();
 	*ptr = (struct BeachNode){
 		.frac_full = EMPTY_double,
 		.is_boundary = TRUE,
 		.row = r,
-		.col = j,
+		.col = c,
 		.next = NULL,
 		.prev = NULL,
 		.GetRow = &GetBoundaryRow,
