@@ -26,7 +26,7 @@ struct BeachGrid {
     int (*CheckIfInShadow)(struct BeachGrid *this, struct BeachNode *node, double wave_angle);
 		int (*FindBeach)(struct BeachGrid* this);
 		struct BeachNode* (*GetShoreline)(struct BeachGrid *this, struct BeachNode *startNode, struct BeachNode* stopNode, int dir_r, int dir_c);
-		int (*IsLandCell) (struct BeachGrid* this, int row, int col);
+		double (*GetDistance)(struct BeachGrid* this, struct BeachNode* node1, struct BeachNode* node2);
 };
 extern const struct BeachGridClass {
     struct BeachGrid (*new)(int rows, int cols, double cell_width, double cell_length);

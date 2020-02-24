@@ -14,22 +14,23 @@ if __name__ == "__main__":
     # wait for vs debugger
     input("Press Enter to continue...")          
     # create basic input variables
-    nRows = 26
-    nCols = 28
-    cellWidth = 300
-    cellLength = 300
+    nRows = 50
+    nCols = 100
+    # cellWidth = 248.00815314166002
+    # cellLength = 132.37451295654398
+    cellWidth = 200
+    cellLength = 200
     shelfSlope = 0.001
     shorefaceSlope = 0.01
-    crossShoreReferencePos = 10
-    shelfDepthAtReferencePos = 10.0
+    crossShoreReferencePos = 0
+    shelfDepthAtReferencePos = 0
     minimumShelfDepthAtClosure = 10.0
     lengthTimestep = 1
     saveInterval = 1
     numTimesteps = 365
 
-    asymmetry = .7
-    #stability = .3
-    stability = .4
+    asymmetry = .3
+    stability = .3
 
     # create wave inputs
     random.seed(5)
@@ -47,16 +48,16 @@ if __name__ == "__main__":
         wavePeriods[i] = (random.random()*10) + 5 # random wave period 5 to 15 seconds
 
     # create grid input
-    import_grid = pd.read_excel("test/input/shoreline_config.xlsx")
+    import_grid = pd.read_excel("test/input/canaveral.xlsx")
     import_grid = import_grid.values
     grid = ((POINTER(c_double)) * nRows)()
     for r in range(nRows):
         grid[r] = (c_double * nCols)()
         for c in range(nCols):
-            grid[r][c] = import_grid[r][c]
+            grid[r][c] = import_grid[nRows - r - 1][c]
 
     # create config object
-    input_orig = config.Config(grid = grid, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods, 
+    input = config.Config(grid = grid, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods, 
             asymmetry = -1, stability = -1, numWaveInputs = numTimesteps,
             nRows = nRows, nCols = nCols, cellWidth = cellWidth, cellLength = cellLength,
             shelfSlope = shelfSlope, shorefaceSlope = shorefaceSlope, crossShoreReferencePos = crossShoreReferencePos,
@@ -64,7 +65,7 @@ if __name__ == "__main__":
             depthOfClosure = 0, lengthTimestep = lengthTimestep, saveInterval = saveInterval, numTimesteps = numTimesteps)
 
     # set library path
-    lib_path = "cem/_build/test_cem"
+    lib_path = "cem_boundary_conds/_build/test_cem"
 
     # open library
     lib = CDLL(lib_path)

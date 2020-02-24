@@ -3,7 +3,6 @@ import pandas as pd
 from ctypes import *
 import random
 import math
-import psutil
 import time
 import sys
 
@@ -50,11 +49,8 @@ if __name__ == "__main__":
     filename_vals = ["test/input/shoreline_config.xlsx", "test/input/rodanthe.xlsx", "test/input/murray.xlsx", "test/input/murray2.xlsx"]
     numTimesteps_vals= [10, 100, 1000]
 
-    #### get process ####
-    process = psutil.Process()
-
     #### iterate grid sizes ####
-    f = 0
+    f = 3
     nRows = nRows_vals[f]
     nCols = nCols_vals[f]
     filename = filename_vals[f]
@@ -87,8 +83,6 @@ if __name__ == "__main__":
         # vars to save times + mems
         time_orig = 0
         time_new = 0
-        mem_orig = 0
-        mem_new = 0
         # run each test 10 times
         for k in range(10):
             asymmetry = random.random() * 0.4 + 0.3
@@ -120,7 +114,6 @@ if __name__ == "__main__":
 
             #### Run new ####
             start = time.time()
-            mem = process.memory_info().rss
             temp = lib_new.initialize(input_new)
             i = 0
             while i < numTimesteps:
@@ -129,11 +122,9 @@ if __name__ == "__main__":
             temp = lib_new.finalize()
             end = time.time()
             time_new = time_new + (end-start)
-            mem_new = mem_new + (process.memory_info().rss - mem)
 
             #### Run original ####
             start = time.time()
-            mem = process.memory_info().rss
             temp = lib_orig.initialize(input_orig)
             i = 0
             while i < numTimesteps:
@@ -142,9 +133,8 @@ if __name__ == "__main__":
             temp = lib_orig.finalize()
             end = time.time()
             time_orig = time_orig + (end-start)
-            mem_orig = mem_orig + (process.memory_info().rss - mem)
 
         print("\nSize: " + str(nCols) + "   t: " + str(numTimesteps))
-        print("Orig\ntime: " + str(time_orig/10) + " mem: " + str(mem_orig/10))
-        print("New\ntime: " + str(time_new/10) + " mem: " + str(mem_new/10))
+        print("Orig\ntime: " + str(time_orig/10))
+        print("New\ntime: " + str(time_new/10))
     sys.exit(0)

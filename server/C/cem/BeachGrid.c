@@ -22,7 +22,6 @@ static struct BeachNode* SetShoreline(struct BeachGrid* this, struct BeachNode* 
 
 void FreeShoreline(struct BeachGrid* this)
 {
-	struct BeachNode* shoreline = this->shoreline;
 	struct BeachNode* curr = this->shoreline;
 	while (!curr->is_boundary) {
 		free(curr->properties);
@@ -44,7 +43,6 @@ void FreeShoreline(struct BeachGrid* this)
 		free(curr->properties);
 		free(curr);
 	}
-	// free mem
 	(*this).SetShoreline(this, NULL);
 
 }
@@ -318,6 +316,8 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 	// start at corner TODO: switch to centroid
 	int node_r = node->GetRow(node);
 	int node_c = node->GetCol(node);
+	int row = node_r;
+	int col = node_c;
 	double r = (double)node_r;
 	double c = (double)node_c;
 	double cos_angle = cos(wave_angle);
@@ -329,8 +329,9 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 
 	while (TRUE)
 	{
-		int next_r = ceil(r + r_sign);
-		int next_c = ceil(c + c_sign);
+		int next_r = trunc(row + r_sign);
+		int next_c = trunc(col + c_sign);
+
 		double d_r = fabs(((next_r - r) * g_cell_length) / cos_angle);
 		double d_c = fabs(((next_c - c) * g_cell_width) / sin_angle);
 
@@ -342,7 +343,7 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 		else
 		{
 			c = (double)next_c;
-			r += (r_sign * fabs(d_c * cos_angle)) / g_cell_length;
+			r += (r_sign * fabs(d_c * cos_angle) / g_cell_length);
 		}
 
 		if (r < 0 || r >= (*this).rows || c < 0 || c >= (*this).cols)
@@ -351,8 +352,8 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 			break;
 		}
 
-		int row = floor(r);
-		int col = floor(c);
+		row = ceil(r);
+		col = floor(c);
 
 		struct BeachNode* temp = TryGetNode(this, row, col);
 		if (!temp)
@@ -373,9 +374,9 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 int FindBeach(struct BeachGrid* this)
 {
 	// clear current shoreline if grid already has one
-	if (this->shoreline)
+	if (this->shoreline != NULL)
 	{
-		(*this).FreeShoreline;
+		(*this).FreeShoreline(this);
 	}
 	
 	// start search downward from top left
@@ -383,11 +384,11 @@ int FindBeach(struct BeachGrid* this)
 	for (c = 0; c < this->cols; c++) {
 		for (r = 1; r < this->rows; r++) {
 			struct BeachNode* node = (*this).TryGetNode(this, r, c);
+			if (!node) { return -1; }
 
 			// start tracing shoreline
-			if ((*this).IsLandCell(this, r, c)) {
+			if (node->frac_full != 0) {
 				struct BeachNode* startNode = node;
-				if (!startNode) { return -1; }
 
 				struct BeachNode* endNode = (*this).GetShoreline(this, startNode, NULL, 1, 0);
 				if (!endNode)
@@ -442,16 +443,15 @@ static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* n
 
 	struct BeachNode* curr = node;
 
-	// get start dir - default to left if prev is null
-	int dir_r = 0;
-	int dir_c = -1;
+	// get start dir - default to up if prev is null or boundary
+	int dir_r = 1;
+	int dir_c = 0;
 	struct BeachNode* prev = start->prev;
-	if (prev)
+	if (prev && !prev->is_boundary)
 	{
 		// start from 45 clockwise of prev
-		double angle = atan2(prev->GetRow(prev) - start->GetRow(start), prev->GetCol(prev) - start->GetCol(start));
-		angle += (PI / 4);
-		dir_r = -round(sin(angle));
+		double angle = atan2(-(prev->GetRow(prev) - start->GetRow(start)), prev->GetCol(prev) - start->GetCol(start));
+		dir_r = round(sin(angle));
 		dir_c = -round(cos(angle));
 	}
 
@@ -508,9 +508,12 @@ struct BeachNode* GetShoreline(struct BeachGrid* this, struct BeachNode* startNo
 	{
 		// mark as beach
 		if (!curr) { return NULL; }
-		struct BeachProperties* props = malloc(sizeof(struct BeachProperties));
-		*props = BeachProperties.new();
-		curr->properties = props;
+		if (!curr->properties)
+		{
+			struct BeachProperties* props = malloc(sizeof(struct BeachProperties));
+			*props = BeachProperties.new();
+			curr->properties = props;
+		}
 
 		// backtrack
 		dir_r = -dir_r;
@@ -519,8 +522,7 @@ struct BeachNode* GetShoreline(struct BeachGrid* this, struct BeachNode* startNo
 		int currCol = curr->GetCol(curr);
 		int backtrack[2] = { currRow + dir_r, currCol + dir_c };
 		int temp[2] = { backtrack[0], backtrack[1] };
-
-		int foundNextBeach = FALSE;
+		struct BeachNode* tempNode = NULL;
 		do
 		{
 			// turn 45 degrees clockwise to next neighbor
@@ -539,43 +541,31 @@ struct BeachNode* GetShoreline(struct BeachGrid* this, struct BeachNode* startNo
 			dir_c = next[1] - temp[1];
 			temp[0] = next[0];
 			temp[1] = next[1];
-			if ((*this).IsLandCell(this, temp[0], temp[1]))
+			tempNode = (*this).TryGetNode(this, temp[0], temp[1]);
+			if (tempNode)
 			{
-				foundNextBeach = TRUE;
-				break;
+				if (tempNode->frac_full != 0 && !tempNode->properties)
+				{
+					break;
+				}
+				else if (stopNode)
+				{
+					// break if we reach stopNode or past stopNode
+					if (tempNode == stopNode || tempNode == stopNode->next || (stopNode->next && tempNode == stopNode->next->next))
+					{
+						curr->next = tempNode;
+						tempNode->prev = curr;
+						return tempNode;
+					}
+				}
+				tempNode = NULL;
 			}
 		} while (temp[0] != backtrack[0] || temp[1] != backtrack[1]);
 
-		// end landmass
-		if (!foundNextBeach) {
+		// end trace
+		if (tempNode == NULL)
+		{
 			break;
-		}
-
-		struct BeachNode* tempNode = (*this).TryGetNode(this, temp[0], temp[1]);
-		// temp node invalid, return NULL
-		if (!tempNode)
-		{
-			return NULL;
-		}
-		
-		// curr node is stop node
-		if (tempNode == stopNode)
-		{
-			curr->next = tempNode;
-			tempNode->prev = curr;
-			return tempNode;
-		}
-
-		// node already a beach cell, invalid grid // change to curr not tempNode
-		if (tempNode->properties) {
-			if (!stopNode || abs(curr->GetRow(curr) - stopNode->GetRow(stopNode)) > 1 || abs(curr->GetCol(curr) - stopNode->GetCol(stopNode)) > 1)
-			{
-				return NULL;
-			}
-
-			curr->next = stopNode;
-			stopNode->prev = curr;
-			return stopNode;
 		}
 
 		curr->next = tempNode;
@@ -585,24 +575,11 @@ struct BeachNode* GetShoreline(struct BeachGrid* this, struct BeachNode* startNo
 	return curr;
 }
 
-/**
-* Return true if cell at row, col contains land
-*/
-static int IsLandCell(struct BeachGrid* this, int row, int col)
+static double GetDistance(struct Beachgrid* this, struct BeachNode* node1, struct BeachNode* node2)
 {
-	if (row < 0 || row > this->rows || col < 0 || col > this->cols)
-	{
-		return FALSE;
-	}
-
-	struct BeachNode* temp = this->TryGetNode(this, row, col);
-	if (!temp)
-	{
-		return FALSE;
-	}
-
-	return (temp->frac_full > 0.0);
+	return sqrt(pow(node1->GetRow(node1) - node2->GetRow(node2), 2) + pow(node1->GetCol(node1) - node2->GetCol(node2), 2));
 }
+
 
 static struct BeachGrid new(int rows, int cols, double cell_width, double cell_length){
 	g_cell_width = cell_width;
@@ -627,7 +604,7 @@ static struct BeachGrid new(int rows, int cols, double cell_width, double cell_l
 			.CheckIfInShadow = &CheckIfInShadow,
 			.FindBeach = &FindBeach,
 			.GetShoreline = &GetShoreline,
-			.IsLandCell = &IsLandCell
+			.GetDistance = &GetDistance
 			};
 }
 

@@ -7,9 +7,9 @@ extern "C" {
 
 // Aspect Parameters
 // number of cells in x (cross-shore) direction
-#define X_MAX (26)
+#define X_MAX (50)
 // number of cells in y (longshore) direction
-#define Y_MAX (28)
+#define Y_MAX (100)
 
 // maximum length of arrays that contain beach data at each time step
 #define MaxBeachLength (8 * Y_MAX)

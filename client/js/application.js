@@ -117,6 +117,7 @@ function onLoad() {
 }
 
 function onRun() {
+    runTab.clearOutput();
     disableAll();
     // create payload
     var input_data = {
@@ -174,6 +175,9 @@ function onUpdate(timestep) {
         runTab.displayTimestep(new_time);
         if (resp.grid.length > 0) {
             mapInterface.updateDisplay(resp.grid);
+        }
+        if (resp.shoreline.length > 0) {
+            mapInterface.displayShoreline(resp.shoreline);
         }
         runTab.updateOutput(resp.results, new_time);
         if (new_time < controlTab.num_timesteps) {

@@ -1,7 +1,6 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <string.h>
 
 #include "consts.h"
@@ -58,9 +57,6 @@ int cem_initialize(Config config)
 	}
 	outputGrid = malloc(myConfig.nRows * myConfig.nCols * sizeof(double));
 
-	//t = clock() - t;
-	//printf("initialize (new): %f\n", ((double)t) / CLOCKS_PER_SEC);
-
 	return 0;
 }
 
@@ -76,6 +72,8 @@ double* cem_update(int saveInterval) {
 	}
 
 	SaveOutputGrid();
+	//test_OutputGrid();
+	//test_LogShoreline();
 	return outputGrid;
 }
 
@@ -156,24 +154,16 @@ void SaveOutputGrid()
 }
 
 void test_LogShoreline() {
-	char savefile_name[40] = "test/output/new_shoreline.txt";
+	char savefile_name[50];
+	sprintf(savefile_name, "test/output/new/shoreline%06d.out", current_time_step - 1);
 
 	FILE* savefile = fopen(savefile_name, "w");
 
-	int r, c;
-	for (r = 0; r < myConfig.nRows; r++)
+	struct BeachNode* curr = g_beachGrid.shoreline;
+	while (!curr->is_boundary)
 	{
-		for (c = 0; c < myConfig.nCols; c++)
-		{
-			struct BeachNode* node = g_beachGrid.TryGetNode(&g_beachGrid, r, c);
-			if (!node)
-			{
-				fprintf(savefile, " --");
-				continue;
-			}
-			fprintf(savefile, " %d", node->properties != NULL);
-		}
-		fprintf(savefile, "\n");
+		fprintf(savefile, " %d,%d\n", curr->row, curr->col);
+		curr = curr->next;
 	}
 
 	fclose(savefile);

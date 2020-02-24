@@ -828,12 +828,12 @@ char FindIfInShadow(int xin, int yin, int ShadMax)
 		/*  Find a cell along the projection line moving against wave direction */
 
 		xdistance = iteration * ShadowStepDistance * cos(WaveAngle);
-		xcheck = xin + rint(xdistance);
+		xcheck = xin + trunc(xdistance);
 
 		ydistance = -iteration * ShadowStepDistance * sin(WaveAngle);
-		ycheck = yin + rint(ydistance);
+		ycheck = yin + trunc(ydistance);
 
-		if (xcheck >= X_MAX - 1 || ycheck >= 2 * Y_MAX - 1) return 'n';
+		if (xcheck >= X_MAX - 1 || ycheck >= Y_MAX - 1) return 'n';
 
 		/* If AllBeach is along the way, and not next neighbor                  */
 		/* Probably won't get to this one, though                               */
@@ -1002,7 +1002,7 @@ void DetermineSedTransport(void)
 	char MaxTrans; /* Do we need to compute using maximum transport ? */
 	int DoFlux; /* Skip sed transport calcs (added 02/04 AA) */
 
-	for (i = 0; i < TotalBeachCells-1; i++) {
+	for (i = 1; i < TotalBeachCells-1; i++) {
 		MaxTrans = 'n';
 
 		/*  Is littoral transport going left or right?  */
@@ -1089,6 +1089,8 @@ void DetermineSedTransport(void)
 			}
 		}
 	}
+	VolumeAcrossBorder[0] = VolumeAcrossBorder[1];
+	VolumeAcrossBorder[TotalBeachCells - 1] = VolumeAcrossBorder[TotalBeachCells - 2];
 }
 
 void SedTrans(int i, int From, double ShoreAngle, char MaxT, int Last)
@@ -1813,7 +1815,7 @@ double Raise(double b, double e)
  */
 {
 	if (b > 0)
-		return powf(b, e);
+		return pow(b, e);
 	else {
 		printf("Raise: can't handle negative base \n");
 		return 0;

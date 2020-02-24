@@ -32,6 +32,7 @@ saveInterval = None
 lenTimestep = None
 start_year = None
 current_year = None
+current_date = None
 
 ###
 # start application
@@ -52,7 +53,7 @@ def startup():
 # run CEM
 @app.route('/initialize', methods = ['POST'])
 def initialize():
-    global numTimesteps, saveInterval, lenTimestep, start_year, current_year, mode
+    global numTimesteps, saveInterval, lenTimestep, start_year, current_year, current_date, mode
     jsdata = request.form['input_data']
     input_data = json.loads(jsdata)
     print("run cem")
@@ -67,6 +68,7 @@ def initialize():
     globals.source = input_data['source']
     start_year = input_data['start']
     current_year = start_year
+    current_date = current_year
     mode = input_data['mode']
 
     # build cell grid
@@ -94,6 +96,12 @@ def initialize():
 
     if not mode == 3:
         # build wave inputs
+        asymmetry = input_data['asymmetry']
+        stability = input_data['stability']
+        if asymmetry > 0:
+            asymmetry = asymmetry/100
+        if stability > 0:
+            stability = 1 - (stability/100)
         H = input_data['waveHeights']
         T = input_data['wavePeriods']
         theta = input_data['waveAngles']
@@ -137,11 +145,10 @@ def initialize():
 # update
 @app.route('/update/<int:timestep>', methods = ['GET'])
 def update(timestep):
-    global current_year
+    global current_year, current_date
     # update time counters
     steps = min(saveInterval, numTimesteps-timestep)
-    end_timestep = timestep + 365 if mode == 3 else timestep + steps
-    year = current_year + math.floor(end_timestep/365)
+    current_date = current_year + 1 if mode == 3 else  current_date + (steps/365)
     # init values
     ee_grid = []
     cem_grid = []
@@ -160,9 +167,9 @@ def update(timestep):
             return throw_error("CEM returned NaN or Inf value")
 
     # update satellite shoreline
-    if year > current_year:
+    if math.floor(current_date) > current_year:
         print("mode: " + str(mode))
-        current_year = year
+        current_year = math.floor(current_date)
         if not mode == 2:
             ee_grid = get_sat_grid()
         # process if running in standard mode
@@ -178,7 +185,8 @@ def update(timestep):
     data = {
         'message': 'Run updated',
         'grid': cem_grid.tolist(),
-        'timestep': end_timestep,
+        'shoreline': analyses.getShoreline(cem_grid).tolist(),
+        'timestep': timestep + steps,
         'results': {
             'sp_pca': sp_pca,
             't_pca': t_pca
