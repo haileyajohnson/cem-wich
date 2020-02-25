@@ -177,7 +177,7 @@ function onUpdate(timestep) {
             mapInterface.updateDisplay(resp.grid);
         }
         if (resp.shoreline.length > 0) {
-            mapInterface.displayShoreline(resp.shoreline);
+            mapInterface.displayShoreline(resp.shoreline, 'red', true);
         }
         runTab.updateOutput(resp.results, new_time);
         if (new_time < controlTab.num_timesteps) {
@@ -189,8 +189,24 @@ function onUpdate(timestep) {
 }
 
 function onModelComplete() {
-    $.get('/finalize').done(() => {
-        mapInterface.mapTransform(getFilterDates(controlTab.end_year), false);
+    $.get('/finalize').done((resp) => {
+        try {
+            resp = JSON.parse(resp);
+            if (resp.status != 200) {
+                throw(new Error(resp.message))
+            }
+        } catch (err){
+            showErrorMessage(err.message);
+            return;
+        }
+        mapInterface.mapTransform(controlTab.end_year, false);
+        if (resp.ref_shoreline.length > 0) {
+            mapInterface.displayShoreline(resp.ref_shoreline, 'black', false);
+        }
+        if (resp.final_shoreline.length > 0) {
+            mapInterface.displayShoreline(resp.final_shoreline, 'blue', false);
+        }
+
         enableAll();
     }).fail((err) => { showErrorMessage(JSON.parse(err.responseText).message); });
 }
@@ -220,6 +236,7 @@ function onModelComplete() {
     controlTab.$end_year.disable();
     controlTab.$length_timestep.disable();
     controlTab.$save_interval.disable();
+    controlTab.$closure_depth.disable();
 
     // run tab
     runTab.$runButton.enable();
@@ -248,16 +265,11 @@ function onModelComplete() {
     controlTab.$end_year.enable();
     controlTab.$length_timestep.enable();
     controlTab.$save_interval.enable();
+    controlTab.$closure_depth.enable();
 
     // run tab
     runTab.$runButton.enable();
     runTab.$outputButton.enable();
- }
-
- function getFilterDates(year) {
-    var start_date = year + "-01-01";
-    var end_date = year + "-12-31";
-    return [start_date, end_date];
  }
 
 /*********************
@@ -466,7 +478,7 @@ function GridTab() {
          * click listeners
          *****************/
         onSubmitClicked: function() {
-            if (mapInterface.mapTransform(getFilterDates(gridTab.start_year), true) == 0) {
+            if (mapInterface.mapTransform(gridTab.start_year, true) == 0) {
                 this.$coords.disable();
 
                 this.$drawButton.disable();

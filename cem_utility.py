@@ -120,7 +120,7 @@ def initialize():
 
         # config object
         input = config.Config(grid = grid, nRows = globals.nRows,  nCols = globals.nCols, cellWidth = globals.colSize, cellLength = globals.rowSize,
-            asymmetry = input_data['asymmetry'], stability = input_data['stability'], numWaveInputs = num_wave_inputs,
+            asymmetry = asymmetry, stability = stability, numWaveInputs = num_wave_inputs,
             waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
             shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
             crossShoreReferencePos = 0, shelfDepthAtReferencePos = 0, minimumShelfDepthAtClosure = 0,
@@ -203,7 +203,14 @@ def finalize():
     if not mode == 3:
         status = lib.finalize()
     if status == 0:
-        return json.dumps({'message': 'Run finalized', 'status': 200}), 200
+        final_shoreline = np.add(globals.ref_shoreline, globals.observed[-1])
+        data = {
+            'message': 'Run finalized',
+            'ref_shoreline': globals.ref_shoreline.tolist(),
+            'final_shoreline': final_shoreline.tolist(),
+            'status': 200}
+
+        return json.dumps(data), 200
     return throw_error('Run failed to finalize')
     
 ###
@@ -222,7 +229,7 @@ def process(cem_grid, ee_grid):
     # grids to shorelines
     shoreline = analyses.getShorelineChange(analyses.getShoreline(cem_grid))
     globals.model = np.vstack((globals.model, shoreline))
-    shorline = analyses.getShorelineChange(analyses.getShoreline(ee_grid))
+    shoreline = analyses.getShorelineChange(analyses.getShoreline(ee_grid))
     globals.observed = np.vstack((globals.observed, shoreline))
 
     # spatial PCA

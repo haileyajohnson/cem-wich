@@ -14,8 +14,8 @@ if __name__ == "__main__":
     # wait for vs debugger
     input("Press Enter to continue...")          
     # create basic input variables
-    nRows = 50
-    nCols = 100
+    nRows = 100
+    nCols = 300
     # cellWidth = 248.00815314166002
     # cellLength = 132.37451295654398
     cellWidth = 200
@@ -29,7 +29,7 @@ if __name__ == "__main__":
     saveInterval = 1
     numTimesteps = 365
 
-    asymmetry = .3
+    asymmetry = .7
     stability = .3
 
     # create wave inputs
@@ -48,13 +48,14 @@ if __name__ == "__main__":
         wavePeriods[i] = (random.random()*10) + 5 # random wave period 5 to 15 seconds
 
     # create grid input
-    import_grid = pd.read_excel("test/input/canaveral.xlsx")
+    import_grid = pd.read_excel("test/input/murray.xlsx")
     import_grid = import_grid.values
     grid = ((POINTER(c_double)) * nRows)()
     for r in range(nRows):
         grid[r] = (c_double * nCols)()
         for c in range(nCols):
-            grid[r][c] = import_grid[nRows - r - 1][c]
+            grid[r][c] = import_grid[r][c]
+            #grid[r][c] = import_grid[nRows - r - 1][c]
 
     # create config object
     input = config.Config(grid = grid, waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods, 

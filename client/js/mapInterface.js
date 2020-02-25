@@ -193,13 +193,14 @@ function MapInterface() {
         /**
          * Convert image to CEM grid
          */
-        mapTransform: function(filterDates, makeGrid){
+        mapTransform: function(year, makeGrid){
             // clear
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
-            var source = this.getSource(gridTab.start_year);
+            var source = this.getSource(year);
             var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
             // get image
             try {
+                filterDates = this.getFilterDates(year);
                 var dataset = ee.ImageCollection(source.url).filterBounds(poly).filterDate(filterDates[0], filterDates[1]);
                 var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
             } catch(error) {
@@ -333,9 +334,11 @@ function MapInterface() {
             this.modelSource.refresh();
         },
 
-        displayShoreline: function(shoreline) {
+        displayShoreline: function(shoreline, color, clear=false) {
             // clear source
-            this.shorelineSource.clear();
+            if (clear) {
+                this.shorelineSource.clear();
+            }
 
             var upper_left = this.polyGrid[0][0][0];
             var lower_left = this.polyGrid[0][0][3];
@@ -362,7 +365,7 @@ function MapInterface() {
                 geometry: new ol.geom.LineString(coords),
                 style: new ol.style.Style({
                     stroke: new ol.style.Stroke({
-                        color: [255, 0, 0, 0.8],
+                        color: color,
                         width: 2
                     })
                 })
@@ -666,6 +669,15 @@ function MapInterface() {
                 return sources[source];
             }
             showErrorMessage("Invalid source input")
+        },
+        
+        /**
+         * Get dates to create yearly composite
+         */
+        getFilterDates: function(year) {
+            var start_date = year + "-01-01";
+            var end_date = year + "-12-31";
+            return [start_date, end_date];
         },
 
         /**

@@ -20,15 +20,15 @@ if __name__ == "__main__":
     filename_vals = ["test/input/shoreline_config.xlsx", "test/input/rodanthe.xlsx", "test/input/murray.xlsx", "test/input/murray2.xlsx", "test/input/canaveral.xlsx"]
 
     # pick test file
-    f = 4
+    f = 2
     nRows = nRows_vals[f]
     nCols = nCols_vals[f]
     filename = filename_vals[f]
 
-    # cellWidth = 300
-    # cellLength = 300
-    cellWidth = 248.00815314166002
-    cellLength = 132.37451295654398
+    cellWidth = 200
+    cellLength = 200
+    # cellWidth = 248.00815314166002
+    # cellLength = 132.37451295654398
     shelfSlope = 0.001
     shorefaceSlope = 0.01
     crossShoreReferencePos = 10
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     saveInterval = 1
     numTimesteps = 365
 
-    asymmetry = .3
+    asymmetry = .7
     stability = .3
 
     # create wave inputs
@@ -64,15 +64,15 @@ if __name__ == "__main__":
     for r in range(nRows):
         grid_orig[r] = (c_double * nCols)()
         for c in range(nCols):
-            #grid_orig[r][c] = import_grid[r][c]
-            grid_orig[r][c] = import_grid[nRows - r - 1][c]
+            grid_orig[r][c] = import_grid[r][c]
+            #grid_orig[r][c] = import_grid[nRows - r - 1][c]
             
     grid_new = ((POINTER(c_double)) * nRows)()
     for r in range(nRows):
         grid_new[r] = (c_double * nCols)()
         for c in range(nCols):
-            #grid_new[r][c] = import_grid[nRows - r - 1][c]
-            grid_new[r][c] = import_grid[r][c]
+            grid_new[r][c] = import_grid[nRows - r - 1][c]
+            #grid_new[r][c] = import_grid[r][c]
             
 
     # create config objects

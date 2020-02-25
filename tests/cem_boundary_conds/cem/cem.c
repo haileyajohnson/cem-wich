@@ -146,7 +146,7 @@ int initialize(Config config) {
 	SHELF_SLOPE = config.shelfSlope;
 	SHOREFACE_SLOPE = config.shorefaceSlope;
 	DEPTH_SHOREFACE = config.minimumShelfDepthAtClosure;
-	INIT_BEACH = X_MAX - config.crossShoreReferencePos -1;
+	INIT_BEACH = config.crossShoreReferencePos;
 	INITIAL_DEPTH = config.shelfDepthAtReferencePos;
 
 	ShadowXMax = X_MAX; /* RCL: was X_MAX-5; */
