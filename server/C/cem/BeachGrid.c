@@ -1,9 +1,12 @@
-
+#include "BeachProperties.h"
 #include "BeachNode.h"
 #include "BeachGrid.h"
+#include "BeachProperties.h"
 #include "consts.h"
 #include "utils.h"
 #include <math.h>
+
+double g_cell_length, g_cell_width;
 
 static struct BeachGrid* SetCells(struct BeachGrid* this, struct BeachNode** cells)
 {
@@ -15,6 +18,33 @@ static struct BeachNode* SetShoreline(struct BeachGrid* this, struct BeachNode* 
 {
 	this->shoreline = shoreline;
 	return shoreline;
+}
+
+void FreeShoreline(struct BeachGrid* this)
+{
+	struct BeachNode* curr = this->shoreline;
+	while (!curr->is_boundary) {
+		free(curr->properties);
+		curr->properties = NULL;
+		if (!curr) { break; }
+		if (curr->prev && curr->prev->is_boundary)
+		{
+			free(curr->prev->properties);
+			free(curr->prev);
+		}
+		curr->prev = NULL;
+		struct BeachNode* next = curr->next;
+		curr->next = NULL;
+		curr = next;
+	}
+
+	if (curr->is_boundary)
+	{
+		free(curr->properties);
+		free(curr);
+	}
+	(*this).SetShoreline(this, NULL);
+
 }
 
 static struct BeachNode* TryGetNode(struct BeachGrid* this, int row, int col)
@@ -35,26 +65,26 @@ static struct BeachNode* TryGetNode(struct BeachGrid* this, int row, int col)
 static double GetPrevAngle(struct BeachGrid* this, struct BeachNode* node)
 {
 	// error: node is null
-	if (BeachNode.isEmpty(node))
+	if (!node)
 	{
 		return EMPTY_double;
 	}
 
-	if (node->prev_timestamp == this->current_time)
+	if (node->properties->prev_timestamp == this->current_time)
 	{
-		return node->prev_angle;
+		return node->properties->prev_angle;
 	}
 
 	double angle;
 	if (node->is_boundary)
 	{
 		// start boundary node: prev is same as next->next
-		if (BeachNode.isEmpty(node->prev) && !BeachNode.isEmpty(node->next))
+		if (!node->prev && node->next)
 		{
 			angle = (*this).GetNextAngle(this, node->next);
 		}
 		// end boundary node: prev is same as prev->prev
-		else if (BeachNode.isEmpty(node->next) && !BeachNode.isEmpty(node->prev))
+		else if (!node->next && node->prev)
 		{
 			angle = (*this).GetPrevAngle(this, node->prev);
 		}
@@ -67,7 +97,7 @@ static double GetPrevAngle(struct BeachGrid* this, struct BeachNode* node)
 	else if (node->prev->is_boundary)
 	{
 		// error: no valid neighbors
-		if (BeachNode.isEmpty(node->next) || node->next->is_boundary)
+		if (!node->next || node->next->is_boundary)
 		{
 			return EMPTY_double;
 		}
@@ -79,34 +109,34 @@ static double GetPrevAngle(struct BeachGrid* this, struct BeachNode* node)
 		// main case
 		angle = BeachNode.GetAngle(node->prev, node);
 	}
-	node->prev_angle = angle;
-	node->prev_timestamp = this->current_time;
+	node->properties->prev_angle = angle;
+	node->properties->prev_timestamp = this->current_time;
 	return angle;
 }
 
 static double GetNextAngle(struct BeachGrid* this, struct BeachNode* node)
 {
 	// error: node is null
-	if (BeachNode.isEmpty(node))
+	if (!node)
 	{
 		return EMPTY_double;
 	}
 
-	if (node->next_timestamp == this->current_time)
+	if (node->properties->next_timestamp == this->current_time)
 	{
-		return node->next_angle;
+		return node->properties->next_angle;
 	}
 
 	double angle;
 	if (node->is_boundary)
 	{
 		// start boundary node: next is same as next->next
-		if (BeachNode.isEmpty(node->prev) && !BeachNode.isEmpty(node->next))
+		if (!node->prev && node->next)
 		{
 			angle = (*this).GetNextAngle(this, node->next);
 		}
 		// end boundary node: next is same as prev->prev
-		else if (BeachNode.isEmpty(node->next) && !BeachNode.isEmpty(node->prev))
+		else if (!node->next && node->prev)
 		{
 			angle = (*this).GetPrevAngle(this, node->prev);
 		}
@@ -119,7 +149,7 @@ static double GetNextAngle(struct BeachGrid* this, struct BeachNode* node)
 	else if (node->next->is_boundary)
 	{
 		// error: no valid neighbors
-		if (BeachNode.isEmpty(node->prev) || node->prev->is_boundary)
+		if (!node->prev || node->prev->is_boundary)
 		{
 			return EMPTY_double;
 		}
@@ -131,41 +161,41 @@ static double GetNextAngle(struct BeachGrid* this, struct BeachNode* node)
 		// main case
 		angle = BeachNode.GetAngle(node, node->next);
 	}
-	node->next_angle = angle;
-	node->next_timestamp = this->current_time;
+	node->properties->next_angle = angle;
+	node->properties->next_timestamp = this->current_time;
 	return angle;
 }
 
 static double GetSurroundingAngle(struct BeachGrid* this, struct BeachNode* node)
 {
 	// error: node is null
-	if (BeachNode.isEmpty(node))
+	if (!node)
 	{
 		return EMPTY_double;
 	}
 
-	if (node->surrounding_timestamp == this->current_time)
+	if (node->properties->surrounding_timestamp == this->current_time)
 	{
-		return node->surrounding_angle;
+		return node->properties->surrounding_angle;
 	}
 
 	double angle;
 	if (node->is_boundary)
 	{
-		if (BeachNode.isEmpty(node->prev))
+		if (!node->prev)
 		{
 			// error: next node is null
-			if (BeachNode.isEmpty(node->next) || node->next->is_boundary)
+			if (!node->next || node->next->is_boundary)
 			{
 				return EMPTY_double;
 			}
 			// start boundary: surrounding is same as next
 			angle = (*this).GetNextAngle(this, node->next);
 		}
-		else if (BeachNode.isEmpty(node->next))
+		else if (!node->next)
 		{
 			// error: prev node is null
-			if (BeachNode.isEmpty(node->prev) || node->prev->is_boundary)
+			if (!node->prev || node->prev->is_boundary)
 			{
 				return EMPTY_double;
 			}
@@ -174,7 +204,7 @@ static double GetSurroundingAngle(struct BeachGrid* this, struct BeachNode* node
 		}
 	}
 	// error: next or prev is null
-	else if (BeachNode.isEmpty(node->prev) || BeachNode.isEmpty(node->next))
+	else if (!node->prev || !node->next)
 	{
 		return EMPTY_double;
 	}
@@ -183,8 +213,8 @@ static double GetSurroundingAngle(struct BeachGrid* this, struct BeachNode* node
 		// main case
 		angle = ((*this).GetPrevAngle(this, node) + (*this).GetNextAngle(this, node)) / 2;
 	}
-	node->surrounding_angle = angle;
-	node->surrounding_timestamp = this->current_time;
+	node->properties->surrounding_angle = angle;
+	node->properties->surrounding_timestamp = this->current_time;
 	return angle;
 }
 
@@ -202,7 +232,7 @@ static double GetAngleByDifferencingScheme(struct BeachGrid* this, struct BeachN
 		upwind_node = node->prev;
 		upwind_angle = (*this).GetPrevAngle(this, calc_node);
 		downwind_angle = (*this).GetNextAngle(this, calc_node);
-		node->transport_dir = RIGHT;
+		node->properties->transport_dir = RIGHT;
 	}
 	else
 	{
@@ -211,7 +241,7 @@ static double GetAngleByDifferencingScheme(struct BeachGrid* this, struct BeachN
 		upwind_node = calc_node->is_boundary ? calc_node : calc_node->next;
 		upwind_angle = (*this).GetNextAngle(this, calc_node);
 		downwind_angle = (*this).GetPrevAngle(this, calc_node);
-		node->transport_dir = LEFT;
+		node->properties->transport_dir = LEFT;
 	}
 
 	if ((*this).CheckIfInShadow(this, calc_node, wave_angle))
@@ -261,7 +291,7 @@ static struct BeachNode** Get4Neighbors(struct BeachGrid* this, struct BeachNode
 	for (i = 0; i < 4; i++)
 	{
 		neighbors[i] = TryGetNode(this, rows[i], cols[i]);
-		if (BeachNode.isEmpty(neighbors[i])) {
+		if (!neighbors[i]) {
 			struct BeachNode* neighbor = BeachNode.boundary(EMPTY_INT, EMPTY_INT);
 			neighbor->frac_full = node->frac_full > 1.0 ? 0.0 : 1.0;
 			neighbors[i] = neighbor;
@@ -278,14 +308,16 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 		return FALSE;
 	}
 
-	if (node->shadow_timestamp == this->current_time)
+	if (node->properties->shadow_timestamp == this->current_time)
 	{
-		return node->in_shadow;
+		return node->properties->in_shadow;
 	}
 
 	// start at corner TODO: switch to centroid
 	int node_r = node->GetRow(node);
 	int node_c = node->GetCol(node);
+	int row = node_r;
+	int col = node_c;
 	double r = (double)node_r;
 	double c = (double)node_c;
 	double cos_angle = cos(wave_angle);
@@ -293,77 +325,58 @@ static int CheckIfInShadow(struct BeachGrid* this, struct BeachNode* node, doubl
 	int r_sign = cos_angle >= 0 ? -1 : 1;
 	int c_sign = sin_angle >= 0 ? -1 : 1;
 
-	node->shadow_timestamp = this->current_time;
+	node->properties->shadow_timestamp = this->current_time;
 
 	while (TRUE)
 	{
-		int next_r = ceil(r + r_sign);
-		int next_c = ceil(c + c_sign);
-		double d_r = fabs(((next_r - r) * this->cell_length) / cos_angle);
-		double d_c = fabs(((next_c - c) * this->cell_width) / sin_angle);
+		int next_r = trunc(row + r_sign);
+		int next_c = trunc(col + c_sign);
+
+		double d_r = fabs(((next_r - r) * g_cell_length) / cos_angle);
+		double d_c = fabs(((next_c - c) * g_cell_width) / sin_angle);
 
 		if (d_r < d_c)
 		{
 			r = (double)next_r;
-			c += (c_sign * fabs(d_r * sin_angle)) / this->cell_width;
+			c += (c_sign * fabs(d_r * sin_angle)) / g_cell_width;
 		}
 		else
 		{
 			c = (double)next_c;
-			r += (r_sign * fabs(d_c * cos_angle)) / this->cell_length;
+			r += (r_sign * fabs(d_c * cos_angle) / g_cell_length);
 		}
 
 		if (r < 0 || r >= (*this).rows || c < 0 || c >= (*this).cols)
 		{
-			node->in_shadow = FALSE;
+			node->properties->in_shadow = FALSE;
 			break;
 		}
 
-		int row = floor(r);
-		int col = floor(c);
+		row = ceil(r);
+		col = floor(c);
 
 		struct BeachNode* temp = TryGetNode(this, row, col);
-		if (BeachNode.isEmpty(temp))
+		if (!temp)
 		{
-			node->in_shadow = FALSE;
+			node->properties->in_shadow = FALSE;
 			break;
 		}
 
 		if (temp->frac_full == 1 && (row - 1) < (node_r - (node->frac_full + fabs((col - node_c) / tan(wave_angle)))))
 		{
-			node->in_shadow = TRUE;
+			node->properties->in_shadow = TRUE;
 			break;
 		}
 	}
-	return node->in_shadow;
+	return node->properties->in_shadow;
 }
 
 int FindBeach(struct BeachGrid* this)
 {
 	// clear current shoreline if grid already has one
-	if (!BeachNode.isEmpty(this->shoreline))
+	if (this->shoreline != NULL)
 	{
-		struct BeachNode* shoreline = this->shoreline;
-		struct BeachNode* curr = this->shoreline;
-		do {
-			curr->is_beach = FALSE;
-			if (BeachNode.isEmpty(curr)) { break; }
-			if (!BeachNode.isEmpty(curr->prev) && curr->prev->is_boundary)
-			{
-				free(curr->prev);
-			}
-			curr->prev = NULL;
-			struct BeachNode* next = curr->next;
-			curr->next = NULL;
-			curr = next;
-		} while (!curr->is_boundary);
-
-		if (curr->is_boundary)
-		{
-			free(curr);
-		}
-		// free mem
-		(*this).SetShoreline(this, NULL);
+		(*this).FreeShoreline(this);
 	}
 	
 	// start search downward from top left
@@ -371,14 +384,14 @@ int FindBeach(struct BeachGrid* this)
 	for (c = 0; c < this->cols; c++) {
 		for (r = 1; r < this->rows; r++) {
 			struct BeachNode* node = (*this).TryGetNode(this, r, c);
+			if (!node) { return -1; }
 
 			// start tracing shoreline
-			if ((*this).IsLandCell(this, r, c)) {
+			if (node->frac_full != 0) {
 				struct BeachNode* startNode = node;
-				if (BeachNode.isEmpty(startNode)) { return -1; }
 
 				struct BeachNode* endNode = (*this).GetShoreline(this, startNode, NULL, 1, 0);
-				if (!endNode || BeachNode.isEmpty(endNode))
+				if (!endNode)
 				{
 					return -1;
 				}
@@ -421,7 +434,7 @@ int FindBeach(struct BeachGrid* this)
 
 static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* node)
 {
-	if (BeachNode.isEmpty(node) || node->is_boundary)
+	if (!node || node->is_boundary)
 	{
 		return NULL;
 	}
@@ -430,16 +443,15 @@ static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* n
 
 	struct BeachNode* curr = node;
 
-	// get start dir - default to left if prev is null
-	int dir_r = 0;
-	int dir_c = -1;
+	// get start dir - default to up if prev is null or boundary
+	int dir_r = 1;
+	int dir_c = 0;
 	struct BeachNode* prev = start->prev;
-	if (!BeachNode.isEmpty(prev))
+	if (prev && !prev->is_boundary)
 	{
 		// start from 45 clockwise of prev
-		double angle = atan2(prev->GetRow(prev) - start->GetRow(start), prev->GetCol(prev) - start->GetCol(start));
-		angle += (PI / 4);
-		dir_r = -round(sin(angle));
+		double angle = atan2(-(prev->GetRow(prev) - start->GetRow(start)), prev->GetCol(prev) - start->GetCol(start));
+		dir_r = round(sin(angle));
 		dir_c = -round(cos(angle));
 	}
 
@@ -452,7 +464,8 @@ static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* n
 			while (!stop->is_boundary)
 			{
 				struct BeachNode* next = stop->next;
-				stop->is_beach = FALSE;
+				free(stop->properties);
+				stop->properties = NULL;
 				stop->prev = NULL;
 				stop->next = NULL;
 				stop = next;
@@ -474,7 +487,8 @@ static struct BeachNode* ReplaceNode(struct BeachGrid* this, struct BeachNode* n
 	}
 
 	// remove node from shoreline
-	node->is_beach = FALSE;
+	free(node->properties);
+	node->properties = NULL;
 	node->prev = NULL;
 	node->next = NULL;
 
@@ -493,8 +507,13 @@ struct BeachNode* GetShoreline(struct BeachGrid* this, struct BeachNode* startNo
 	while (TRUE)
 	{
 		// mark as beach
-		if (BeachNode.isEmpty(curr)) { return NULL; }
-		curr->is_beach = TRUE;
+		if (!curr) { return NULL; }
+		if (!curr->properties)
+		{
+			struct BeachProperties* props = malloc(sizeof(struct BeachProperties));
+			*props = BeachProperties.new();
+			curr->properties = props;
+		}
 
 		// backtrack
 		dir_r = -dir_r;
@@ -503,8 +522,7 @@ struct BeachNode* GetShoreline(struct BeachGrid* this, struct BeachNode* startNo
 		int currCol = curr->GetCol(curr);
 		int backtrack[2] = { currRow + dir_r, currCol + dir_c };
 		int temp[2] = { backtrack[0], backtrack[1] };
-
-		int foundNextBeach = FALSE;
+		struct BeachNode* tempNode = NULL;
 		do
 		{
 			// turn 45 degrees clockwise to next neighbor
@@ -523,43 +541,31 @@ struct BeachNode* GetShoreline(struct BeachGrid* this, struct BeachNode* startNo
 			dir_c = next[1] - temp[1];
 			temp[0] = next[0];
 			temp[1] = next[1];
-			if ((*this).IsLandCell(this, temp[0], temp[1]))
+			tempNode = (*this).TryGetNode(this, temp[0], temp[1]);
+			if (tempNode)
 			{
-				foundNextBeach = TRUE;
-				break;
+				if (tempNode->frac_full != 0 && !tempNode->properties)
+				{
+					break;
+				}
+				else if (stopNode)
+				{
+					// break if we reach stopNode or past stopNode
+					if (tempNode == stopNode || tempNode == stopNode->next || (stopNode->next && tempNode == stopNode->next->next))
+					{
+						curr->next = tempNode;
+						tempNode->prev = curr;
+						return tempNode;
+					}
+				}
+				tempNode = NULL;
 			}
 		} while (temp[0] != backtrack[0] || temp[1] != backtrack[1]);
 
-		// end landmass
-		if (!foundNextBeach) {
+		// end trace
+		if (tempNode == NULL)
+		{
 			break;
-		}
-
-		struct BeachNode* tempNode = (*this).TryGetNode(this, temp[0], temp[1]);
-		// temp node invalid, return NULL
-		if (!tempNode || BeachNode.isEmpty(tempNode))
-		{
-			return NULL;
-		}
-		
-		// curr node is stop node
-		if (tempNode == stopNode)
-		{
-			curr->next = tempNode;
-			tempNode->prev = curr;
-			return tempNode;
-		}
-
-		// node already a beach cell, invalid grid // change to curr not tempNode
-		if (tempNode->is_beach) {
-			if (!stopNode || abs(curr->GetRow(curr) - stopNode->GetRow(stopNode)) > 1 || abs(curr->GetCol(curr) - stopNode->GetCol(stopNode)) > 1)
-			{
-				return NULL;
-			}
-
-			curr->next = stopNode;
-			stopNode->prev = curr;
-			return stopNode;
 		}
 
 		curr->next = tempNode;
@@ -569,48 +575,37 @@ struct BeachNode* GetShoreline(struct BeachGrid* this, struct BeachNode* startNo
 	return curr;
 }
 
-/**
-* Return true if cell at row, col contains land
-*/
-static int IsLandCell(struct BeachGrid* this, int row, int col)
+static double GetDistance(struct Beachgrid* this, struct BeachNode* node1, struct BeachNode* node2)
 {
-	if (row < 0 || row > this->rows || col < 0 || col > this->cols)
-	{
-		return FALSE;
-	}
-
-	struct BeachNode* temp = this->TryGetNode(this, row, col);
-	if (BeachNode.isEmpty(temp))
-	{
-		return FALSE;
-	}
-
-	return (temp->frac_full > 0.0);
+	return sqrt(pow(node1->GetRow(node1) - node2->GetRow(node2), 2) + pow(node1->GetCol(node1) - node2->GetCol(node2), 2));
 }
 
+
 static struct BeachGrid new(int rows, int cols, double cell_width, double cell_length){
-		return (struct BeachGrid) {
-				.cell_width = cell_width,
-				.cell_length = cell_length,
-				.rows = rows,
-				.cols = cols,
-				.current_time = 0,
-				.cells = NULL,
-				.shoreline = NULL,
-				.SetCells = &SetCells,
-				.SetShoreline = &SetShoreline,
-				.TryGetNode = &TryGetNode,
-				.GetPrevAngle = &GetPrevAngle,
-				.GetNextAngle = &GetNextAngle,
-				.GetSurroundingAngle = &GetSurroundingAngle,
-				.GetAngleByDifferencingScheme = &GetAngleByDifferencingScheme,
-				.ReplaceNode = &ReplaceNode,
-				.Get4Neighbors = &Get4Neighbors,
-				.CheckIfInShadow = &CheckIfInShadow,
-				.FindBeach = &FindBeach,
-				.GetShoreline = &GetShoreline,
-				.IsLandCell = &IsLandCell
-				};
+	g_cell_width = cell_width;
+	g_cell_length = cell_length;
+
+	return (struct BeachGrid) {
+			.rows = rows,
+			.cols = cols,
+			.current_time = 0,
+			.cells = NULL,
+			.shoreline = NULL,
+			.SetCells = &SetCells,
+			.SetShoreline = &SetShoreline,
+			.FreeShoreline = &FreeShoreline,
+			.TryGetNode = &TryGetNode,
+			.GetPrevAngle = &GetPrevAngle,
+			.GetNextAngle = &GetNextAngle,
+			.GetSurroundingAngle = &GetSurroundingAngle,
+			.GetAngleByDifferencingScheme = &GetAngleByDifferencingScheme,
+			.ReplaceNode = &ReplaceNode,
+			.Get4Neighbors = &Get4Neighbors,
+			.CheckIfInShadow = &CheckIfInShadow,
+			.FindBeach = &FindBeach,
+			.GetShoreline = &GetShoreline,
+			.GetDistance = &GetDistance
+			};
 }
 
 const struct BeachGridClass BeachGrid = { .new = &new };

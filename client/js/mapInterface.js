@@ -63,6 +63,7 @@ function MapInterface() {
         boundsSource: null,
         gridSource: null,
         modelSource: null,
+        shorelineSource: null,
         imLayer: null,
 
         drawingMode: false,
@@ -114,8 +115,10 @@ function MapInterface() {
             // create grid source
             this.gridSource = new ol.source.Vector({});      
              
-            // create CEM source
-            this.modelSource = new ol.source.Vector({}); 
+            // create CEM sources
+            this.modelSource = new ol.source.Vector({});
+            this.shorelineSource = new ol.source.Vector({});
+
             // add to map
             var modelLayer = new ol.layer.Vector({source: this.modelSource, 
                 style: function(feature, resolution) {
@@ -130,6 +133,15 @@ function MapInterface() {
                 }});
             modelLayer.setZIndex(4);
             this.map.addLayer(modelLayer);
+
+            var shorelineLayer = new ol.layer.Vector({
+                source: this.shorelineSource,
+                style: function(feature, resolution) {
+                    return feature.get('style');
+                }
+            });
+            shorelineLayer.setZIndex(5);
+            this.map.addLayer(shorelineLayer)
 
             // create Bing Maps layer
             var bingLayer = new ol.layer.Tile({
@@ -181,13 +193,14 @@ function MapInterface() {
         /**
          * Convert image to CEM grid
          */
-        mapTransform: function(filterDates, makeGrid){
+        mapTransform: function(year, makeGrid){
             // clear
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
-            var source = this.getSource(gridTab.start_year);
+            var source = this.getSource(year);
             var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
             // get image
             try {
+                filterDates = this.getFilterDates(year);
                 var dataset = ee.ImageCollection(source.url).filterBounds(poly).filterDate(filterDates[0], filterDates[1]);
                 var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
             } catch(error) {
@@ -305,7 +318,6 @@ function MapInterface() {
         updateDisplay: function(grid) {
             // clear source
             this.modelSource.clear();
-            //if (this.modelLayer) { this.map.removeLayer(this.modelLayer); }
 
             // make polygons
             for (var r = 0; r < this.numRows; r++)
@@ -320,6 +332,45 @@ function MapInterface() {
                 }
             }
             this.modelSource.refresh();
+        },
+
+        displayShoreline: function(shoreline, color, clear=false) {
+            // clear source
+            if (clear) {
+                this.shorelineSource.clear();
+            }
+
+            var upper_left = this.polyGrid[0][0][0];
+            var lower_left = this.polyGrid[0][0][3];
+            var dist_lon = upper_left[0] - lower_left[0];
+            var dist_lat = upper_left[1] - lower_left[1];
+
+            var coords = [];
+            for (var i = 0; i < shoreline.length; i++)
+            {
+                // get coordinates
+                var c = i;
+                var r = Math.floor(shoreline[i]);
+                var frac_full = shoreline[i]%1;
+                var lower_left = this.polyGrid[r][c][3];
+                var lower_right = this.polyGrid[r][c][2];
+                var lon = (lower_left[0] + lower_right[0])/2 + dist_lon*(1 - frac_full);
+                var lat = (lower_left[1] + lower_right[1])/2 + dist_lat*(1 - frac_full);
+
+                coords.push([lon, lat]);
+            }
+
+            // make polyline
+            this.shorelineSource.addFeature(new ol.Feature({
+                geometry: new ol.geom.LineString(coords),
+                style: new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: color,
+                        width: 2
+                    })
+                })
+            }));
+            this.shorelineSource.refresh();
         },
 
         /**
@@ -619,6 +670,15 @@ function MapInterface() {
             }
             showErrorMessage("Invalid source input")
         },
+        
+        /**
+         * Get dates to create yearly composite
+         */
+        getFilterDates: function(year) {
+            var start_date = year + "-01-01";
+            var end_date = year + "-12-31";
+            return [start_date, end_date];
+        },
 
         /**
          * reset map
@@ -627,6 +687,7 @@ function MapInterface() {
             this.boundsSource.clear();
             this.gridSource.clear();
             this.modelSource.clear();
+            this.shorelineSource.clear();
             if (this.imLayer) { this.map.removeLayer(this.imLayer); }
             this.box = null;
             this.polyGrid = [];
