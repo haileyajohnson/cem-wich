@@ -17,8 +17,6 @@
     <!-- Load local compiled OpenLayers -->
     <script src="{{ url_for('static', filename='extern/js/ol.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='extern/css/ol.css') }}" type="text/css">
-    <!-- Load local compiled Earth Engine JavaScript client library. -->
-    <script src="{{ url_for('static', filename='extern/js/ee_api_js.js') }}"></script>
     <!-- Load application -->
     {% for filename in distDir %}    
     <script src="{{ url_for('static', filename=filename) }}"></script>
@@ -77,14 +75,6 @@
             </div>
 
             <div class="tab-view-container">
-                <!-- Google sign in -->
-                <div class="g-sign-in hidden">
-                    <span class="label">Sign in with:</span>
-                    <div class="button">
-                        <span class="icon"></span>
-                        <span class="button-text">Google</span>
-                    </div>
-                </div>
 
                 <!-- grid input tab -->
                 <div class="grid-tab tab-view">

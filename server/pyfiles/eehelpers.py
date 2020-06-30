@@ -28,7 +28,7 @@ sources = [
 
 ###
 # make CEM-formatted grid from sat image
-def make_cem_grid(im):       
+def make_cem_grid(im):
     features = []
     for r in range(globals.nRows):
         for c in range(globals.nCols):
@@ -36,7 +36,7 @@ def make_cem_grid(im):
 
     fc = ee.FeatureCollection(features)
 
-    eeGrid = np.empty((globals.nRows, globals.nCols), float)
+    grid = np.empty((globals.nRows, globals.nCols), float)
             
     # Reduce features to mean value
     maxTries = 8
@@ -51,16 +51,28 @@ def make_cem_grid(im):
             print("Could not get info from EE server. Trying again...")
             if numTries == maxTries:
                 print("Max tries exceeded: could not get info from EE server")
-                return eeGrid
+                return None
 
     i = 0
     for r in range(globals.nRows):
         for c in range(globals.nCols):
             feature = info[i]
             fill = feature['properties']['mean']
-            eeGrid[r][c] = fill
+            grid[r][c] = fill
             i += 1
-    return eeGrid
+
+    for c in range(globals.nCols):
+        fill = False  
+        for r in range(globals.nRows):
+            if fill:
+                grid[r][c] = 1
+                continue
+            if grid[r][c] >= 0.1:
+                fill = True
+                continue
+            grid[r][c] = 0
+            
+    return grid
 
 ###
 # create water mask from 365 day TOA composite 
@@ -93,7 +105,16 @@ def get_image_composite(year):
     gaussian = ee.Kernel.gaussian(3)            
     smooth = mask.convolve(gaussian).clip(poly)
     return smooth
+
+###
+# get image url
+def get_image_URL(im):
     
+            # smooth.getThumbURL({dimensions: [800, 800], region: poly.toGeoJSONString() }, (url) => {
+            #     this.displayPhoto(url);
+            # })
+    return ""
+
 ###
 # build URL to request image
 def _get_source(year):    
@@ -104,4 +125,4 @@ def _get_source(year):
 
     elif (source < len(sources)):
         return sources[source]
-    #TODO: throw error
+    return None

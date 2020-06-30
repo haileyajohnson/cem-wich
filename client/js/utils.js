@@ -43,16 +43,8 @@ function tryParseFloat(input, fallback) {
 /**
  *  ensure all required fields are present in payload
  */
-function validateData(data) {
-    if (!data.grid || data.grid.length == 0) { return -1; }
-    if (!data.cellWidth || data.cellWidth <= 0) { return -1; }
-    if (!data.cellLength || data.cellLength <= 0) { return -1; }
-    if (!data.nRows || data.nRows <= 0) { return -1; }
-    if (!data.nCols || data.nCols <= 0) { return -1; }
-    if (!data.source) { return -1; }
-    if (!data.start) { return -1; }
-    if (!data.geometry || data.geometry == 0) { return -1; }
-    if (!data.polyGrid || data.polyGrid.length == 0) { return -1; }
+function validateInputData(data) {
+    if (!data.grid || data.grid.length == 0) { return -1; }    
     if (!data.waveHeights) { return -1; }
     if (!data.wavePeriods) { return -1; }
     if (!data.shelfSlope) { return -1; }
@@ -61,6 +53,19 @@ function validateData(data) {
     if (!data.numTimesteps || data.numTimesteps <= 0) { return -1; }
     if (!data.lengthTimestep || data.lengthTimestep <= 0) { return -1; }
     if (!data.saveInterval || data.saveInterval <=0) { return -1; }
+    // success
+    return 0;
+}
+
+function validateMapData(data) {
+    if (!data.cellWidth || data.cellWidth <= 0) { return -1; }
+    if (!data.cellLength || data.cellLength <= 0) { return -1; }
+    if (!data.nRows || data.nRows <= 0) { return -1; }
+    if (!data.nCols || data.nCols <= 0) { return -1; }
+    if (!data.source) { return -1; }
+    if (!data.start) { return -1; }
+    if (!data.geometry || data.geometry == 0) { return -1; }
+    if (!data.polyGrid || data.polyGrid.length == 0) { return -1; }
     // success
     return 0;
 }

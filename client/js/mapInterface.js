@@ -23,36 +23,6 @@ function getColor(feature) {
     return [r, g, b, 0.2];
 }
 
-sources = [
-// Landsat 5 access info
-{
-    id: 0,
-    name: "LS5",
-    start: 1985,
-    end: 2011,
-    bands: ['B2', 'B4'],
-    url:"LANDSAT/LT05/C01/T1"
-},
-// Landsat 7 access info
-{
-    id: 1,
-    name: "LS7",
-    start: 1999,
-    end: 9999,
-    bands: ['B2', 'B4'],
-    url:"LANDSAT/LE07/C01/T1"
-},
-
-// Landsat 8 access info
-{
-    id: 2,
-    name: "LS8",
-    start: 2014,
-    end: 9999,
-    bands: ['B3', 'B5'],
-    url:"LANDSAT/LC08/C01/T1"
-}];
-
 function MapInterface() {
     return {
         map: null,        
@@ -75,9 +45,7 @@ function MapInterface() {
         rotation: 0,
 
         initMap: function() {
-            // initialize earth engine
-            ee.initialize();
-
+            
             // create rotatable map
             this.map = new ol.Map({
                 interactions: ol.interaction.defaults().extend([
@@ -190,134 +158,10 @@ function MapInterface() {
             }));
         },        
 
-        /**
-         * Convert image to CEM grid
-         */
-        mapTransform: function(year, makeGrid){
-            // clear
-            if (this.imLayer) { this.map.removeLayer(this.imLayer); }
-            var source = this.getSource(year);
-            var poly = new ee.Geometry.Polygon(this.box.getCoordinates()[0]);
-            // get image
-            try {
-                filterDates = this.getFilterDates(year);
-                var dataset = ee.ImageCollection(source.url).filterBounds(poly).filterDate(filterDates[0], filterDates[1]);
-                var composite = ee.Algorithms.Landsat.simpleComposite(dataset);
-            } catch(error) {
-                showErrorMessage("Error generating composite image.");
-                return -1;
-            }
-            
-            // Otsu thresholding to classify as land/water
-            var water_bands = source.bands;
-            var ndwi = composite.normalizedDifference(water_bands);
-
-            var values = ndwi.reduceRegion({
-                reducer: ee.Reducer.histogram(),
-                geometry: poly,
-                scale: 10,
-                bestEffort: true
-            });
-
-            // returns water mask: water = 1, land = 0
-            var water = ndwi.gt(this.otsu(values.get('nd')));
-            // remove small features
-            var minConnectivity = 50;
-            var connectCount = water.connectedPixelCount(minConnectivity, true);
-            var unconnect_land_pix = water.eq(0).and(connectCount.lt(minConnectivity));
-            var unconnect_water_pix = water.eq(1).and(connectCount.lt(minConnectivity)).multiply(-1); // mask = negative ones on low connectivity water pixels
-            // 1. add mask of ones for low connectivity land pixels
-            // 2. add mask of -1 for low connectivity water pixels
-            // 3. invert: land = 1, water = 0
-            var mask = water.add(unconnect_land_pix).add(unconnect_water_pix).not();
-
-            // smooth
-            var gaussian = ee.Kernel.gaussian({
-                radius: 3
-            });            
-            var smooth = mask.convolve(gaussian).clip(poly);
-
-            // get mask image
-            smooth.getThumbURL({dimensions: [800, 800], region: poly.toGeoJSONString() }, (url) => {
-                this.displayPhoto(url);
-            })
-
-            // create model input grid
-            if (makeGrid) {
-                this.createGrid(smooth);
-            }
-            return 0;
-        },
-
-        /**
-         * convert Otsu image into CEM input grid
-         */
-        createGrid: function(image) {
-            var features = [];
-            for (var r = 0; r < this.numRows; r++) {
-                this.cemGrid.push([]);
-                for (var c = 0; c < this.numCols; c++) {
-                    // create polygon feature for each cell                    
-                    features.push(new ee.Feature(new ee.Geometry.Polygon(this.polyGrid[r][c])));
-                    // create placeholder for cem grid
-                    this.cemGrid[r].push(-1);
-                }
-            }
-
-            var fc = new ee.FeatureCollection(features);
-            // Reduce features to mean value
-            var maxTries = 8;
-            var numTries = 0;
-            while (numTries < maxTries) {
-                try {
-                    var dict = image.reduceRegions({
-                        reducer: ee.Reducer.mean(),
-                        collection: fc,
-                        scale: 30
-                    });
-        
-                    var infoGrid = dict.getInfo();
-                    break;
-                } catch (e) {
-                    numTries++;
-                    if (numTries == maxTries) {
-                        showErrorMessage("Max tries exceeded: could not get info from EE server")
-                        return;
-                    }
-                }
-            }
-            var numCells = infoGrid.features.length;
-
-            // get fill of each cell feature
-            var polyFill = [];
-            for (var i = 0; i < numCells; i++) {
-                var feature = infoGrid.features[i];
-                polyFill.push(feature.properties.mean);
-                var rc = this.indexToRowCol(i);    
-                this.cemGrid[rc[0]][rc[1]] = polyFill[i];
-            }
-
-            for (var c = 0; c < this.numCols; c++) {
-                var fill = false;
-                for (var r = 0; r < this.numRows; r++) {
-                    if (fill) {
-                        this.cemGrid[r][c] = 1
-                        continue;
-                    }
-                    if (this.cemGrid[r][c] >= 0.1) {
-                        fill = true;
-                        continue;
-                    }
-                    this.cemGrid[r][c] = 0;
-                }
-            }
-
-            this.updateDisplay(this.cemGrid);
-        },
-
         updateDisplay: function(grid) {
             // clear source
             this.modelSource.clear();
+            this.cemGrid = grid;
 
             // make polygons
             for (var r = 0; r < this.numRows; r++)
@@ -327,7 +171,7 @@ function MapInterface() {
                     this.modelSource.addFeature( new ol.Feature({
                         geometry: new ol.geom.Polygon([this.polyGrid[r][c]]),
                         id: i,
-                        fill: grid[r][c]
+                        fill: this.cemGrid[r][c]
                     }));
                 }
             }
@@ -397,37 +241,6 @@ function MapInterface() {
             });
             this.imLayer.setZIndex(2);
             this.map.addLayer(this.imLayer);
-        },
-
-        /**
-         * Classify pixels based on thresholding
-         */
-        otsu: function(histogram) {
-            var counts = ee.Array(ee.Dictionary(histogram).get('histogram'));
-            var means = ee.Array(ee.Dictionary(histogram).get('bucketMeans'));
-            var size = means.length().get([0]);
-            var total = counts.reduce(ee.Reducer.sum(), [0]).get([0]);
-            var sum = means.multiply(counts).reduce(ee.Reducer.sum(), [0]).get([0]);
-            var mean = sum.divide(total);
-
-            var indices = ee.List.sequence(1, size);
-
-            // Compute between sum of squares, where each mean partitions the data.
-            var bss = indices.map(function (i) {
-                var aCounts = counts.slice(0, 0, i);
-                var aCount = aCounts.reduce(ee.Reducer.sum(), [0]).get([0]);
-                var aMeans = means.slice(0, 0, i);
-                var aMean = aMeans.multiply(aCounts)
-                    .reduce(ee.Reducer.sum(), [0]).get([0])
-                    .divide(aCount);
-                var bCount = total.subtract(aCount);
-                var bMean = sum.subtract(aCount.multiply(aMean)).divide(bCount);
-                return aCount.multiply(aMean.subtract(mean).pow(2)).add(
-                    bCount.multiply(bMean.subtract(mean).pow(2)));
-            });
-
-            // Return the mean value corresponding to the maximum BSS.
-            return means.sort(bss).get([-1]);
         },
 
         /**
@@ -545,6 +358,34 @@ function MapInterface() {
             this.numCols = cols;
         },
 
+        /**
+         * Get cell width in meters
+         */
+        getCellWidth: function() {
+            var coords = this.box.getCoordinates()[0];
+            var lat1 = coords[0][0];
+            var lon1 = coords[0][1];
+            var lat2 = coords[1][0];
+            var lon2 = coords[1][1];
+
+            var dist_cols = this.getLatLonAsMeters(lat1, lon1, lat2, lon2);
+            return dist_cols/this.numCols;
+        },
+
+        /**
+         * Get cell length in meters
+         */
+        getCellLength: function() {
+            var coords = this.box.getCoordinates()[0];
+            var lat1 = coords[0][0];
+            var lon1 = coords[0][1];
+            var lat2 = coords[3][0];
+            var lon2 = coords[3][1];
+
+            var dist_rows = this.getLatLonAsMeters(lat1, lon1, lat2, lon2);
+            return dist_rows/this.numRows;
+        },
+
 
         /*************
          * Helpers
@@ -608,34 +449,6 @@ function MapInterface() {
         },
 
         /**
-         * Get cell width in meters
-         */
-        getCellWidth: function() {
-            var coords = this.box.getCoordinates()[0];
-            var lat1 = coords[0][0];
-            var lon1 = coords[0][1];
-            var lat2 = coords[1][0];
-            var lon2 = coords[1][1];
-
-            var dist_cols = this.getLatLonAsMeters(lat1, lon1, lat2, lon2);
-            return dist_cols/this.numCols;
-        },
-
-        /**
-         * Get cell length in meters
-         */
-        getCellLength: function() {
-            var coords = this.box.getCoordinates()[0];
-            var lat1 = coords[0][0];
-            var lon1 = coords[0][1];
-            var lat2 = coords[3][0];
-            var lon2 = coords[3][1];
-
-            var dist_rows = this.getLatLonAsMeters(lat1, lon1, lat2, lon2);
-            return dist_rows/this.numRows;
-        },
-
-        /**
          * Get distance between two coordinate points in meters
          */
         getLatLonAsMeters: function(lat1, lon1, lat2, lon2){ 
@@ -648,36 +461,6 @@ function MapInterface() {
             var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
             var d = R * c;
             return d * 1000; // meters
-        },
-
-        /**
-         * Get appropriate satellite mission
-         */
-        getSource: function(year) {
-            source = gridTab.source;
-            if (source < 0) {
-                for (var i = sources.length - 1; i >= 0 ; i--){
-                    if (year >= sources[i].start) {
-                        return sources[i];
-                    }
-                }
-            }
-            else if (source < sources.length) {
-                if (year < sources[source].start) {
-                    showErrorMessage("Time range out of bounds for the provided source.")
-                }
-                return sources[source];
-            }
-            showErrorMessage("Invalid source input")
-        },
-        
-        /**
-         * Get dates to create yearly composite
-         */
-        getFilterDates: function(year) {
-            var start_date = year + "-01-01";
-            var end_date = year + "-12-31";
-            return [start_date, end_date];
         },
 
         /**
