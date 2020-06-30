@@ -7,8 +7,9 @@ nCols = None
 rowSize = None
 colSize = None
 ref_shoreline = None
+max_modes = 5
 
-# exported variables
+# export variables
 model = None
 observed = None
 S = None

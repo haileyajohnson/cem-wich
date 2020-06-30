@@ -25,12 +25,12 @@
     "gulp-concat": "^2.6.1",
     "gulp-postcss": "^8.0.0",
     "gulp-replace": "^1.0.0",
-    "gulp-sass": "^4.0.2",
+    "gulp-sass": "^4.1.0",
     "gulp-sourcemaps": "^2.6.5",
     "gulp-uglify-es": "^1.0.4"
   },
   "dependencies": {
-    "browserslist": "^4.8.3",
-    "caniuse-lite": "^1.0.30001019"
+    "browserslist": "^4.12.2",
+    "caniuse-lite": "^1.0.30001090"
   }
 }

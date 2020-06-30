@@ -13,13 +13,6 @@ import zipfile
 
 from server.pyfiles import *
 
-# mode application is running in
-mode = None
-class Mode(Enum):
-    BOTH = 1
-    CEM = 2
-    GEE = 3
-
 # path to built CEM lib
 import platform
 lib_path = "server/C/_build/py_cem.so"
@@ -27,12 +20,24 @@ if platform.system() == "Windows":
     lib_path = "server/C/_build/py_cem"
 lib = CDLL(lib_path)
 
+# mode enum
+class Mode(Enum):
+    BOTH = 1
+    CEM = 2
+    GEE = 3
+
+# init local vars
+mode = None
 numTimesteps = None
 saveInterval = None
 lenTimestep = None
 start_year = None
 current_year = None
 current_date = None
+
+############################
+# request routes
+############################
 
 ###
 # start application
@@ -58,6 +63,7 @@ def initialize():
     input_data = json.loads(jsdata)
     print("run cem")
     status = 0
+
     # initialize global variables
     globals.nRows = input_data['nRows']
     globals.nCols = input_data['nCols']
@@ -85,9 +91,9 @@ def initialize():
     globals.observed = np.array([]).reshape(0, globals.nCols)
 
     # initialize exported variables
-    globals.S = np.array([]).reshape(0, 3)
-    globals.r = np.array([]).reshape(0, 3)
-    globals.var_ratio = np.array([]).reshape(0, 3)
+    globals.S = np.array([]).reshape(0, globals.max_modes)
+    globals.r = np.array([]).reshape(0, globals.max_modes)
+    globals.var_ratio = np.array([]).reshape(0, globals.max_modes)
         
     # run variables
     numTimesteps = input_data['numTimesteps']
@@ -212,36 +218,13 @@ def finalize():
 
         return json.dumps(data), 200
     return throw_error('Run failed to finalize')
+
+###
+# get cem grid
+@app.route('/request-grid')
+def request_grid():
+
     
-###
-# get remote-sensed shoreline for supplied date
-def get_sat_grid():
-    # get moving window composite
-    print("get im")
-    im = eehelpers.get_image_composite(current_year)
-    # convert to grid
-    print("convert im")
-    return eehelpers.make_cem_grid(im)
-
-###
-# process results and return to client
-def process(cem_grid, ee_grid):
-    # grids to shorelines
-    shoreline = analyses.getShorelineChange(analyses.getShoreline(cem_grid))
-    globals.model = np.vstack((globals.model, shoreline))
-    shoreline = analyses.getShorelineChange(analyses.getShoreline(ee_grid))
-    globals.observed = np.vstack((globals.observed, shoreline))
-
-    # spatial PCA
-    sp_pca = analyses.get_spatial_pca()
-    # temporal PCA
-    t_pca = []
-    if np.shape(globals.model)[0] > 2:
-        analyses.get_similarity_index()
-        t_pca = globals.S[-1].tolist()
-
-    return sp_pca, t_pca
-
 ###
 # export zip file of data
 @app.route('/download-zip')
@@ -292,6 +275,41 @@ def export_zip():
         attachment_filename='results.zip'
     )
 
+############################
+# utility functions
+############################
+    
+###
+# get remote-sensed shoreline for supplied date
+def get_sat_grid():
+    # get moving window composite
+    print("get im")
+    im = eehelpers.get_image_composite(current_year)
+    # convert to grid
+    print("convert im")
+    return eehelpers.make_cem_grid(im)
+
+###
+# process results and return to client
+def process(cem_grid, ee_grid):
+    # grids to shorelines
+    shoreline = analyses.getShorelineChange(analyses.getShoreline(cem_grid))
+    globals.model = np.vstack((globals.model, shoreline))
+    shoreline = analyses.getShorelineChange(analyses.getShoreline(ee_grid))
+    globals.observed = np.vstack((globals.observed, shoreline))
+
+    # spatial PCA
+    sp_pca = analyses.get_spatial_pca()
+    # temporal PCA
+    t_pca = []
+    if np.shape(globals.model)[0] > 2:
+        analyses.get_similarity_index()
+        t_pca = globals.S[-1].tolist()
+
+    return sp_pca, t_pca
+
+###
+# return error message to client
 @app.errorhandler(500)
 def throw_error(message):
     error = {
@@ -301,5 +319,8 @@ def throw_error(message):
     return json.dumps(error), 500
 
 
+############################
+# run app
+############################
 if __name__ == "__main__":
     app.run(host="localhost", port=8080)

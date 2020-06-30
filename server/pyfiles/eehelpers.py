@@ -4,6 +4,8 @@ from skimage import filters
 
 from server.pyfiles import globals
 
+###
+# source definition enum
 sources = [
 {
     'start': 1985,
