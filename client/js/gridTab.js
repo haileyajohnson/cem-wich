@@ -76,7 +76,7 @@ function GridTab() {
             };
 
             // validate payload 
-            if (validateMapData(input_data) == 0) {
+            if (validateMapData(map_input) == 0) {
                 // send request
                 $.post('/request-grid', {
                     type: "json",

@@ -25,4 +25,4 @@ tests/test/output/
 # autosave #
 ############
 **/*.asv
-server/pyfiles/__pycache__/
+**/__pycache__/

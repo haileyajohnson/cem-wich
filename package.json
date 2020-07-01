@@ -1,5 +1,5 @@
 {
-  "name": "cem-util",
+  "name": "cem-wich",
   "version": "1.0.0",
   "description": "",
   "main": "application.js",
@@ -17,7 +17,7 @@
   },
   "homepage": "https://github.com/haileyajohnson/cem-utility#readme",
   "devDependencies": {
-    "autoprefixer": "^9.7.3",
+    "autoprefixer": "^9.8.4",
     "cssnano": "^4.1.10",
     "del": "^5.1.0",
     "gulp": "^4.0.2",
@@ -31,6 +31,7 @@
   },
   "dependencies": {
     "browserslist": "^4.12.2",
-    "caniuse-lite": "^1.0.30001090"
+    "caniuse-lite": "^1.0.30001090",
+    "ol": "^6.3.1"
   }
 }

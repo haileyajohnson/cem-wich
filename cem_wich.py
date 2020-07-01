@@ -4,7 +4,6 @@ app = Flask(__name__, static_folder="_dist")
 from ctypes import *
 import math
 import numpy as np
-import multiprocessing as mp
 import ee
 import os
 from io import StringIO, BytesIO
@@ -133,6 +132,7 @@ def initialize():
         lib.finalize.restype = c_int
 
         status = lib.initialize(input)
+        print(status)
 
     # return response
     if status == 0:
@@ -177,7 +177,7 @@ def update(timestep):
             # convert to grid
             print("convert im")
             ee_grid = eehelpers.make_cem_grid(im)
-            if ee_grid is None:s
+            if ee_grid is None:
                 return throw_error("Timeout reducing feature collection")
         # process if running in standard mode
         if mode == 1:
@@ -250,7 +250,7 @@ def request_grid():
     if grid is None:
         return throw_errow("Timeout reducing feature collection")
 
-    url = ee.get_image_url(im)
+    url = eehelpers.get_image_URL(im)
 
     data = {
         'message': 'Grid created',
