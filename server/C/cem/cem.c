@@ -72,8 +72,8 @@ double* cem_update(int saveInterval) {
 	}
 
 	SaveOutputGrid();
-	test_OutputGrid();
-	test_LogShoreline();
+	//test_OutputGrid();
+	//test_LogShoreline();
 	return outputGrid;
 }
 

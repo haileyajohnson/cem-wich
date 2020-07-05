@@ -15,3 +15,4 @@ observed = None
 S = None
 r = None
 var_ratio = None
+wave_var = None

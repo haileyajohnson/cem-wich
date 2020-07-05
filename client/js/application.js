@@ -148,7 +148,9 @@ function onUpdate(timestep) {
         if (resp.shoreline.length > 0) {
             mapInterface.displayShoreline(resp.shoreline, 'red', true);
         }
+
         runTab.updateOutput(resp.results, new_time);
+        
         if (new_time < controlTab.num_timesteps) {
             onUpdate(new_time);
         } else {

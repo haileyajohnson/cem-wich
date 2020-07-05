@@ -26,32 +26,27 @@ function RunTab() {
          * callbacks
          ***********/
         updateOutput: function(msg, timestep) {
+            // check for results
+            if (!msg.hasResults) {
+                return;
+            }
+            // create row for current timestep
             var $trow = $("<tr></tr>");
             $trow.append($("<td></td>").text(timestep));
 
-            var shape = msg.sp_pca;
-            if (shape.hasOwnProperty("rotation")) {
-                $trow.append($("<td></td>").text((shape.rotation).toFixed(3)));
-            } else {
-                $trow.append($("<td></td>").text("---"));
+            // display similarity indices
+            var S = msg.S;
+            for (var k = 0; k < S.length; k++) {
+                $trow.append($("<td></td>").text(S[k].toFixed(3)));
             }
-            if (shape.hasOwnProperty("scale")) {
-                $trow.append($("<td></td>").text((shape.scale).toFixed(3)));
-            } else {
+            for (var k = S.length; k < 5; k++) {
                 $trow.append($("<td></td>").text("---"));
             }
 
-            var S = msg.t_pca;
-            if (S.length >= 3) {
-                $trow.append($("<td></td>").text(S[0].toFixed(3)))
-                .append($("<td></td>").text(S[1].toFixed(3)))
-                .append($("<td></td>").text(S[2].toFixed(3)));
-            } else {
-                $trow.append($("<td></td>").text("---"))
-                .append($("<td></td>").text("---"))
-                .append($("<td></td>").text("---"));
-            }
-
+            // display percent explained variability            
+            $trow.append($("<td></td>").text(msg.w.toFixed(3)));
+            
+            // appeand row to output table
             $trow.appendTo(this.$output);
         },
 

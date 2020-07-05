@@ -63,6 +63,8 @@ function GridTab() {
          * click listeners
          *****************/
         onSubmitClicked: function() {
+            this.onSubmitStart();
+
             // create payload
             var map_input = {
                 nRows: mapInterface.numRows,
@@ -88,6 +90,7 @@ function GridTab() {
                             throw(new Error(resp.message))
                         }
                     } catch (err){
+                        gridTab.onSubmitFail();
                         showErrorMessage(err.message);
                         return;
                     }
@@ -101,14 +104,17 @@ function GridTab() {
                     }
                     gridTab.onSubmitSuccess();
                 }).fail((err) => {
+                    gridTab.onSubmitFail();
                     showErrorMessage(JSON.parse(err.responseText).message);
                 });
             } else {
+                gridTab.onSubmitFail();
                 showErrorMessage("One or more inputs are invalid.");
             }
         },
 
-        onSubmitSuccess: function() {
+        onSubmitStart: function() {
+            this.$rotation.disable();
             this.$coords.disable();
             this.$drawButton.disable();
             $loadButton.disable();
@@ -116,7 +122,22 @@ function GridTab() {
             this.$numRows.disable();
             this.$numCols.disable();
             this.$submitButton.disable();
-            this.$start_year.disable();      
+            this.$start_year.disable();   
+        },
+
+        onSubmitFail: function() {
+            this.$rotation.enable();
+            this.$coords.enable();
+            this.$drawButton.enable();
+            $loadButton.enable();
+            $('input[type=radio][name=source]').enable();
+            this.$numRows.enable();
+            this.$numCols.enable();
+            this.$submitButton.enable();
+            this.$start_year.enable();   
+        },
+
+        onSubmitSuccess: function() {   
             this.$editButton.enable();
             this.$exportButton.enable();
             runTab.$runButton.enable();

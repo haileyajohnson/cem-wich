@@ -126,13 +126,12 @@ def initialize():
 
         # init
         lib.initialize.argtypes = [config.Config]
-        lib.initialize.restype = c_int
+        # lib.initialize.restype = c_int
         lib.update.argtypes = [c_int]
         lib.update.restype = POINTER(c_double)
         lib.finalize.restype = c_int
 
         status = lib.initialize(input)
-        print(status)
 
     # return response
     if status == 0:
@@ -147,11 +146,14 @@ def update(timestep):
     # update time counters
     steps = min(saveInterval, numTimesteps-timestep)
     current_date = current_year + 1 if mode == 3 else  current_date + (steps/365)
-    # init values
+    # init output values
     ee_grid = []
     cem_grid = []
-    sp_pca = []
-    t_pca = []
+    S = []
+    r = []
+    L = []
+    w = []
+
     # run CEM if not in GEE only mode
     if not mode == 3:
         try:
@@ -166,7 +168,6 @@ def update(timestep):
 
     # update satellite shoreline
     if math.floor(current_date) > current_year:
-        print("mode: " + str(mode))
         current_year = math.floor(current_date)
         if not mode == 2:
             # get moving window composite
@@ -181,13 +182,12 @@ def update(timestep):
                 return throw_error("Timeout reducing feature collection")
         # process if running in standard mode
         if mode == 1:
-            prc = process(cem_grid, ee_grid)
-            sp_pca = prc[0]
-            t_pca = prc[1]            
-            if not np.isfinite(sp_pca['rotation']) or not np.isfinite(sp_pca['scale']):
-                return throw_error("Spatial PCA returned NaN or Inf value")
-            if np.any(np.isnan(t_pca)) or not np.all(np.isfinite(t_pca)):
-                return throw_error("Temporal PCA returned NaN or Inf value")
+            process(cem_grid, ee_grid)
+            S = [~np.isnan(globals.S[-1])].tolist()
+            w = np.sum(globals.wave_car[-1])  
+            if not np.all(np.isfinite(S)) or np.isnan(w) or not np.isfinite(w):
+                return throw_error("PCA returned NaN or Inf value")
+            results = True
     
     data = {
         'message': 'Run updated',
@@ -195,8 +195,9 @@ def update(timestep):
         'shoreline': analyses.getShoreline(cem_grid).tolist(),
         'timestep': timestep + steps,
         'results': {
-            'sp_pca': sp_pca,
-            't_pca': t_pca
+            'hasResults': results,
+            'S': S,
+            'w': w
         },
         'status': 200
     }
@@ -285,6 +286,8 @@ def export_zip():
         PCs = analyses.get_wave_PCs()
         results.write("Wave-driven modes:\n")
         np.savetxt(results, PCs, delimiter=',')
+        results.write("Wave-explained variance:\n")
+        np.savetxt(results, globals.wave_var, delimiter=',')
         results.write("Corrcoeffs:\n")
         np.savetxt(results, globals.r, delimiter=',')
         results.write("\n\n\nVariance ratios:\n")
@@ -324,25 +327,27 @@ def process(cem_grid, ee_grid):
     shoreline = analyses.getShorelineChange(analyses.getShoreline(ee_grid))
     globals.observed = np.vstack((globals.observed, shoreline))
 
-    # spatial PCA
-    sp_pca = analyses.get_spatial_pca()
-    # temporal PCA
-    t_pca = []
+    # PCA analysis
     if np.shape(globals.model)[0] > 2:
         analyses.get_similarity_index()
-        t_pca = globals.S[-1].tolist()
-
-    return sp_pca, t_pca
+        analysis.get_wave_PCs()
 
 ###
 # return error message to client
-@app.errorhandler(500)
 def throw_error(message):
     error = {
         'message': message,
         'status': 500
     }
     return json.dumps(error), 500
+
+###
+# handle internal errors
+@app.errorhandler(500)
+def handle_error(e):
+    throw_error("internal server error")
+
+
 
 
 ############################

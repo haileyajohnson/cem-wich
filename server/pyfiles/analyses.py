@@ -21,35 +21,6 @@ def getShorelineChange(shoreline):
     return np.subtract(shoreline, globals.ref_shoreline)
 
 ###
-# get difference in shoreline orientation and cross-shore variability using 2D spatial PCA
-def get_spatial_pca():
-    # columnwise positions
-    cols = np.multiply(range(globals.nCols), globals.colSize).reshape([globals.nCols, 1])
-    # row-wise positions
-    rows_mod = np.multiply(globals.model[-1], globals.rowSize).reshape([globals.nCols, 1])
-    rows_obs = np.multiply(globals.observed[-1], globals.rowSize).reshape([globals.nCols, 1])
-    mod = np.concatenate((cols, rows_mod), axis=1)
-    obs = np.concatenate((cols, rows_obs), axis=1)
-
-    pca_mod = PCA(n_components=2)
-    pca_mod.fit(mod)
-    pca_obs = PCA(n_components=2)
-    pca_obs.fit(obs)
-
-    # rotation = angle between modeled mode 1 and observed mode 1 (interpreted as alongshore vector)
-    cos = np.dot(pca_mod.components_[0], pca_obs.components_[0])
-    cos = np.clip(cos, -1, 1)
-    rotation = math.acos(cos) * (math.pi)
-
-    # scale = ratio between variance of modeled mode 2 and variance of observed mode 2 (interpreted as cross-shore variability)
-    var_mod = pca_mod.explained_variance_[1]
-    var_obs = pca_obs.explained_variance_[1]
-    scale = 0 if var_mod == 0 or var_obs == 0 else var_obs / var_mod
-
-    # return tuple with rotation and scale
-    return {"rotation": rotation, "scale": scale}
-
-###
 # determine similarity indicators for observed and modelled shorelines using shoreline EOF
 # 1. correlation coefficients of first three modes: decribes spatial similarity of shoreline change
 # 2. ratio of explained variance of first three modes: describes similarity of scale of shoreline change
@@ -57,7 +28,7 @@ def get_spatial_pca():
 def get_similarity_index():
 
     # modeled pca
-    pca = PCA(n_components=.99, solver='full')
+    pca = PCA(n_components=.99, svd_solver='full')
     pca.fit(globals.model)
     Emod = pca.components_
     Lmod = pca.explained_variance_
@@ -86,9 +57,20 @@ def get_similarity_index():
     globals.S = np.vstack((globals.S, S))
 
 ###
-# get amplitude of first three modeled "wave-driven modes" in observed shorelines
+# project "wave-driven modes" on observed shoreline date
 def get_wave_PCs():    
-    waves = PCA(n_components=.99, solver='full')
-    waves.fit(globals.model)
-    E = np.transpose(waves.components_) # column-wise eigenvectors
-    return np.matmul(globals.observed, E)
+    pca = PCA(n_components=.99, svd_solver='full')
+    pca.fit(globals.model)
+    nModes = min(pca.explained_variance_.size, globals.max_modes)
+    E = np.transpose(pca.components_) # column-wise eigenvectors
+    total_var = np.var(globals.observed)
+    # get amplitude of wave-driven modes in observed data
+    C = np.matmul(globals.observed, E)
+    # record percent explained variance of observed data
+    C_var = np.var(C, axis = 0)
+    wave_var = np.empty([1, globals.max_modes])
+    for k in range(nModes):
+        wave_var[k] = C_var[k]
+
+    globals.wave_var = np.vstack((globals.wave_var, wave_var))
+    return C
