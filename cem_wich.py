@@ -1,11 +1,13 @@
 from flask import Flask, render_template, send_file, request, jsonify
+from werkzeug.exceptions import HTTPException
 import json
-app = Flask(__name__, static_folder="_dist")
+app = Flask(__name__, static_folder="_dist", template_folder="client/html")
 from ctypes import *
 import math
 import numpy as np
 import ee
 import os
+import traceback
 from io import StringIO, BytesIO
 from enum import Enum
 import zipfile
@@ -60,7 +62,6 @@ def initialize():
     global numTimesteps, saveInterval, lenTimestep, current_year, current_date, mode
     jsdata = request.form['input_data']
     input_data = json.loads(jsdata)
-    print("run cem")
     status = 0
 
     # initialize vars
@@ -85,11 +86,12 @@ def initialize():
     globals.S = np.array([]).reshape(0, globals.max_modes)
     globals.r = np.array([]).reshape(0, globals.max_modes)
     globals.var_ratio = np.array([]).reshape(0, globals.max_modes)
+    globals.wave_var = np.array([]).reshape(0, globals.max_modes)
         
     # run variables
     numTimesteps = input_data['numTimesteps']
     saveInterval = input_data['saveInterval']
-    lengthTimestep = input_data['lengthTimestep']
+    lenTimestep = input_data['lengthTimestep']
 
     if not mode == 3:
         # build wave inputs
@@ -121,8 +123,8 @@ def initialize():
             waveHeights = waveHeights, waveAngles = waveAngles, wavePeriods = wavePeriods,
             shelfSlope = input_data['shelfSlope'], shorefaceSlope = input_data['shorefaceSlope'],
             crossShoreReferencePos = 0, shelfDepthAtReferencePos = 0, minimumShelfDepthAtClosure = 0,
-            depthOfClosure = input_data['depthOfClosure'], numTimesteps = numTimesteps,
-            lengthTimestep = lengthTimestep, saveInterval = saveInterval)
+            depthOfClosure = input_data['depthOfClosure'], sedMobility = input_data['sedMobility'], numTimesteps = numTimesteps,
+            lengthTimestep = lenTimestep, saveInterval = saveInterval)
 
         # init
         lib.initialize.argtypes = [config.Config]
@@ -145,14 +147,14 @@ def update(timestep):
     global current_year, current_date
     # update time counters
     steps = min(saveInterval, numTimesteps-timestep)
-    current_date = current_year + 1 if mode == 3 else  current_date + (steps/365)
+    current_date = current_year + 1 if mode == 3 else  current_date + ((steps*lenTimestep)/365)
     # init output values
     ee_grid = []
     cem_grid = []
     S = []
     r = []
     L = []
-    w = []
+    w = -1
 
     # run CEM if not in GEE only mode
     if not mode == 3:
@@ -171,23 +173,26 @@ def update(timestep):
         current_year = math.floor(current_date)
         if not mode == 2:
             # get moving window composite
-            print("get im")
+            print("update: building composite")
             im = eehelpers.get_image_composite(current_year)
             if im is None:
                 return throw_error("Source error: could not get image")
             # convert to grid
-            print("convert im")
+            print("update: generating grid")
             ee_grid = eehelpers.make_cem_grid(im)
+
             if ee_grid is None:
-                return throw_error("Timeout reducing feature collection")
+                return throw_error("Error reducing feature collection")
         # process if running in standard mode
         if mode == 1:
-            process(cem_grid, ee_grid)
-            S = [~np.isnan(globals.S[-1])].tolist()
-            w = np.sum(globals.wave_car[-1])  
-            if not np.all(np.isfinite(S)) or np.isnan(w) or not np.isfinite(w):
-                return throw_error("PCA returned NaN or Inf value")
-            results = True
+            process(cem_grid, ee_grid)            
+            if globals.S.size > 0 and globals.wave_var.size > 0:
+                S = globals.S[-1]
+                S = S[~np.isnan(S)].tolist()
+                print(S)
+                w = globals.wave_var[-1]
+                w = w[~np.isnan(w)]
+                w = np.sum(w)
     
     data = {
         'message': 'Run updated',
@@ -195,7 +200,6 @@ def update(timestep):
         'shoreline': analyses.getShoreline(cem_grid).tolist(),
         'timestep': timestep + steps,
         'results': {
-            'hasResults': results,
             'S': S,
             'w': w
         },
@@ -205,17 +209,20 @@ def update(timestep):
 
 ### 
 # finalize
-@app.route('/finalize', methods = ['POST'])
+@app.route('/finalize', methods = ['GET'])
 def finalize():
     status = 0
     if not mode == 3:
         status = lib.finalize()
-    if status == 0:
+    if status == 0:        
+        im = eehelpers.get_image_composite(current_year)
+        url = eehelpers.get_image_URL(im)
         final_shoreline = np.add(globals.ref_shoreline, globals.observed[-1])
         data = {
             'message': 'Run finalized',
             'ref_shoreline': globals.ref_shoreline.tolist(),
             'final_shoreline': final_shoreline.tolist(),
+            'im_url': url,
             'status': 200}
 
         return json.dumps(data), 200
@@ -241,15 +248,15 @@ def request_grid():
     start_year = input_data['start']
 
     # get moving window composite
-    print("get im")
+    print("building composite")
     im = eehelpers.get_image_composite(start_year)
     if im is None:
         return throw_error("Source error: could not get image")
     # convert to grid
-    print("convert im")
+    print("generating grid")
     grid = eehelpers.make_cem_grid(im)
     if grid is None:
-        return throw_errow("Timeout reducing feature collection")
+        return throw_error("Timeout reducing feature collection")
 
     url = eehelpers.get_image_URL(im)
 
@@ -311,7 +318,8 @@ def export_zip():
         buff,
         mimetype='application/zip',
         as_attachment=True,
-        attachment_filename='results.zip'
+        attachment_filename='results.zip',
+        cache_timeout=0
     )
 
 ############################
@@ -330,10 +338,12 @@ def process(cem_grid, ee_grid):
     # PCA analysis
     if np.shape(globals.model)[0] > 2:
         analyses.get_similarity_index()
-        analysis.get_wave_PCs()
+        analyses.get_wave_PCs()
 
-###
-# return error message to client
+#############################
+# Exception handlers
+#############################
+
 def throw_error(message):
     error = {
         'message': message,
@@ -341,11 +351,23 @@ def throw_error(message):
     }
     return json.dumps(error), 500
 
-###
-# handle internal errors
-@app.errorhandler(500)
-def handle_error(e):
-    throw_error("internal server error")
+@app.errorhandler(Exception)
+def handle_generic_exception(e):
+    traceback.print_exc()
+    return throw_error("500: Internal server error")
+
+@app.errorhandler(HTTPException)
+def handle_exception(e):
+    """Return JSON instead of HTML for HTTP errors."""
+    # start with the correct headers and status code from the error
+    response = e.get_response()
+    # replace the body with JSON
+    response.data = json.dumps({
+        "status": e.code,
+        "message": e.description,
+    })
+    response.content_type = "application/json"
+    return response
 
 
 

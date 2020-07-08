@@ -83,9 +83,11 @@ def get_image_composite(year):
     end_date = str(year) + "-12-31"
     source = _get_source(year)
 
+    if source is None:
+        return None
+
     # get composite
     collection = ee.ImageCollection(source['url']).filterBounds(poly).filterDate(start_date, end_date) 
-    # TODO: fine tune temporal resolution on ee composites
     composite = ee.Algorithms.Landsat.simpleComposite(collection)
 
     # otsu
@@ -117,12 +119,12 @@ def get_image_URL(im):
 
 ###
 # build URL to request image
-def _get_source(year):    
+def _get_source(year):
     if (globals.source < 0):
         for i in range(len(sources)-1, -1, -1):
             if (year >= sources[i]['start']):
                 return sources[i]
 
-    elif (source < len(sources)):
-        return sources[source]
+    elif (globals.source < len(sources)):
+        return sources[globals.source]
     return None

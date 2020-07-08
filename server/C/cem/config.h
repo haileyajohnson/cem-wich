@@ -23,6 +23,7 @@ extern "C" {
 		double shelfDepthAtReferencePos;
 		double minimumShelfDepthAtClosure;
 		double depthOfClosure;
+		double sedMobility;
 		double lengthTimestep;
 		int numTimesteps;
 		int saveInterval;

@@ -108,6 +108,7 @@ function onRun() {
         shelfSlope: parseFloat(this.controlTab.shelf_slope),
         shorefaceSlope: parseFloat(this.controlTab.shoreface_slope),
         depthOfClosure: parseFloat(this.controlTab.closure_depth),
+        sedMobility: parseFloat(this.controlTab.sed_mobility),
         numTimesteps: controlTab.num_timesteps,
         lengthTimestep: parseFloat(this.controlTab.length_timestep),
         saveInterval: parseInt(this.controlTab.save_interval),
@@ -207,6 +208,8 @@ function onModelComplete() {
     // conds tab
     controlTab.$shelf_slope.disable();
     controlTab.$shoreface_slope.disable();
+    controlTab.$closure_depth.disable();
+    controlTab.$sed_mobility.disable();
     controlTab.$end_year.disable();
     controlTab.$length_timestep.disable();
     controlTab.$save_interval.disable();
@@ -236,6 +239,8 @@ function onModelComplete() {
     // conds tab
     controlTab.$shelf_slope.enable();
     controlTab.$shoreface_slope.enable();
+    controlTab.$closure_depth.enable();
+    controlTab.$sed_mobility.enable();
     controlTab.$end_year.enable();
     controlTab.$length_timestep.enable();
     controlTab.$save_interval.enable();
@@ -288,6 +293,7 @@ function updateJSON() {
         crossShoreRef: controlTab.cross_shore_ref,
         refDepth: controlTab.ref_depth,
         minClosureDepth: controlTab.min_closure_depth,
+        sedMobility: controlTab.sed_mobility,
         endYear: controlTab.end_year,
         lengthTimestep: controlTab.length_timestep,
         saveInterval: controlTab.save_interval
@@ -340,6 +346,7 @@ function importJSON(newContent) {
         controlTab.cross_shore_ref = controlConfig.crossShoreRef ? controlConfig.crossShoreRef : controlTab.cross_shore_ref;
         controlTab.ref_depth = controlConfig.refDepth ? controlConfig.refDepth : controlTab.ref_depth;
         controlTab.min_closure_depth = controlConfig.minClosureDepth ? controlConfig.minClosureDepth : controlTab.min_closure_depth;
+        controlTab.sed_mobility = controlConfig.sedMobility ? controlConfig.sedMobility : controlTab.sed_mobility;
         controlTab.end_year = controlConfig.endYear ? controlConfig.endYear : controlTab.end_year;
         controlTab.length_timestep = controlConfig.lengthTimestep ? controlConfig.lengthTimestep : controlTab.length_timestep;
         controlTab.save_interval = controlConfig.saveInterval ? controlConfig.saveInterval : controlTab.save_interval;

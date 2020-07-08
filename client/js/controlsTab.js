@@ -9,6 +9,7 @@ function ControlsTab() {
         $shelf_slope: $("input[name=shelf-slope]"),
         $shoreface_slope: $("input[name=shoreface-slope]"),
         $closure_depth: $("input[name=closure-depth]"),
+        $sed_mobility: $("input[name=sed-mobility]"),
         $end_year: $("input[name=end-date]"),
         $length_timestep: $("input[name=timestep]"),
         $save_interval: $("input[name=save-interval]"),
@@ -16,6 +17,7 @@ function ControlsTab() {
         shelf_slope: .001,
         shoreface_slope: .01,
         closure_depth: 10.0,
+        sed_mobility: 0.67,
         end_year: new Date().getFullYear() - 1,
         length_timestep: 1,
         save_interval: 365,
@@ -29,6 +31,7 @@ function ControlsTab() {
             this.$shelf_slope.change(() => { this.onShelfSlopeChange(); });
             this.$shoreface_slope.change(() => { this.onShorefaceSlopeChange(); });
             this.$closure_depth.change(() => { this.onClosureDepthChange(); });
+            this.$sed_mobility.change(() => { this.onSedMobilityChange(); });
             this.$end_year.change(() => { this.onEndYearChange(); });
             this.$length_timestep.change(() => { this.onTimestepLengthChange(); });
             this.$save_interval.change(() => { this.onSaveIntervalChange(); });
@@ -58,6 +61,10 @@ function ControlsTab() {
             this.closure_depth = this.$closure_depth.val();
         },
 
+        onSedMobilityChange: function() {
+            this.sed_mobility = this.$sed_mobility.val();
+        },
+
         onEndYearChange: function() {
             this.end_year = this.$end_year.val();
             this.getNumTimesteps();
@@ -82,6 +89,7 @@ function ControlsTab() {
             this.$shelf_slope.val(this.shelf_slope);
             this.$shoreface_slope.val(this.shoreface_slope);
             this.$closure_depth.val(this.closure_depth);
+            this.$sed_mobility.val(this.sed_mobility);
             this.$end_year.val(this.end_year);
             this.$length_timestep.val(this.length_timestep);
             this.$save_interval.val(this.save_interval);  

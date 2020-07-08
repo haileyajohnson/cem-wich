@@ -42,12 +42,6 @@ function debugTask() {
       .pipe(dest('_dist'));
 }
 
-// include external libraries
-function includeExternsTask() {
-  return src('client/extern/**/*')
-      .pipe(dest('_dist/extern'));
-}
-
 // clean distribution folder
 function cleanTask() {
   return src('_dist', {read: false, allowEmpty: true})
@@ -57,11 +51,11 @@ function cleanTask() {
 // production build task
 exports.build = series(
     cleanTask,
-    parallel(scssTask, jsTask, includeExternsTask)
+    parallel(scssTask, jsTask)
   );
 
 // dev build task
 exports.debug = series(
     cleanTask,
-    parallel(scssTask, debugTask, includeExternsTask)
+    parallel(scssTask, debugTask)
 );

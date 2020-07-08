@@ -10,7 +10,7 @@ def getShoreline(grid):
     shoreline = np.empty(globals.nCols)   
     for c in range(globals.nCols): 
         for r in range(globals.nRows):
-            if grid[r][c] > 0.1:
+            if grid[r][c] > 0:
                 shoreline[c] = r + (1-grid[r][c])
                 break
     return shoreline
@@ -41,8 +41,12 @@ def get_similarity_index():
     print(Lobs)
 
     r = np.empty([1, globals.max_modes])
+    r[:] = np.nan
     var_ratio = np.empty([1, globals.max_modes])
+    var_ratio[:] = np.nan
     S = np.empty([1, globals.max_modes])
+    S[:] = np.nan
+
     # iterate modes
     for k in range(nModes):        
         # part 1: correlation coefficient (r_k)
@@ -69,8 +73,9 @@ def get_wave_PCs():
     # record percent explained variance of observed data
     C_var = np.var(C, axis = 0)
     wave_var = np.empty([1, globals.max_modes])
+    wave_var[:] = np.nan
     for k in range(nModes):
-        wave_var[k] = C_var[k]
+        wave_var[0][k] = C_var[k]
 
     globals.wave_var = np.vstack((globals.wave_var, wave_var))
     return C

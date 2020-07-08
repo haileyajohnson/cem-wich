@@ -26,10 +26,6 @@ function RunTab() {
          * callbacks
          ***********/
         updateOutput: function(msg, timestep) {
-            // check for results
-            if (!msg.hasResults) {
-                return;
-            }
             // create row for current timestep
             var $trow = $("<tr></tr>");
             $trow.append($("<td></td>").text(timestep));
@@ -44,7 +40,7 @@ function RunTab() {
             }
 
             // display percent explained variability            
-            $trow.append($("<td></td>").text(msg.w.toFixed(3)));
+            $trow.append($("<td></td>").text((msg.w * 100).toFixed(3)));
             
             // appeand row to output table
             $trow.appendTo(this.$output);

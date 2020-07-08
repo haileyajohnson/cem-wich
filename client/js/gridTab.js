@@ -45,7 +45,7 @@ function GridTab() {
             this.$exportButton.click(() => { this.exportGrid(); });
 
             $('input[type=radio][name=source]').click(($elem) => {
-                    this.source = $elem.value;
+                    this.source = tryParseInt($elem.target.value, -1);
             });
             $('input[type=radio][name=source]:first').attr("checked", true);
 
@@ -122,6 +122,7 @@ function GridTab() {
             this.$numRows.disable();
             this.$numCols.disable();
             this.$submitButton.disable();
+            this.$clearButton.disable();
             this.$start_year.disable();   
         },
 
@@ -134,22 +135,23 @@ function GridTab() {
             this.$numRows.enable();
             this.$numCols.enable();
             this.$submitButton.enable();
+            this.$clearButton.enable();
             this.$start_year.enable();   
         },
 
         onSubmitSuccess: function() {   
             this.$editButton.enable();
             this.$exportButton.enable();
+            this.$clearButton.enable();
             runTab.$runButton.enable();
-            this.$cellSize.text("Cell size: " + mapInterface.getCellLength().toFixed(3) + "m x " + mapInterface.getCellWidth().toFixed(3) + "m");
         },
 
         onClearClicked: function() {
             mapInterface.clearMap();
+            this.onCoordsChange();
 
             this.$rotation.enable();
             this.setRotation();
-            this.$coords.val("");
             this.$coords.enable();
             $('input[type=radio][name=source]').enable();            
             this.$numRows.enable();
@@ -184,6 +186,13 @@ function GridTab() {
             content += mapInterface.numRows + ", " + mapInterface.numCols + "\n";
             // write row size and col size
             content += mapInterface.getCellLength() + ", " + mapInterface.getCellWidth() + "\n";
+            // write box coords (top left, clockwise), lat, lon
+            coords = mapInterface.box.getCoordinates()[0];
+            content += "lat, lon\n";
+            content += coords[0][1] + ", " + coords[0][0] + "\n";
+            content += coords[1][1] + ", " + coords[1][0] + "\n";
+            content += coords[2][1] + ", " + coords[2][0] + "\n";
+            content += coords[3][1] + ", " + coords[3][0] + "\n";
             // write grid
             content += mapInterface.cemGrid.map(e => e.join(",")).join("\n");
             a.href = encodeURI(content);
@@ -212,6 +221,7 @@ function GridTab() {
             mapInterface.setNumRows(tryParseInt(this.$numRows.val()), mapInterface.numRows);
             if (mapInterface.box) {
                 mapInterface.drawGrid();
+                this.$cellSize.text("Cell size: " + mapInterface.getCellLength().toFixed(3) + "m x " + mapInterface.getCellWidth().toFixed(3) + "m");
             }
         },
 
@@ -219,6 +229,7 @@ function GridTab() {
             mapInterface.setNumCols(tryParseInt(this.$numCols.val()), mapInterface.numCols);
             if (mapInterface.box) {
                 mapInterface.drawGrid();
+                this.$cellSize.text("Cell size: " + mapInterface.getCellLength().toFixed(3) + "m x " + mapInterface.getCellWidth().toFixed(3) + "m");
             }
         },
 
@@ -228,7 +239,7 @@ function GridTab() {
         },
 
         onStartYearChange: function() {
-            this.start_year = this.$start_year.val();
+            this.start_year = tryParseInt(this.$start_year.val());
             controlTab.getNumTimesteps();
             runTab.displayTimestep(0);
         },

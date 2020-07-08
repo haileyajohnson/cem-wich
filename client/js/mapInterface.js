@@ -363,10 +363,10 @@ function MapInterface() {
          */
         getCellWidth: function() {
             var coords = this.box.getCoordinates()[0];
-            var lat1 = coords[0][0];
-            var lon1 = coords[0][1];
-            var lat2 = coords[1][0];
-            var lon2 = coords[1][1];
+            var lon1 = coords[0][0];
+            var lat1 = coords[0][1];
+            var lon2 = coords[1][0];
+            var lat2 = coords[1][1];
 
             var dist_cols = this.getLatLonAsMeters(lat1, lon1, lat2, lon2);
             return dist_cols/this.numCols;
@@ -377,10 +377,10 @@ function MapInterface() {
          */
         getCellLength: function() {
             var coords = this.box.getCoordinates()[0];
-            var lat1 = coords[0][0];
-            var lon1 = coords[0][1];
-            var lat2 = coords[3][0];
-            var lon2 = coords[3][1];
+            var lon1 = coords[0][0];
+            var lat1 = coords[0][1];
+            var lon2 = coords[3][0];
+            var lat2 = coords[3][1];
 
             var dist_rows = this.getLatLonAsMeters(lat1, lon1, lat2, lon2);
             return dist_rows/this.numRows;
