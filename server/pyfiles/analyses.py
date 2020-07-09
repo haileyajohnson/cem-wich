@@ -33,12 +33,11 @@ def get_similarity_index():
     Emod = pca.components_
     Lmod = pca.explained_variance_
     nModes = min(Lmod.size, globals.max_modes) 
-    print(Lmod)
     # observed pca
+    pca = PCA(n_components=nModes, svd_solver='full')
     pca.fit(globals.observed)
     Eobs = pca.components_
     Lobs = pca.explained_variance_
-    print(Lobs)
 
     r = np.empty([1, globals.max_modes])
     r[:] = np.nan

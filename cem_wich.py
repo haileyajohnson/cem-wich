@@ -22,7 +22,7 @@ if platform.system() == "Windows":
 lib = CDLL(lib_path)
 
 # mode enum
-class Mode(Enum):
+class Modes(Enum):
     BOTH = 1
     CEM = 2
     GEE = 3
@@ -47,6 +47,7 @@ def startup():
     service_account = 'cem-ee-utility@cem-ee-utility.iam.gserviceaccount.com'    
     credentials = ee.ServiceAccountCredentials(service_account, '../private_key.json')
     ee.Initialize(credentials)
+    # eehelpers.init_projections()
     distDir = []
     for filename in os.listdir('_dist'):
         if filename.endswith(".js"):
@@ -54,6 +55,44 @@ def startup():
         else:
             continue
     return render_template("application.html", distDir=distDir)
+    
+###
+# create starting shoreline
+@app.route('/request-shoreline', methods = ['POST'])
+def request_shoreline():
+    global start_year
+    # read request data
+    jsdata = request.form['input_data']
+    input_data = json.loads(jsdata)
+    
+    # initialize vars
+    globals.nRows = input_data['nRows']
+    globals.nCols = input_data['nCols']
+    globals.rowSize = input_data['rowSize']
+    globals.colSize = input_data['colSize']
+    globals.geometry = input_data['geometry']
+    globals.rotation = input_data['rotation']
+    globals.source = input_data['source']
+    start_year = input_data['start']
+
+    # reduce rotation, if necessary
+    while globals.rotation > math.radians(180):
+        globals.rotation = globals.rotation - math.radians(360)
+    while globals.rotation < math.radians(-180):
+        globals.rotation = globals.rotation + math.radians(360)
+
+    shoreline, gridded_shoreline = eehelpers.get_shoreline(start_year)
+    if shoreline is None:
+        return throw_error("Could not trace shoreline") 
+    globals.ref_shoreline = gridded_shoreline
+
+    data = {
+        'message': 'Shoreline detected',
+        'latlon': shoreline.tolist(),
+        'grid': gridded_shoreline.tolist(),\
+        'status': 200
+    }
+    return json.dumps(data), 200
     
 ###
 # run CEM
@@ -77,10 +116,11 @@ def initialize():
         for c in range(globals.nCols):
             grid[r][c] = input_grid[r][c]
 
-    # initialize reference shoreline and shoreline matrices    
-    globals.ref_shoreline = analyses.getShoreline(input_grid)
+    # initialize shoreline change matrices    
     globals.model = np.array([]).reshape(0, globals.nCols)
     globals.observed = np.array([]).reshape(0, globals.nCols)
+    globals.shoreline_lons = []
+    globals.shoreline_lats = []
 
     # initialize exported variables
     globals.S = np.array([]).reshape(0, globals.max_modes)
@@ -93,7 +133,7 @@ def initialize():
     saveInterval = input_data['saveInterval']
     lenTimestep = input_data['lengthTimestep']
 
-    if not mode == 3:
+    if not mode == Modes.GEE:
         # build wave inputs
         asymmetry = input_data['asymmetry']
         stability = input_data['stability']
@@ -128,7 +168,7 @@ def initialize():
 
         # init
         lib.initialize.argtypes = [config.Config]
-        # lib.initialize.restype = c_int
+        lib.initialize.restype = c_int
         lib.update.argtypes = [c_int]
         lib.update.restype = POINTER(c_double)
         lib.finalize.restype = c_int
@@ -147,9 +187,10 @@ def update(timestep):
     global current_year, current_date
     # update time counters
     steps = min(saveInterval, numTimesteps-timestep)
-    current_date = current_year + 1 if mode == 3 else  current_date + ((steps*lenTimestep)/365)
+    current_date = current_year + 1 if mode == Modes.GEE else  current_date + ((steps*lenTimestep)/365)
     # init output values
-    ee_grid = []
+    ee_shoreline = []
+    cem_shoreline = []
     cem_grid = []
     S = []
     r = []
@@ -157,47 +198,50 @@ def update(timestep):
     w = -1
 
     # run CEM if not in GEE only mode
-    if not mode == 3:
+    if not mode == Modes.GEE:
         try:
             out = lib.update(steps)
         except:
-            print("Error on run update")
             return throw_error("Error on run update")   
 
         cem_grid = np.ctypeslib.as_array(out, shape=[globals.nRows, globals.nCols])
         if np.any(np.isnan(cem_grid)) or not np.all(np.isfinite(cem_grid)):
             return throw_error("CEM returned NaN or Inf value")
+        cem_shoreline = analyses.getShoreline(cem_grid)
 
-    # update satellite shoreline
+    # udpdate year
     if math.floor(current_date) > current_year:
         current_year = math.floor(current_date)
-        if not mode == 2:
-            # get moving window composite
-            print("update: building composite")
-            im = eehelpers.get_image_composite(current_year)
-            if im is None:
-                return throw_error("Source error: could not get image")
-            # convert to grid
-            print("update: generating grid")
-            ee_grid = eehelpers.make_cem_grid(im)
 
-            if ee_grid is None:
-                return throw_error("Error reducing feature collection")
+        # process satellite imagery if not in CEM only modes
+        if not mode == Modes.CEM:
+            ee_shoreline, gridded_shoreline = eehelpers.get_shoreline(current_year)
+            globals.shoreline_lons.append(ee_shoreline[0, :].tolist())
+            globals.shoreline_lats.append(ee_shoreline[1, :].tolist())
+            globals.observed = np.vstack((globals.observed, analyses.getShorelineChange(gridded_shoreline)))
+
+        # output model data if not in GEE mode
+        if not mode == Modes.GEE:
+            globals.model = np.vstack((globals.model, analyses.getShorelineChange(cem_shoreline)))
+
         # process if running in standard mode
-        if mode == 1:
-            process(cem_grid, ee_grid)            
-            if globals.S.size > 0 and globals.wave_var.size > 0:
-                S = globals.S[-1]
-                S = S[~np.isnan(S)].tolist()
-                print(S)
-                w = globals.wave_var[-1]
-                w = w[~np.isnan(w)]
-                w = np.sum(w)
-    
+        if mode == BOTH:
+            if np.shape(globals.model)[0] > 2:
+                analyses.get_similarity_index()
+                analyses.get_wave_PCs()
+                if globals.S.size > 0 and globals.wave_var.size > 0:
+                    S = globals.S[-1]
+                    S = S[~np.isnan(S)].tolist()
+                    w = globals.wave_var[-1]
+                    w = w[~np.isnan(w)]
+                    w = np.sum(w)
+
+    # create return payload
     data = {
         'message': 'Run updated',
         'grid': cem_grid.tolist(),
-        'shoreline': analyses.getShoreline(cem_grid).tolist(),
+        'cem_shoreline': cem_shoreline.tolist(),
+        'ee_shoreline': ee_shoreline.totlist(),
         'timestep': timestep + steps,
         'results': {
             'S': S,
@@ -212,80 +256,41 @@ def update(timestep):
 @app.route('/finalize', methods = ['GET'])
 def finalize():
     status = 0
-    if not mode == 3:
+    if not mode == Modes.GEE:
         status = lib.finalize()
     if status == 0:        
-        im = eehelpers.get_image_composite(current_year)
-        url = eehelpers.get_image_URL(im)
-        final_shoreline = np.add(globals.ref_shoreline, globals.observed[-1])
         data = {
             'message': 'Run finalized',
-            'ref_shoreline': globals.ref_shoreline.tolist(),
-            'final_shoreline': final_shoreline.tolist(),
-            'im_url': url,
             'status': 200}
 
         return json.dumps(data), 200
     return throw_error('Run failed to finalize')
-
-###
-# get cem grid
-@app.route('/request-grid', methods = ['POST'])
-def request_grid():
-    global start_year
-    # read request data
-    jsdata = request.form['input_data']
-    input_data = json.loads(jsdata)
-    
-    # initialize vars
-    globals.nRows = input_data['nRows']
-    globals.nCols = input_data['nCols']
-    globals.rowSize = input_data['cellLength']
-    globals.colSize = input_data['cellWidth']
-    globals.polyGrid = np.asarray(input_data['polyGrid'])
-    globals.geometry = input_data['geometry']
-    globals.source = input_data['source']
-    start_year = input_data['start']
-
-    # get moving window composite
-    print("building composite")
-    im = eehelpers.get_image_composite(start_year)
-    if im is None:
-        return throw_error("Source error: could not get image")
-    # convert to grid
-    print("generating grid")
-    grid = eehelpers.make_cem_grid(im)
-    if grid is None:
-        return throw_error("Timeout reducing feature collection")
-
-    url = eehelpers.get_image_URL(im)
-
-    data = {
-        'message': 'Grid created',
-        'grid': grid.tolist(),
-        'im_url': url,
-        'status': 200
-    }
-    return json.dumps(data), 200
-
     
 ###
 # export zip file of data
 @app.route('/download-zip')
 def export_zip():
-    # reference shoreline
+    # reference shoreline.txt
     ref_shoreline = StringIO()
     np.savetxt(ref_shoreline, globals.ref_shoreline, delimiter=',')
 
     # cem_shorelines.txt
-    if not mode == 3:
+    if not mode == Modes.GEE:
         cem_shorelines = StringIO()    
         np.savetxt(cem_shorelines, globals.model, delimiter=',')
 
     # gee_shorelines.txt
-    if not mode == 2:
+    if not mode == Modes.CEM:
         gee_shorelines = StringIO()
         np.savetxt(gee_shorelines, globals.observed, delimiter=',')
+
+        shoreline_lons = StringIO()
+        lons_string = '\n'.join(','.join(map(str, row)) for row in globals.shoreline_lons)
+        shoreline_lons.write(lons_string)
+
+        shoreline_lats = StringIO()
+        lats_string = '\n'.join(','.join(map(str, row)) for row in globals.shoreline_lats)
+        shoreline_lats.write(lats_string)
     
     # results.txt
     results = StringIO()
@@ -310,6 +315,8 @@ def export_zip():
             z.writestr('cem_shorelines.txt', cem_shorelines.getvalue())
         if not mode == 2:
             z.writestr('gee_shorelines.txt', gee_shorelines.getvalue())
+            z.writestr('shoreline_lons.txt', shoreline_lons.getvalue())
+            z.writestr('shoreline_lats.txt', shoreline_lats.getvalue())
         if mode == 1:
             z.writestr('results.txt', results.getvalue())
 
@@ -321,24 +328,6 @@ def export_zip():
         attachment_filename='results.zip',
         cache_timeout=0
     )
-
-############################
-# utility functions
-############################
-
-###
-# process results and return to client
-def process(cem_grid, ee_grid):
-    # grids to shorelines
-    shoreline = analyses.getShorelineChange(analyses.getShoreline(cem_grid))
-    globals.model = np.vstack((globals.model, shoreline))
-    shoreline = analyses.getShorelineChange(analyses.getShoreline(ee_grid))
-    globals.observed = np.vstack((globals.observed, shoreline))
-
-    # PCA analysis
-    if np.shape(globals.model)[0] > 2:
-        analyses.get_similarity_index()
-        analyses.get_wave_PCs()
 
 #############################
 # Exception handlers

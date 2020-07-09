@@ -29,7 +29,8 @@
     "gulp-replace": "^1.0.0",
     "gulp-sass": "^4.1.0",
     "gulp-sourcemaps": "^2.6.5",
-    "gulp-uglify-es": "^1.0.4"
+    "gulp-uglify-es": "^1.0.4",
+    "scipy": "^0.1.4"
   },
   "dependencies": {
     "browserslist": "^4.12.2",

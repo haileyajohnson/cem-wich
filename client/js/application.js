@@ -144,10 +144,10 @@ function onUpdate(timestep) {
         new_time = resp.timestep;
         runTab.displayTimestep(new_time);
         if (resp.grid.length > 0) {
-            mapInterface.updateDisplay(resp.grid);
+            mapInterface.updateDisplay(resp.grid, resp.cem_shoreline);
         }
-        if (resp.shoreline.length > 0) {
-            mapInterface.displayShoreline(resp.shoreline, 'red', true);
+        if (resp.ee_shoreline.length > 0) {
+            mapInterface.displayShoreline(resp.ee_shoreline, 'blue');
         }
 
         runTab.updateOutput(resp.results, new_time);
@@ -171,17 +171,6 @@ function onModelComplete() {
             showErrorMessage(err.message);
             return;
         }
-
-        if (resp.ref_shoreline.length > 0) {
-            mapInterface.displayShoreline(resp.ref_shoreline, 'black', false);
-        }
-        if (resp.final_shoreline.length > 0) {
-            mapInterface.displayShoreline(resp.final_shoreline, 'blue', false);
-        }
-        if (resp.im_url.length > 0) {
-            mapInterface.displayPhoto(resp.im_url);
-        }
-
         enableAll();
     }).fail((err) => { showErrorMessage(JSON.parse(err.responseText).message); });
 }
