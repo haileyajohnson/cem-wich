@@ -6,7 +6,7 @@
 #include "BeachGrid.h"
 
 
-double GetTransportVolumePotential(double alpha, double wave_height, double timestep_length);
+double GetTransportVolumePotential(double alpha, double wave_height, double timestep_length, double k);
 void OopsImEmpty(struct BeachGrid* grid, struct BeachNode* node);
 void OopsImFull(struct BeachGrid* grid, struct BeachNode* node);
 double GetDepthOfClosure(struct BeachNode* node, int ref_pos, double shelf_depth_at_ref_pos, double shelf_slope, double shoreface_slope, double shore_angle, double min_shelf_depth_at_closure, int cell_size);
@@ -16,7 +16,7 @@ double GetDir(double shore_angle);
 struct BeachNode* GetNodeInDir(struct BeachGrid* grid, struct BeachNode* node, double dir);
 
 
-void WaveTransformation(struct BeachGrid* grid, double wave_angle, double wave_period, double wave_height, double timestep_length)
+void WaveTransformation(struct BeachGrid* grid, double wave_angle, double wave_period, double wave_height, double timestep_length, double k)
 {
 	double start_depth = 3 * wave_height;       // (meters) depth to begin refraction calculations
 	double refract_step = 0.2;                  // (meters) step size to iterate through depth
@@ -72,16 +72,16 @@ void WaveTransformation(struct BeachGrid* grid, double wave_angle, double wave_p
 		}
 
 		// sed transport_potential
-		curr->properties->transport_potential = GetTransportVolumePotential(local_alpha, local_wave_height, timestep_length);
+		curr->properties->transport_potential = GetTransportVolumePotential(local_alpha, local_wave_height, timestep_length, k);
 
 		curr = curr->next;
 	}
 }
 
-double GetTransportVolumePotential(double alpha, double wave_height, double timestep_length)
+double GetTransportVolumePotential(double alpha, double wave_height, double timestep_length, double k)
 {
 	int rho = 1020;         // (kg/m^3) density of salt water
-	return fabs(.67 * rho * pow(GRAVITY, 3.0 / 2.0) * pow(wave_height, 5.0 / 2.0) * cos(alpha) * sin(alpha) * timestep_length);
+	return fabs(k * rho * pow(GRAVITY, 3.0 / 2.0) * pow(wave_height, 5.0 / 2.0) * cos(alpha) * sin(alpha) * timestep_length);
 }
 
 void GetAvailableSupply(struct BeachGrid* grid, int ref_pos, double ref_depth, double shelf_slope, double shoreface_slope, double min_depth, double depthOfClosure)

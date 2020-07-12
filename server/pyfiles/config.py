@@ -20,6 +20,7 @@ class Config(Structure):
 		("shelfDepthAtReferencePos", c_double),
 		("minimumShelfDepthAtClosure", c_double),
         ("depthOfClosure", c_double),
+        ("sedMobility", c_double),
         ("lengthTimestep", c_double),
         ("numTimesteps", c_int),
         ("saveInterval", c_int)]

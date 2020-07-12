@@ -72,8 +72,8 @@ double* cem_update(int saveInterval) {
 	}
 
 	SaveOutputGrid();
-	test_OutputGrid();
-	test_LogShoreline();
+	//test_OutputGrid();
+	//test_LogShoreline();
 	return outputGrid;
 }
 
@@ -112,7 +112,7 @@ void SedimentTransport()
 		g_wave_climate.GetWaveAngle(&g_wave_climate, current_time_step),
 		g_wave_climate.GetWavePeriod(&g_wave_climate, current_time_step),
 		g_wave_climate.GetWaveHeight(&g_wave_climate, current_time_step),
-		myConfig.lengthTimestep);
+		myConfig.lengthTimestep, myConfig.sedMobility);
 
 	GetAvailableSupply(&g_beachGrid,
 		myConfig.crossShoreReferencePos,
