@@ -28,6 +28,8 @@ function GridTab() {
         source: -1,
         start_year: 1985,
 
+        shoreline: [],
+
         init: function() {
             // add input listeners
             this.$tab.click(() => { onTabChange(this); });
@@ -69,10 +71,10 @@ function GridTab() {
             var map_input = {
                 nRows: mapInterface.numRows,
                 nCols: mapInterface.numCols,
-                cellWidth: mapInterface.getCellWidth(),
-                cellLength: mapInterface.getCellLength(),
-                polyGrid: mapInterface.polyGrid,
+                rowSize: mapInterface.getRowSize(),
+                colSize: mapInterface.getColSize(),
                 geometry: mapInterface.box.getCoordinates(),
+                rotation: mapInterface.rotation,
                 source: this.source,
                 start: this.start_year,
             };
@@ -80,7 +82,7 @@ function GridTab() {
             // validate payload 
             if (validateMapData(map_input) == 0) {
                 // send request
-                $.post('/request-grid', {
+                $.post('/request-shoreline', {
                     type: "json",
                     input_data: JSON.stringify(map_input)
                 }).done((resp) => {
@@ -96,12 +98,16 @@ function GridTab() {
                     }
                     // draw grid
                     if (resp.grid.length > 0) {
-                        mapInterface.updateDisplay(resp.grid);
+                        var grid = mapInterface.makeGrid(resp.grid);
+                        mapInterface.updateDisplay(grid);
                     }
-                    // display composite image
-                    if (resp.im_url.length > 0){
-                       mapInterface.displayPhoto(resp.im_url)
+                    // draw shoreline                    
+                    if (resp.latlon.length > 0) {
+                        mapInterface.displayShoreline(resp.latlon, 'black');
+                        this.shoreline = resp.latlon;
                     }
+
+
                     gridTab.onSubmitSuccess();
                 }).fail((err) => {
                     gridTab.onSubmitFail();
@@ -148,6 +154,7 @@ function GridTab() {
 
         onClearClicked: function() {
             mapInterface.clearMap();
+            this.setCoords();
             this.onCoordsChange();
 
             this.$rotation.enable();
@@ -168,6 +175,8 @@ function GridTab() {
             runTab.$runButton.disable();
             runTab.$outputButton.disable();
             runTab.clearOutput();
+
+            this.shoreline = [];
         },
 
         onDrawClicked: function() {
@@ -185,7 +194,7 @@ function GridTab() {
             // write nRows and nCols
             content += mapInterface.numRows + ", " + mapInterface.numCols + "\n";
             // write row size and col size
-            content += mapInterface.getCellLength() + ", " + mapInterface.getCellWidth() + "\n";
+            content += mapInterface.getRowSize() + ", " + mapInterface.getColSize() + "\n";
             // write box coords (top left, clockwise), lat, lon
             coords = mapInterface.box.getCoordinates()[0];
             content += "lat, lon\n";
@@ -195,6 +204,9 @@ function GridTab() {
             content += coords[3][1] + ", " + coords[3][0] + "\n";
             // write grid
             content += mapInterface.cemGrid.map(e => e.join(",")).join("\n");
+            // write shoreline coords
+            content += "\nshoreline coordinates\n"
+            content += this.shoreline.join(",");
             a.href = encodeURI(content);
             a.download = "grid.txt";
             a.click();
@@ -221,7 +233,6 @@ function GridTab() {
             mapInterface.setNumRows(tryParseInt(this.$numRows.val()), mapInterface.numRows);
             if (mapInterface.box) {
                 mapInterface.drawGrid();
-                this.$cellSize.text("Cell size: " + mapInterface.getCellLength().toFixed(3) + "m x " + mapInterface.getCellWidth().toFixed(3) + "m");
             }
         },
 
@@ -229,7 +240,7 @@ function GridTab() {
             mapInterface.setNumCols(tryParseInt(this.$numCols.val()), mapInterface.numCols);
             if (mapInterface.box) {
                 mapInterface.drawGrid();
-                this.$cellSize.text("Cell size: " + mapInterface.getCellLength().toFixed(3) + "m x " + mapInterface.getCellWidth().toFixed(3) + "m");
+                this.$cellSize.text("Cell size: " + mapInterface.getRowSize().toFixed(3) + "m x " + mapInterface.getColSize().toFixed(3) + "m");
             }
         },
 
@@ -261,7 +272,13 @@ function GridTab() {
         },        
 
         setCoords: function() {
-            if (!mapInterface.box) { return; }
+            if (!mapInterface.box) { 
+                $("input[name=lon1]").val("");
+                $("input[name=lat1]").val("");
+                $("input[name=lon2]").val("");
+                $("input[name=lat2]").val("");
+                return;
+            }
             var coords = mapInterface.box.getCoordinates()[0];
             $("input[name=lon1]").val(coords[0][0]);
             $("input[name=lat1]").val(coords[0][1]);
@@ -278,6 +295,10 @@ function GridTab() {
             this.$rotation.disable();
             this.$clearButton.enable();
             this.$submitButton.enable();
+        },
+
+        onGridDrawn: function() {            
+            this.$cellSize.text("Cell size: " + mapInterface.getRowSize().toFixed(3) + "m x " + mapInterface.getColSize().toFixed(3) + "m");
         }
     }
 }

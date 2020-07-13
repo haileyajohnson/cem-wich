@@ -34,7 +34,6 @@ function MapInterface() {
         gridSource: null,
         modelSource: null,
         shorelineSource: null,
-        imLayer: null,
 
         drawingMode: false,
         editMode: false,
@@ -81,7 +80,16 @@ function MapInterface() {
             this.boundsSource = new ol.source.Vector({});           
             
             // create grid source
-            this.gridSource = new ol.source.Vector({});      
+            this.gridSource = new ol.source.Vector({});
+
+            // add to map
+            var gridLayer = new ol.layer.Vector({source: this.gridSource, 
+                style: function(feature, resolution) {
+                    return feature.get('style');
+                }
+            });
+            gridLayer.setZIndex(3);
+            this.map.addLayer(gridLayer);      
              
             // create CEM sources
             this.modelSource = new ol.source.Vector({});
@@ -127,7 +135,8 @@ function MapInterface() {
             geometryFunction = function (coordinates, geometry) {
                 var first = coordinates[0];
                 var last = coordinates[1];
-                var coordinates = that.getRectangleVertices(first, last);                
+
+                var coordinates = that.getRectangleVertices(first, last);
                 if (!geometry) {
                     geometry = new ol.geom.Polygon([coordinates]);
                 } else {
@@ -156,9 +165,33 @@ function MapInterface() {
             this.map.addLayer(new ol.layer.Vector({
                 source: this.boundsSource
             }));
-        },        
+        },
 
-        updateDisplay: function(grid) {
+        makeGrid: function(griddedShoreline) {
+            // init grid
+            this.cemGrid = [];
+            for (var r = 0; r < this.numRows; r++) {
+                this.cemGrid.push([]);
+                for (var c = 0; c < this.numCols; c++) {
+                    this.cemGrid[r].push(0);
+                }
+            }
+            // fill in values
+            for (var c = 0; c < griddedShoreline.length; c++)
+            {
+                var val = griddedShoreline[c];
+                if (val <= 0) { continue; }
+                var row = Math.floor(val);
+                var sed = 1 - (val - row);
+                this.cemGrid[row][c] = sed;
+                for(var r = row+1; r < this.numRows; r++) {
+                    this.cemGrid[r][c] = 1;
+                }
+            }
+            return this.cemGrid;
+        },
+
+        updateDisplay: function(grid, shoreline=null) {
             // clear source
             this.modelSource.clear();
             this.cemGrid = grid;
@@ -175,38 +208,24 @@ function MapInterface() {
                     }));
                 }
             }
+            if (shoreline) {
+                this.modelSource.addFeature(new ol.Feature({
+                    geometry: new ol.geom.LineString(shoreline),
+                    style: new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: red,
+                            width: 2
+                        })
+                    })
+                }));
+            }
             this.modelSource.refresh();
         },
 
-        displayShoreline: function(shoreline, color, clear=false) {
-            // clear source
-            if (clear) {
-                this.shorelineSource.clear();
-            }
-
-            var upper_left = this.polyGrid[0][0][0];
-            var lower_left = this.polyGrid[0][0][3];
-            var dist_lon = upper_left[0] - lower_left[0];
-            var dist_lat = upper_left[1] - lower_left[1];
-
-            var coords = [];
-            for (var i = 0; i < shoreline.length; i++)
-            {
-                // get coordinates
-                var c = i;
-                var r = Math.floor(shoreline[i]);
-                var frac_full = shoreline[i]%1;
-                var lower_left = this.polyGrid[r][c][3];
-                var lower_right = this.polyGrid[r][c][2];
-                var lon = (lower_left[0] + lower_right[0])/2 + dist_lon*(1 - frac_full);
-                var lat = (lower_left[1] + lower_right[1])/2 + dist_lat*(1 - frac_full);
-
-                coords.push([lon, lat]);
-            }
-
+        displayShoreline: function(shoreline, color) {
             // make polyline
             this.shorelineSource.addFeature(new ol.Feature({
-                geometry: new ol.geom.LineString(coords),
+                geometry: new ol.geom.LineString(shoreline),
                 style: new ol.style.Style({
                     stroke: new ol.style.Stroke({
                         color: color,
@@ -227,20 +246,6 @@ function MapInterface() {
 
             feature.set('fill', fill);
             this.modelSource.refresh();
-        },
-
-        /**
-         * Show land/water mask on map
-         */
-        displayPhoto: function(photoUrl) {
-            this.imLayer = new ol.layer.Image({
-                source: new ol.source.ImageStatic({
-                    url: photoUrl,
-                    imageExtent: this.box.getExtent()
-                })
-            });
-            this.imLayer.setZIndex(2);
-            this.map.addLayer(this.imLayer);
         },
 
         /**
@@ -278,15 +283,6 @@ function MapInterface() {
                 }));
             }
 
-            // add to map
-            var vectorLayer = new ol.layer.Vector({source: this.gridSource, 
-                style: function(feature, resolution) {
-                    return feature.get('style');
-                }
-            });
-            vectorLayer.setZIndex(3);
-            this.map.addLayer(vectorLayer);
-
             // create matrix of polygons to map cem grid
             this.polyGrid = [];
             var top_edge = this.linspace(edge3_0[0], edge1_2[0], this.numCols);
@@ -301,6 +297,7 @@ function MapInterface() {
                 }
                 top_edge = bottom_edge;
             }
+            gridTab.onGridDrawn();
         },
 
         /**
@@ -342,7 +339,10 @@ function MapInterface() {
          */
         updateBox: function(lon1, lat1, lon2, lat2) {
             this.toggleDrawMode();
-            var coordinates = this.getRectangleVertices([lon1, lat1], [lon2, lat2])
+            var first = [lon1, lat1];
+            var last = [lon2, lat2];
+
+            var coordinates = this.getRectangleVertices(first, last);
             var geometry = new ol.geom.Polygon([coordinates]);
             this.boundsSource.addFeature(new ol.Feature({ geometry: geometry}));
         },
@@ -359,37 +359,52 @@ function MapInterface() {
         },
 
         /**
-         * Get cell width in meters
+         * Estimate cell width in meters
          */
-        getCellWidth: function() {
+        getColSize: function() {
             var coords = this.box.getCoordinates()[0];
-            var lon1 = coords[0][0];
             var lat1 = coords[0][1];
-            var lon2 = coords[1][0];
+            var lon1 = coords[0][0];
             var lat2 = coords[1][1];
+            var lon2 = coords[1][0];
 
             var dist_cols = this.getLatLonAsMeters(lat1, lon1, lat2, lon2);
             return dist_cols/this.numCols;
         },
 
         /**
-         * Get cell length in meters
+         * Estimate cell length in meters
          */
-        getCellLength: function() {
+        getRowSize: function() {
             var coords = this.box.getCoordinates()[0];
-            var lon1 = coords[0][0];
             var lat1 = coords[0][1];
-            var lon2 = coords[3][0];
+            var lon1 = coords[0][0];
             var lat2 = coords[3][1];
+            var lon2 = coords[3][0];
 
             var dist_rows = this.getLatLonAsMeters(lat1, lon1, lat2, lon2);
             return dist_rows/this.numRows;
         },
 
-
         /*************
          * Helpers
          *************/
+
+        /**
+         * Estimate distance between two coordinate points in meters
+         */
+        getLatLonAsMeters: function(lat1, lon1, lat2, lon2){ 
+            var R = 6371; // Radius of earth in KM
+            var dLat = lat2 * Math.PI / 180 - lat1 * Math.PI / 180;
+            var dLon = lon2 * Math.PI / 180 - lon1 * Math.PI / 180;
+            var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            var d = R * c;
+            return d * 1000; // meters
+        },
+
 
          /**
           * Get N linearly spaced coordinates between start and stop
@@ -449,21 +464,6 @@ function MapInterface() {
         },
 
         /**
-         * Get distance between two coordinate points in meters
-         */
-        getLatLonAsMeters: function(lat1, lon1, lat2, lon2){ 
-            var R = 6378.137; // Radius of earth in KM
-            var dLat = lat2 * Math.PI / 180 - lat1 * Math.PI / 180;
-            var dLon = lon2 * Math.PI / 180 - lon1 * Math.PI / 180;
-            var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-            var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            var d = R * c;
-            return d * 1000; // meters
-        },
-
-        /**
          * reset map
          */
         clearMap: function() {
@@ -471,7 +471,6 @@ function MapInterface() {
             this.gridSource.clear();
             this.modelSource.clear();
             this.shorelineSource.clear();
-            if (this.imLayer) { this.map.removeLayer(this.imLayer); }
             this.box = null;
             this.polyGrid = [];
             this.cemGrid = [];

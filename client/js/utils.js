@@ -58,14 +58,14 @@ function validateInputData(data) {
 }
 
 function validateMapData(data) {
-    if (!data.cellWidth || data.cellWidth <= 0) { return -1; }
-    if (!data.cellLength || data.cellLength <= 0) { return -1; }
     if (!data.nRows || data.nRows <= 0) { return -1; }
     if (!data.nCols || data.nCols <= 0) { return -1; }
+    if (!data.rowSize || data.rowSize <= 0) { return -1; }
+    if (!data.colSize || data.colSize <= 0) { return -1; }
     if (!data.source) { return -1; }
     if (!data.start) { return -1; }
     if (!data.geometry || data.geometry == 0) { return -1; }
-    if (!data.polyGrid || data.polyGrid.length == 0) { return -1; }
+    if (!data.rotation || data.rotation == 0) { return -1; }
     // success
     return 0;
 }
