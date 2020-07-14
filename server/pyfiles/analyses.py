@@ -21,24 +21,42 @@ def getShorelineChange(shoreline):
     return np.subtract(shoreline, globals.ref_shoreline)
 
 ###
-# determine similarity indicators for observed and modelled shorelines using shoreline EOF
-# 1. correlation coefficients of first three modes: decribes spatial similarity of shoreline change
-# 2. ratio of explained variance of first three modes: describes similarity of scale of shoreline change
-# 3. similarity score, an overal descriptive index: correlation coefficient * ratio
-def get_similarity_index():
+# Compare PCA of modeled and observed shoreline change
+# Compute:
+# 1. percent variance explained by "wave-driven" modes
+# 2. similarity index of first k modes
+#   a. correlation coefficients of first k modes: decribes spatial similarity of shoreline change
+#   b. ratio of explained variance of first k modes: describes similarity of scale of shoreline change
+def compare_PCA():
 
-    # modeled pca
+    # PCA for modeled data
     pca = PCA(n_components=.99, svd_solver='full')
     pca.fit(globals.model)
-    Emod = pca.components_
-    Lmod = pca.explained_variance_
-    nModes = min(Lmod.size, globals.max_modes) 
-    # observed pca
+    E_mod = pca.components_
+    L_mod = pca.explained_variance_
+    nModes = min(L_mod.size, globals.max_modes)
+
+    # Project "wave-driven" modes onto observed data
+    E_waves = np.transpose(E_mod) # column-wise eigenvectors
+    C = np.matmul(globals.observed, E_waves)
+
+    # get total variance of observed data
+    total_var = np.sum(np.diagonal(np.cov(globals.observed)))
+
+    # record percent variance of observed data esplained by wave modes
+    wave_var = np.empty([1, globals.max_modes])
+    wave_var[:] = np.nan
+    for k in range(nModes):
+        wave_var[0][k] = np.var(C[:,k])/total_var
+    globals.wave_var = np.vstack((globals.wave_var, wave_var))
+
+    # PCA for observed data
     pca = PCA(n_components=nModes, svd_solver='full')
     pca.fit(globals.observed)
-    Eobs = pca.components_
-    Lobs = pca.explained_variance_
+    E_obs = pca.components_
+    L_obs = pca.explained_variance_
 
+    # initialize similarity index arrays
     r = np.empty([1, globals.max_modes])
     r[:] = np.nan
     var_ratio = np.empty([1, globals.max_modes])
@@ -46,35 +64,15 @@ def get_similarity_index():
     S = np.empty([1, globals.max_modes])
     S[:] = np.nan
 
-    # iterate modes
+    # fill in values
     for k in range(nModes):        
         # part 1: correlation coefficient (r_k)
-        r[0][k] = np.corrcoef(Eobs[k], Emod[k])[0][1]
+        r[0][k] = np.corrcoef(E_obs[k], E_mod[k])[0][1]
         # part 2: ratio of explained variance
-        var_ratio[0][k] = 0 if Lmod[k] == 0 or Lobs[k] == 0 else Lobs[k]/Lmod[k]
+        var_ratio[0][k] = 0 if L_mod[k] == 0 or L_obs[k] == 0 else min(L_obs[k], L_mod[k])/max(L_obs[k], L_mod[k])
         # part 3: similarity score (S_k)
-        S[0][k] = r[0][k] * min(var_ratio[0][k], 1/var_ratio[0][k])
+        S[0][k] = r[0][k] * var_ratio[0][k]
     
     globals.r = np.vstack((globals.r, r))
     globals.var_ratio = np.vstack((globals.var_ratio, var_ratio))
     globals.S = np.vstack((globals.S, S))
-
-###
-# project "wave-driven modes" on observed shoreline date
-def get_wave_PCs():    
-    pca = PCA(n_components=.99, svd_solver='full')
-    pca.fit(globals.model)
-    nModes = min(pca.explained_variance_.size, globals.max_modes)
-    E = np.transpose(pca.components_) # column-wise eigenvectors
-    total_var = np.var(globals.observed)
-    # get amplitude of wave-driven modes in observed data
-    C = np.matmul(globals.observed, E)
-    # record percent explained variance of observed data
-    C_var = np.var(C, axis = 0)
-    wave_var = np.empty([1, globals.max_modes])
-    wave_var[:] = np.nan
-    for k in range(nModes):
-        wave_var[0][k] = C_var[k]
-
-    globals.wave_var = np.vstack((globals.wave_var, wave_var))
-    return C

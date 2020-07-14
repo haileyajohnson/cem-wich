@@ -1,7 +1,6 @@
 // colormap for grid cells
-function getColor(feature) {
+function getColor(fill) {
     var r, g, b;
-    var fill = feature.get('fill');
     if (fill > 2/3) {
         var f = (fill-(2/3)) * 3;
         r = f*255;
@@ -98,14 +97,7 @@ function MapInterface() {
             // add to map
             var modelLayer = new ol.layer.Vector({source: this.modelSource, 
                 style: function(feature, resolution) {
-                    return new ol.style.Style({                        
-                        stroke: new ol.style.Stroke({
-                            color: [255, 255, 255, 0]
-                        }),
-                        fill: new ol.style.Fill({
-                            color: getColor(feature)
-                        })
-                    });
+                    return feature.get('style');
                 }});
             modelLayer.setZIndex(4);
             this.map.addLayer(modelLayer);
@@ -201,20 +193,48 @@ function MapInterface() {
             {
                 for (var c = 0; c < this.numCols; c++) {
                     var i = this.rowColsToIndex(r, c);
+                    var fill = this.cemGrid[r][c];
+                    var color = getColor(fill)
                     this.modelSource.addFeature( new ol.Feature({
                         geometry: new ol.geom.Polygon([this.polyGrid[r][c]]),
                         id: i,
-                        fill: this.cemGrid[r][c]
+                        fill: fill,
+                        style: new ol.style.Style({                        
+                                stroke: new ol.style.Stroke({
+                                    color: [255, 255, 255, 0]
+                                }),
+                                fill: new ol.style.Fill({
+                                    color: color
+                                })
+                            })
                     }));
                 }
             }
             if (shoreline) {
+                var upper_left = this.polyGrid[0][0][0];
+                var lower_left = this.polyGrid[0][0][3];
+                var dist_lon = upper_left[0] - lower_left[0];
+                var dist_lat = upper_left[1] - lower_left[1];
+                var coords = [];
+                for (var i = 0; i < shoreline.length; i++)
+                {
+                    // get coordinates
+                    var c = i;
+                    var r = Math.floor(shoreline[i]);
+                    var frac_full = shoreline[i]%1;
+                    var lower_left = this.polyGrid[r][c][3];
+                    var lower_right = this.polyGrid[r][c][2];
+                    var lon = (lower_left[0] + lower_right[0])/2 + dist_lon*(1 - frac_full);
+                    var lat = (lower_left[1] + lower_right[1])/2 + dist_lat*(1 - frac_full);
+                    coords.push([lon, lat]);
+                }
+                // make polyline
                 this.modelSource.addFeature(new ol.Feature({
-                    geometry: new ol.geom.LineString(shoreline),
+                    geometry: new ol.geom.LineString(coords),
                     style: new ol.style.Style({
                         stroke: new ol.style.Stroke({
-                            color: red,
-                            width: 2
+                            color: 'red',
+                            width: 1.5
                         })
                     })
                 }));
@@ -222,17 +242,28 @@ function MapInterface() {
             this.modelSource.refresh();
         },
 
-        displayShoreline: function(shoreline, color) {
-            // make polyline
+        displayShoreline: function(ref_shoreline, shoreline=null) {
+            this.shorelineSource.clear()
             this.shorelineSource.addFeature(new ol.Feature({
-                geometry: new ol.geom.LineString(shoreline),
+                geometry: new ol.geom.LineString(ref_shoreline),
                 style: new ol.style.Style({
                     stroke: new ol.style.Stroke({
-                        color: color,
-                        width: 2
+                        color: 'black',
+                        width: 1.2
                     })
                 })
             }));
+            if (shoreline) {
+                this.shorelineSource.addFeature(new ol.Feature({
+                    geometry: new ol.geom.LineString(shoreline),
+                    style: new ol.style.Style({
+                        stroke: new ol.style.Stroke({
+                            color: 'blue',
+                            width: 1.2
+                        })
+                    })
+                }));
+            }
             this.shorelineSource.refresh();
         },
 

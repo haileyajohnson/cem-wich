@@ -106,7 +106,7 @@ def initialize():
     # initialize vars
     current_year = start_year
     current_date = current_year
-    mode = input_data['mode']
+    mode = Modes(input_data['mode'])
 
     # build cell grid
     input_grid = input_data['grid']
@@ -189,9 +189,9 @@ def update(timestep):
     steps = min(saveInterval, numTimesteps-timestep)
     current_date = current_year + 1 if mode == Modes.GEE else  current_date + ((steps*lenTimestep)/365)
     # init output values
-    ee_shoreline = []
-    cem_shoreline = []
-    cem_grid = []
+    ee_shoreline = np.array([])
+    cem_shoreline = np.array([])
+    cem_grid = np.array([])
     S = []
     r = []
     L = []
@@ -225,10 +225,9 @@ def update(timestep):
             globals.model = np.vstack((globals.model, analyses.getShorelineChange(cem_shoreline)))
 
         # process if running in standard mode
-        if mode == BOTH:
+        if mode == Modes.BOTH:
             if np.shape(globals.model)[0] > 2:
-                analyses.get_similarity_index()
-                analyses.get_wave_PCs()
+                analyses.compare_PCA()
                 if globals.S.size > 0 and globals.wave_var.size > 0:
                     S = globals.S[-1]
                     S = S[~np.isnan(S)].tolist()
@@ -241,7 +240,7 @@ def update(timestep):
         'message': 'Run updated',
         'grid': cem_grid.tolist(),
         'cem_shoreline': cem_shoreline.tolist(),
-        'ee_shoreline': ee_shoreline.totlist(),
+        'ee_shoreline': ee_shoreline.tolist(),
         'timestep': timestep + steps,
         'results': {
             'S': S,
@@ -294,10 +293,7 @@ def export_zip():
     
     # results.txt
     results = StringIO()
-    if mode == 1 and np.shape(globals.model)[0] > 2 and np.shape(globals.observed)[0] > 2:
-        PCs = analyses.get_wave_PCs()
-        results.write("Wave-driven modes:\n")
-        np.savetxt(results, PCs, delimiter=',')
+    if mode == Modes.BOTH and np.shape(globals.model)[0] > 2 and np.shape(globals.observed)[0] > 2:
         results.write("Wave-explained variance:\n")
         np.savetxt(results, globals.wave_var, delimiter=',')
         results.write("Corrcoeffs:\n")
@@ -311,13 +307,13 @@ def export_zip():
     buff = BytesIO()
     with zipfile.ZipFile(buff, mode='w') as z:
         z.writestr('ref_shoreline.txt', ref_shoreline.getvalue())
-        if not mode == 3:
+        if not mode == Modes.GEE:
             z.writestr('cem_shorelines.txt', cem_shorelines.getvalue())
-        if not mode == 2:
+        if not mode == Modes.CEM:
             z.writestr('gee_shorelines.txt', gee_shorelines.getvalue())
             z.writestr('shoreline_lons.txt', shoreline_lons.getvalue())
             z.writestr('shoreline_lats.txt', shoreline_lats.getvalue())
-        if mode == 1:
+        if mode == Modes.BOTH:
             z.writestr('results.txt', results.getvalue())
 
     buff.seek(0)
@@ -344,21 +340,6 @@ def throw_error(message):
 def handle_generic_exception(e):
     traceback.print_exc()
     return throw_error("500: Internal server error")
-
-@app.errorhandler(HTTPException)
-def handle_exception(e):
-    """Return JSON instead of HTML for HTTP errors."""
-    # start with the correct headers and status code from the error
-    response = e.get_response()
-    # replace the body with JSON
-    response.data = json.dumps({
-        "status": e.code,
-        "message": e.description,
-    })
-    response.content_type = "application/json"
-    return response
-
-
 
 
 ############################
