@@ -103,8 +103,8 @@ function GridTab() {
                     }
                     // draw shoreline                    
                     if (resp.latlon.length > 0) {
-                        mapInterface.displayShoreline(resp.latlon, 'black');
                         this.shoreline = resp.latlon;
+                        mapInterface.displayShoreline(this.shoreline);
                     }
 
 

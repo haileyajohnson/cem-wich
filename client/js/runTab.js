@@ -39,8 +39,9 @@ function RunTab() {
                 $trow.append($("<td></td>").text("---"));
             }
 
-            // display percent explained variability            
-            $trow.append($("<td></td>").text((msg.w * 100).toFixed(3)));
+            // display percent explained variability
+            var wave_var = msg.w < 0 ? "---" : (msg.w*100).toFixed(3)     
+            $trow.append($("<td></td>").text(wave_var));
             
             // appeand row to output table
             $trow.appendTo(this.$output);
@@ -48,6 +49,7 @@ function RunTab() {
 
         clearOutput: function() {
             this.$output.empty();
+            this.displayTimestep(0);
         },
 
         displayTimestep: function(t) {
