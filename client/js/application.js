@@ -147,7 +147,7 @@ function onUpdate(timestep) {
             mapInterface.updateDisplay(resp.grid, resp.cem_shoreline);
         }
         if (resp.ee_shoreline.length > 0) {
-            mapInterface.displayShoreline(gridTab.shoreline, resp.ee_shoreline);
+            mapInterface.displayShoreline(mapInterface.geeShoreline, resp.ee_shoreline);
         }
 
         runTab.updateOutput(resp.results, new_time);

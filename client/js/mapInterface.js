@@ -34,6 +34,10 @@ function MapInterface() {
         modelSource: null,
         shorelineSource: null,
 
+        refShoreline: null,
+        cemShoreline: null,
+        geeShoreline: null,
+
         drawingMode: false,
         editMode: false,
         draw: null,
@@ -64,71 +68,25 @@ function MapInterface() {
                 }
             });
 
-            this.map.on("click", (e) => {
-                if (this.editMode) {
-                    this.map.forEachFeatureAtPixel(e.pixel, (feature, layer) => {
-                        // no-op if feature is in a different layer
-                        if (layer.getZIndex() != 4) { return; }
-                        //this.editCellFeature(feature);
-                        modal.open(feature);
-                    });
-                }
-            });
-
-            // create box source
-            this.boundsSource = new ol.source.Vector({});           
-            
-            // create grid source
-            this.gridSource = new ol.source.Vector({});
-
-            // add to map
-            var gridLayer = new ol.layer.Vector({source: this.gridSource, 
-                style: function(feature, resolution) {
-                    return feature.get('style');
-                }
-            });
-            gridLayer.setZIndex(3);
-            this.map.addLayer(gridLayer);      
-             
-            // create CEM sources
-            this.modelSource = new ol.source.Vector({});
-            this.shorelineSource = new ol.source.Vector({});
-
-            // add to map
-            var modelLayer = new ol.layer.Vector({source: this.modelSource, 
-                style: function(feature, resolution) {
-                    return feature.get('style');
-                }});
-            modelLayer.setZIndex(4);
-            this.map.addLayer(modelLayer);
-
-            var shorelineLayer = new ol.layer.Vector({
-                source: this.shorelineSource,
-                style: function(feature, resolution) {
-                    return feature.get('style');
-                }
-            });
-            shorelineLayer.setZIndex(5);
-            this.map.addLayer(shorelineLayer)
-
-            // create Bing Maps layer
-            var bingLayer = new ol.layer.Tile({
+            // LAYER 0: Bing Maps
+            this.map.addLayer(new ol.layer.Tile({
                 visible: true,
                 preload: Infinity,
                 source: new ol.source.BingMaps({
                     key: 'Am3Erq9Ut-VwSCA-xAUa8RoLu_jFgJwrK5zu0d81AWJkBwwOEr6DSSvzbi7b70e_',
                     imagerySet: 'aerial'
                 })
-            });
-            this.map.addLayer(bingLayer);
+            }));
+
+            // LAYER 1: domain boundaries
+            this.boundsSource = new ol.source.Vector({});  
 
             // craete draw function
-            var that = this;
-            geometryFunction = function (coordinates, geometry) {
+            geometryFunction = (coordinates, geometry) => {
                 var first = coordinates[0];
                 var last = coordinates[1];
 
-                var coordinates = that.getRectangleVertices(first, last);
+                var coordinates = this.getRectangleVertices(first, last);
                 if (!geometry) {
                     geometry = new ol.geom.Polygon([coordinates]);
                 } else {
@@ -139,7 +97,7 @@ function MapInterface() {
 
             // add drawing interaction
             this.draw = new ol.interaction.Draw({
-                source: that.boundsSource,
+                source: this.boundsSource,
                 type: 'Circle',
                 geometryFunction: geometryFunction
             });
@@ -147,15 +105,83 @@ function MapInterface() {
             // When a drawing ends, save geometry
             this.boundsSource.on('addfeature', (evt) => {
                 var feature = evt.feature;
-                that.box = feature.getGeometry();
+                this.box = feature.getGeometry();
                 gridTab.onBoxDrawn();
                 this.drawGrid();
                 this.toggleDrawMode();
             });
             
-            // add layer
             this.map.addLayer(new ol.layer.Vector({
                 source: this.boundsSource
+            }));
+            
+            // LAYER 2: grid lines
+            this.gridSource = new ol.source.Vector({});
+            this.map.addLayer(new ol.layer.Vector({source: this.gridSource, 
+                style: function(feature, resolution) {
+                    return feature.get('style');
+                }
+            }));      
+             
+            // LAYER 3: CEM values
+            this.modelSource = new ol.source.Vector({});
+            this.map.addLayer(new ol.layer.Vector({source: this.modelSource, 
+                style: function(feature, resolution) {
+                    return feature.get('style');
+                },
+                id: "modelLayer"
+            }));
+            
+            // add edit on click function
+            this.map.on("click", (e) => {
+                if (this.editMode) {
+                    this.map.forEachFeatureAtPixel(e.pixel, (feature, layer) => {
+                        // no-op if feature is in a different layer
+                        if (layer.getId() != "modelLayer") { return; }
+                        //this.editCellFeature(feature);
+                        modal.open(feature);
+                    });
+                }
+            });       
+
+            // LAYER 4: shoreline vectors
+            this.shorelineSource = new ol.source.Vector({});
+            this.refShoreline = new ol.Feature({
+                geometry: new ol.geom.LineString([]),
+                style: new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: 'black',
+                        width: 1.2
+                    })
+                }),
+                id: 0
+            });
+            this.cemShoreline = new ol.Feature({
+                geometry: new ol.geom.LineString([]),
+                style: new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: 'red',
+                        width: 1.2
+                    })
+                }),
+                id: 1
+            });
+            this.geeShoreline = new ol.Feature({
+                geometry: new ol.geom.LineString([]),
+                style: new ol.style.Style({
+                    stroke: new ol.style.Stroke({
+                        color: 'blue',
+                        width: 1.2
+                    })
+                }),
+                id: 2
+            });
+
+            this.map.addLayer(new ol.layer.Vector({
+                source: this.shorelineSource,
+                style: function(feature, resolution) {
+                    return feature.get('style');
+                }
             }));
         },
 
@@ -209,7 +235,10 @@ function MapInterface() {
                             })
                     }));
                 }
-            }
+            }            
+            this.modelSource.refresh();
+
+            // draw shoreline
             if (shoreline) {
                 var upper_left = this.polyGrid[0][0][0];
                 var lower_left = this.polyGrid[0][0][3];
@@ -221,48 +250,25 @@ function MapInterface() {
                     // get coordinates
                     var c = i;
                     var r = Math.floor(shoreline[i]);
-                    var frac_full = shoreline[i]%1;
+                    var frac_full = shoreline[i] -r;
                     var lower_left = this.polyGrid[r][c][3];
                     var lower_right = this.polyGrid[r][c][2];
                     var lon = (lower_left[0] + lower_right[0])/2 + dist_lon*(1 - frac_full);
                     var lat = (lower_left[1] + lower_right[1])/2 + dist_lat*(1 - frac_full);
                     coords.push([lon, lat]);
                 }
-                // make polyline
-                this.modelSource.addFeature(new ol.Feature({
-                    geometry: new ol.geom.LineString(coords),
-                    style: new ol.style.Style({
-                        stroke: new ol.style.Stroke({
-                            color: 'red',
-                            width: 1.5
-                        })
-                    })
-                }));
+                this.cemShoreline.setGeometry(new ol.geom.LineString(coords));
+                if (!this.shorelineSource.hasFeature(this.cemShoreline)) {
+                    this.shorelineSource.addFeature(this.cemShoreline);
+                }
+                this.shorelineSource.refresh();
             }
-            this.modelSource.refresh();
         },
 
-        displayShoreline: function(ref_shoreline, shoreline=null) {
-            this.shorelineSource.clear()
-            this.shorelineSource.addFeature(new ol.Feature({
-                geometry: new ol.geom.LineString(ref_shoreline),
-                style: new ol.style.Style({
-                    stroke: new ol.style.Stroke({
-                        color: 'black',
-                        width: 1.2
-                    })
-                })
-            }));
-            if (shoreline) {
-                this.shorelineSource.addFeature(new ol.Feature({
-                    geometry: new ol.geom.LineString(shoreline),
-                    style: new ol.style.Style({
-                        stroke: new ol.style.Stroke({
-                            color: 'blue',
-                            width: 1.2
-                        })
-                    })
-                }));
+        displayShoreline: function(feature, shoreline) {
+            feature.setGeometry(new ol.geom.LineString(shoreline));
+            if (!this.shorelineSource.hasFeature(feature)) {
+                this.shorelineSource.addFeature(feature);
             }
             this.shorelineSource.refresh();
         },
