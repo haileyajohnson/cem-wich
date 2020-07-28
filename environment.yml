@@ -16,7 +16,6 @@ dependencies:
   - decorator
   - freetype
   - giflib
-  - icc_rt
   - imagecodecs
   - imageio
   - intel-openmp
@@ -62,10 +61,7 @@ dependencies:
   - tk
   - toolz
   - tornado
-  - vc
-  - vs2015_runtime
   - wheel
-  - wincertstore
   - xz
   - yaml
   - zfp
