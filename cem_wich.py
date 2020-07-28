@@ -44,10 +44,6 @@ current_date = None
 # start application
 @app.route("/")
 def startup():
-    service_account = 'cem-ee-utility@cem-ee-utility.iam.gserviceaccount.com'    
-    credentials = ee.ServiceAccountCredentials(service_account, '../private_key.json')
-    ee.Initialize(credentials)
-    # eehelpers.init_projections()
     distDir = []
     for filename in os.listdir('_dist'):
         if filename.endswith(".js"):
@@ -345,5 +341,8 @@ def handle_generic_exception(e):
 ############################
 # run app
 ############################
-if __name__ == "__main__":
+if __name__ == "__main__":    
+    service_account = 'cem-ee-utility@cem-ee-utility.iam.gserviceaccount.com'    
+    credentials = ee.ServiceAccountCredentials(service_account, '../private_key.json')
+    ee.Initialize(credentials)
     app.run(host="localhost", port=8080)

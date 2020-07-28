@@ -3,7 +3,6 @@ import numpy as np
 import math
 from skimage import filters
 from scipy.ndimage import gaussian_filter1d
-import cv2
 
 from server.pyfiles import globals
 

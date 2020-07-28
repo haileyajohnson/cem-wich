@@ -13,7 +13,8 @@ const clean = require('gulp-clean');
 // File paths
 const files = { 
   scssPath: 'client/scss/**/*.scss',
-  jsPath: 'client/js/**/*.js'
+  jsPath: 'client/js/**/*.js',
+  staticPath: 'client/static/**/*'
 }
 
 // Sass task: compiles the style.scss file into style.css
@@ -36,6 +37,12 @@ function jsTask(){
   );
 }
 
+// static task: move static resources to _dist
+function staticTask(){
+  return src(files.staticPath)
+    .pipe(dest('_dist'));
+}
+
 // serves files without concat and minify
 function debugTask() {
   return src(files.jsPath)
@@ -51,11 +58,11 @@ function cleanTask() {
 // production build task
 exports.build = series(
     cleanTask,
-    parallel(scssTask, jsTask)
+    parallel(scssTask, jsTask), staticTask
   );
 
 // dev build task
 exports.debug = series(
     cleanTask,
-    parallel(scssTask, debugTask)
+    parallel(scssTask, debugTask, staticTask)
 );
