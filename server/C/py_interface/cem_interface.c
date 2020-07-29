@@ -26,7 +26,7 @@ int run_test(Config config, int numTimesteps, int saveInterval)
 		test_OutputGrid();
 		i += saveInterval;
 	}
-	if (cem_finalize(config) != 0) { return FAILURE; }
+	if (cem_finalize() != 0) { return FAILURE; }
 	return SUCCESS;
 }
 
