@@ -401,7 +401,7 @@ void FixBeach(struct BeachGrid* grid)
 				// distribute to beach neighbors
 				if (total_sed > 0)
 				{
-					double delta_fill = min(1 - curr->frac_full, total_sed);
+					double delta_fill = (1 - curr->frac_full) < total_sed ? (1 - curr->frac_full) : total_sed;
 					curr->frac_full += delta_fill;
 					for (j = 0; j < 4; j++)
 					{
