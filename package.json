@@ -33,7 +33,7 @@
     "scipy": "^0.1.4"
   },
   "dependencies": {
-    "browserslist": "^4.12.2",
+    "browserslist": "^4.16.5",
     "caniuse-lite": "^1.0.30001090"
   }
 }
